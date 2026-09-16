@@ -1,0 +1,28 @@
+---
+description: Quy tắc chống tái phát lỗi dựng hình THCS của geo-draw
+alwaysApply: true
+---
+
+# Geo-draw: bộ nhớ lỗi đã sửa
+
+- Mọi thay đổi phải bảo toàn đầy đủ dữ kiện và đối tượng được nêu trong đề.
+- Tam giác đều phải có ba cạnh bằng nhau thật và được kiểm tra số trước khi render; không tự vẽ vạch cạnh.
+- Nền bản vẽ màu trắng; nét, điểm, nhãn và ký hiệu màu đen.
+- Mọi đường hình học dùng nét liền; đoạn thẳng không có mũi tên.
+- Ký hiệu góc đa giác phải nằm trong hình và chỉ xuất hiện một lần cho mỗi góc.
+- Hai góc khác số đo dùng số cung khác nhau; hai góc bằng nhau dùng cùng kiểu cung.
+- Khi một đỉnh có nhiều góc con, tự ghi số 1, 2 sát các cung để phân biệt.
+- Tia phân giác phải là một nét liền từ đỉnh qua các giao điểm đến cạnh biên đầu tiên của hình.
+- Chỉ vẽ ô vuông cho quan hệ vuông góc thuộc dữ kiện; kết luận cần chứng minh không được tự gắn ký hiệu.
+- Một quan hệ vuông góc đã cho chỉ có một ô vuông; các quan hệ đã cho khác nhau có ô riêng.
+- Các đoạn bằng nhau dùng cùng số vạch; các nhóm không bằng nhau không được dùng chung kiểu.
+- Mỗi dữ kiện trung điểm phải đánh dấu đúng cả hai nửa; không chồng thêm bộ vạch khác lên chúng.
+- Nếu một nửa đoạn trung điểm chứa thêm điểm có tên, ẩn cả hai vạch và chỉ kiểm tra bằng tọa độ.
+- Trung điểm của hai đoạn bằng nhau dùng cùng kiểu; quan hệ trung điểm độc lập dùng kiểu khác.
+- Không tự đánh dấu cạnh bằng nhau của hình bình hành, chữ nhật, vuông hoặc thoi nếu đề không yêu cầu.
+- Ký hiệu song song chỉ để kiểm chứng, không vẽ mũi tên lên đoạn thẳng.
+- Đường thẳng phải được kéo dài tới giao điểm ngoài đoạn khi đề nói chúng cắt nhau tại đó.
+- Mọi điểm trong đề phải được dựng, chấm và ghi tên; nhãn không được chạm đường, phần kéo dài hoặc ký hiệu.
+- Nhãn giao điểm trong như E, F, G, H phải gần chấm điểm, không bị đẩy sang vùng xa.
+- Hình và các điểm phụ phải cân đối, đủ thoáng, không tràn khung và vẫn zoom được.
+- Dùng các helper đã kiểm chứng; thêm kiểm thử hồi quy cho mọi lỗi hình học mới được sửa.
