@@ -4,9 +4,13 @@ from unittest.mock import patch
 from geo_draw.ai_codegen import (
     AiSettings,
     SYSTEM_PROMPT,
+    _drawing_facts_text,
     _ensure_light_theme,
+    _ordinary_polygons,
     extract_problem_from_image,
     extract_python,
+    generate_manim_code,
+    missing_reference_figure_points,
     sanitize_code,
     validate_code,
 )
@@ -24,6 +28,63 @@ class GeoScene(Scene):
 
 
 class AiCodegenTests(unittest.TestCase):
+    def test_multiline_proof_goals_are_not_drawing_facts(self):
+        problem = (
+            "Trong Hình 12, cho biết ABCD là một hình vuông. Chứng minh rằng:\n"
+            "a/ Tứ giác EFGH có ba góc vuông.\n"
+            "b/ HE = HG.\n"
+            "c/ Tứ giác EFGH là một hình vuông."
+        )
+        facts = _drawing_facts_text(problem)
+        self.assertIn("ABCD", facts)
+        self.assertNotIn("HE = HG", facts)
+        self.assertNotIn("EFGH", facts)
+        self.assertEqual(missing_reference_figure_points(problem), ["E", "F", "G", "H"])
+        self.assertEqual(_ordinary_polygons(problem), [])
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_missing_referenced_figure_stops_before_ai_generation(self, request_chat):
+        problem = (
+            "Trong Hình 12, cho biết ABCD là một hình vuông. "
+            "Chứng minh rằng: a/ Tứ giác EFGH có ba góc vuông. b/ HE = HG."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="test-key"), False)
+        self.assertFalse(result.ok)
+        self.assertIn("E, F, G, H", result.error)
+        request_chat.assert_not_called()
+
+    def test_visible_referenced_figure_description_supplies_points(self):
+        problem = (
+            "Trong Hình 12, ABCD là hình vuông. Chứng minh rằng EFGH là hình vuông.\n"
+            "Theo hình vẽ: E thuộc AB, F thuộc BC, G thuộc CD, H thuộc DA."
+        )
+        self.assertEqual(missing_reference_figure_points(problem), [])
+        self.assertIn("E thuộc AB", _drawing_facts_text(problem))
+
+    def test_proof_only_equality_marks_are_rejected_before_render(self):
+        problem = (
+            "Trong Hình 12, cho biết ABCD là một hình vuông. "
+            "Chứng minh rằng:\na/ EFGH có ba góc vuông.\nb/ HE = HG."
+        )
+        code = """from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import equal_segment_marks
+
+class GeoScene(Scene):
+    def construct(self):
+        A = np.array([0, 0, 0])
+        B = np.array([3, 0, 0])
+        C = np.array([3, 3, 0])
+        D = np.array([0, 3, 0])
+        E = np.array([1, 0, 0])
+        F = np.array([3, 1, 0])
+        G = np.array([1, 3, 0])
+        H = np.array([0, 1, 0])
+        self.add(equal_segment_marks((H, E), (H, G)))
+"""
+        with self.assertRaisesRegex(ValueError, "Không tự đánh dấu cạnh bằng nhau"):
+            validate_code(code, problem=problem)
+
     def test_rejects_oversized_raw_line_with_arithmetic_endpoints(self):
         code = SAFE_CODE.replace(
             "        self.add(Dot(a), Text(\"A\").next_to(a, UP))",
@@ -319,6 +380,38 @@ class GeoScene(Scene):
         self.assertIn(
             "from geo_draw.geometry_primitives import parallel_segment_marks",
             sanitized,
+        )
+
+    def test_plain_triangle_is_checked_without_restricting_auxiliary_rectangle(self):
+        problem = (
+            "Cho tam giác ABC có đường cao AH. Gọi I là trung điểm của AC, E là điểm đối xứng "
+            "với H qua I. Gọi M, N lần lượt là trung điểm của HC, CE. Các đường thẳng AM, AN "
+            "cắt HE tại G và K. Chứng minh tứ giác AHCE là hình chữ nhật."
+        )
+        self.assertEqual(_ordinary_polygons(problem), ["ABC"])
+        code = """from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        A = np.array([0, 4, 0])
+        B = np.array([-3, 0, 0])
+        C = np.array([3, 0, 0])
+        self.add(Line(A, B), Line(B, C), Line(C, A))
+        fit_scene_to_frame(self)
+"""
+        sanitized = sanitize_code(code, animate=False, problem="Cho tam giác ABC.")
+        self.assertIn("ordinary_polygon_check((A, B, C), names='ABC'", sanitized)
+        self.assertEqual(sanitized.count("ordinary_polygon_check((A, B, C)"), 1)
+
+    def test_explicit_special_polygon_does_not_get_ordinary_check(self):
+        self.assertEqual(_ordinary_polygons("Cho tam giác cân ABC tại A."), [])
+        self.assertEqual(_ordinary_polygons("Cho tam giác ABC vuông tại B."), [])
+        self.assertEqual(_ordinary_polygons("Cho hình chữ nhật ABCD."), [])
+        self.assertEqual(
+            _ordinary_polygons("Cho tứ giác ABCD. Chứng minh tứ giác ABCD là hình chữ nhật."),
+            [],
         )
 
     def test_rejects_unrequested_angle_markers(self):

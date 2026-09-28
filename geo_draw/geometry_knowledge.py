@@ -19,6 +19,11 @@ DRAWING_ERROR_MEMORY = r"""
 NON-REGRESSION MEMORY -- previously corrected drawing failures:
 - Always use a white canvas and black strokes, dots, labels, and construction marks.
 - Preserve every stated object and condition when later auxiliary objects are added.
+- Treat every a/b/c item after "Chứng minh" as a conclusion, even across line breaks. Never
+  put equality ticks on HE and HG merely because the exercise asks students to prove HE=HG.
+- If a problem refers to a numbered figure but only the text is available, do not invent the
+  positions of unnamed-in-givens points such as E, F, G, H. Ask for the actual figure or its
+  precise point/line relations before generating geometry.
 - Display each explicitly given numerical segment length once, close to but not touching its
   segment; never omit its unit or invent measurements that the problem does not state.
 - Use only solid strokes. A finite segment has no arrowhead, including parallel segments.
@@ -47,6 +52,8 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   Manim units); do not push them into unrelated regions merely to avoid a stroke.
 - Keep auxiliary points readable and balanced: neither crowded nor excessively spread out. Fit
   the complete figure and exterior labels inside the frame; preserve interactive zoom.
+- A plain triangle or quadrilateral must not accidentally become isosceles, right, a kite, a
+  trapezoid, or a parallelogram unless a stated condition forces that special case.
 - A generated scene that violates any item above is invalid and must be regenerated, not rendered.
 """
 

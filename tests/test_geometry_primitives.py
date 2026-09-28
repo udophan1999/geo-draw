@@ -15,6 +15,7 @@ from geo_draw.geometry_primitives import (
     line_through_intersection,
     layout_spacing_check,
     midpoint_marker,
+    ordinary_polygon_check,
     parallel_segment_marks,
     perpendicular_bisector,
     perpendicular_intersection_marker,
@@ -102,6 +103,45 @@ class GeometryPrimitiveTests(unittest.TestCase):
                 np.array([-1.0, 0.0, 0.0]),
                 np.array([2.0, 0.0, 0.0]),
             )
+
+    def test_ordinary_triangle_rejects_unstated_isosceles_and_right_shapes(self):
+        with self.assertRaisesRegex(ValueError, "Tam giác ABC gần cân"):
+            ordinary_polygon_check(
+                (np.array([0.0, 4.0, 0.0]), np.array([-3.0, 0.0, 0.0]),
+                 np.array([3.0, 0.0, 0.0])),
+                names="ABC",
+            )
+        with self.assertRaisesRegex(ValueError, "gần vuông"):
+            ordinary_polygon_check(
+                (np.array([0.0, 3.0, 0.0]), np.array([0.0, 0.0, 0.0]),
+                 np.array([4.0, 0.0, 0.0])),
+                names="ABC",
+            )
+        ordinary_polygon_check(
+            (np.array([-1.0, 2.5, 0.0]), np.array([-3.0, 0.0, 0.0]),
+             np.array([4.0, 0.0, 0.0])),
+            names="ABC",
+        )
+
+    def test_ordinary_triangle_allows_only_stated_special_relations(self):
+        ordinary_polygon_check(
+            (np.array([0.0, 4.0, 0.0]), np.array([-3.0, 0.0, 0.0]),
+             np.array([3.0, 0.0, 0.0])),
+            names="ABC", allowed_equal_pairs=(("AB", "AC"),),
+        )
+        ordinary_polygon_check(
+            (np.array([0.0, 3.0, 0.0]), np.array([0.0, 0.0, 0.0]),
+             np.array([4.0, 0.0, 0.0])),
+            names="ABC", allowed_right_vertices=("B",),
+        )
+
+    def test_ordinary_quadrilateral_rejects_unstated_parallel_sides(self):
+        points = (
+            np.array([-2.0, 1.0, 0.0]), np.array([2.0, 1.0, 0.0]),
+            np.array([3.0, -1.0, 0.0]), np.array([-1.0, -1.0, 0.0]),
+        )
+        with self.assertRaisesRegex(ValueError, "gần vuông|gần hình diều|gần hình bình hành|gần.*song song"):
+            ordinary_polygon_check(points, names="ABCD")
 
     def setUp(self):
         self.a = np.array([-2.0, 1.0, 0.0])

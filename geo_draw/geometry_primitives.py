@@ -231,6 +231,95 @@ def equilateral_triangle_check(first, second, third, tolerance: float = 0.01):
     return True
 
 
+def ordinary_polygon_check(vertices, names: str, allowed_equal_pairs=(),
+                           allowed_right_vertices=(), allowed_parallel_pairs=(),
+                           side_gap: float = 0.06, right_gap_degrees: float = 7.0,
+                           parallel_sine_gap: float = 0.08):
+    """Reject an unstated special case in a named ordinary triangle/quadrilateral.
+
+    This checks only the original polygon, not auxiliary polygons that the
+    exercise asks the student to prove special. Explicitly stated relations can
+    be exempted without weakening checks on unrelated sides or vertices.
+    """
+    points = [_point(vertex) for vertex in vertices]
+    if len(points) not in (3, 4) or len(names) != len(points):
+        raise ValueError("ordinary_polygon_check cần ba hoặc bốn đỉnh có tên.")
+    if len(set(names)) != len(names):
+        raise ValueError("Các đỉnh của đa giác phải khác nhau.")
+
+    n = len(points)
+    sides = [points[(i + 1) % n] - points[i] for i in range(n)]
+    lengths = [float(np.linalg.norm(side[:2])) for side in sides]
+    scale = max(lengths)
+    if min(lengths) < EPS or abs(_cross2(points[1] - points[0], points[2] - points[0])) < EPS * scale * scale:
+        raise ValueError("Đa giác ban đầu bị suy biến.")
+
+    edge_names = [names[i] + names[(i + 1) % n] for i in range(n)]
+
+    def edge_key(name: str) -> str:
+        return "".join(sorted(name.upper()))
+
+    allowed_equals = {
+        frozenset((edge_key(left), edge_key(right)))
+        for left, right in allowed_equal_pairs
+    }
+
+    def equal_unstated(i: int, j: int) -> bool:
+        if abs(lengths[i] - lengths[j]) > side_gap * scale:
+            return False
+        return frozenset((edge_key(edge_names[i]), edge_key(edge_names[j]))) not in allowed_equals
+
+    def sides_nearly_equal(i: int, j: int) -> bool:
+        return abs(lengths[i] - lengths[j]) <= side_gap * scale
+
+    if n == 3:
+        if any(equal_unstated(i, j) for i in range(3) for j in range(i + 1, 3)):
+            raise ValueError(
+                f"GEOMETRY_ACCIDENTAL_SPECIAL: Tam giác {names} gần cân/đều dù đề không cho; "
+                "hãy đổi tọa độ tam giác gốc rồi tính lại các điểm phụ."
+            )
+    else:
+        # An ordinary quadrilateral may have one equal-side pair by chance.
+        # Two matching pairs, however, suggest a kite or parallelogram.
+        special_equal_patterns = (((0, 1), (2, 3)), ((0, 3), (1, 2)), ((0, 2), (1, 3)))
+        if any(all(sides_nearly_equal(i, j) for i, j in pattern)
+               and any(equal_unstated(i, j) for i, j in pattern)
+               for pattern in special_equal_patterns):
+            raise ValueError(
+                f"GEOMETRY_ACCIDENTAL_SPECIAL: Tứ giác {names} gần hình diều/hình bình hành "
+                "dù đề không cho; hãy đổi tọa độ tứ giác gốc."
+            )
+
+    allowed_rights = {name.upper() for name in allowed_right_vertices}
+    right_limit = float(np.sin(np.deg2rad(right_gap_degrees)))
+    for i, vertex in enumerate(points):
+        before = points[(i - 1) % n] - vertex
+        after = points[(i + 1) % n] - vertex
+        cosine = float(np.dot(before[:2], after[:2])) / (
+            float(np.linalg.norm(before[:2])) * float(np.linalg.norm(after[:2]))
+        )
+        if abs(cosine) < right_limit and names[i] not in allowed_rights:
+            raise ValueError(
+                f"GEOMETRY_ACCIDENTAL_SPECIAL: Góc {names[i]} của đa giác {names} gần vuông "
+                "dù đề không cho; hãy đổi tọa độ các đỉnh gốc."
+            )
+
+    if n == 4:
+        allowed_parallels = {
+            frozenset((edge_key(left), edge_key(right)))
+            for left, right in allowed_parallel_pairs
+        }
+        for i, j in ((0, 2), (1, 3)):
+            sine = abs(_cross2(sides[i], sides[j])) / (lengths[i] * lengths[j])
+            relation = frozenset((edge_key(edge_names[i]), edge_key(edge_names[j])))
+            if sine < parallel_sine_gap and relation not in allowed_parallels:
+                raise ValueError(
+                    f"GEOMETRY_ACCIDENTAL_SPECIAL: Tứ giác {names} có hai cạnh đối gần "
+                    "song song dù đề không cho; hãy đổi tọa độ các đỉnh gốc."
+                )
+    return True
+
+
 def midpoint_marker(midpoint, start, end, other_points=(), **mark_style):
     """Verify a midpoint and omit ambiguous ticks when another named point splits a half."""
     midpoint, start, end = _point(midpoint), _point(start), _point(end)

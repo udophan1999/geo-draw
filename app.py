@@ -12,6 +12,7 @@ from geo_draw.ai_codegen import (
     extract_problem_from_image,
     generate_manim_code,
     load_dotenv,
+    missing_reference_figure_points,
     settings_from_env,
 )
 from geo_draw.engine import build_figure
@@ -548,7 +549,6 @@ def _display_saved_render() -> bool:
             st.session_state["last_animate"] = False
     if not image_path.is_file() or not scene_path.is_file():
         return False
-    st.write(st.session_state.get("last_summary", "Manim"))
     _manual_editor(
         scene_path,
         st.session_state.get("last_quality", "l"),
@@ -664,9 +664,7 @@ def main() -> None:
         height=160,
         key="problem",
     )
-    left, right = st.columns([1, 1])
-    with left:
-        draw = st.button("Vẽ hình", type="primary")
+    draw = st.button("Vẽ hình", type="primary")
 
     if not draw:
         if not _display_saved_render():
@@ -675,6 +673,16 @@ def main() -> None:
     if not text.strip():
         st.error("Chưa có đề bài.")
         return
+    if mode == "DeepSeek AI":
+        missing_points = missing_reference_figure_points(text)
+        if missing_points:
+            st.error(
+                "Đề nhắc đến hình minh họa nhưng chưa nêu vị trí các điểm "
+                + ", ".join(missing_points)
+                + ". Hãy dán ảnh có đầy đủ hình vẽ hoặc bổ sung các quan hệ "
+                "của những điểm này vào đề trước khi vẽ."
+            )
+            return
 
     st.session_state["label_offsets"] = {}
     st.session_state["manual_edits"] = {
@@ -700,9 +708,6 @@ def main() -> None:
         summary = f"DeepSeek AI · {model}"
     else:
         scene_path, summary = _parser_scene(text, animate)
-
-    with right:
-        st.write(summary)
 
     with st.spinner("Manim đang render..."):
         result = render_scene(

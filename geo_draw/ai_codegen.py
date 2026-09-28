@@ -136,6 +136,14 @@ Exact construction requirements:
   `parallel_segment_marks` verifier is mandatory for an explicit relation such as AB//CD or
   "song song", but its absence alone must not prevent rendering when only the standard shape name
   is given.
+- A plain "tam giác ABC" must look scalene and non-right; a plain "tứ giác ABCD" must not
+  accidentally look like a trapezoid, parallelogram, rectangle, or kite. Avoid near-equalities,
+  near-right angles, and near-parallel opposite sides unless the givens require them. The app
+  automatically checks the original named polygon with `ordinary_polygon_check` before render.
+  If GEOMETRY_ACCIDENTAL_SPECIAL occurs, change the original vertex coordinates and recompute all
+  dependent points. Do not change or delete a stated condition. A special auxiliary polygon that
+  the problem asks students to prove (for example AHCE is a rectangle) must still be constructed
+  accurately; the ordinary-shape check applies only to the original ABC/ABCD.
 - For every stated equilateral triangle ABC, construct three genuinely equal side lengths and call
   `equilateral_triangle_check(A, B, C)` before rendering. This is an invisible numerical check;
   do not add side ticks unless the problem explicitly requests equality marks.
@@ -268,16 +276,38 @@ def extract_python(text: str) -> str:
 def _drawing_facts_text(problem: str) -> str:
     """Return givens and constructions while excluding proof conclusions."""
     facts = []
+    in_proof = False
+    in_figure_description = False
     for clause in re.split(r"[.;\n]+", problem):
+        clause = clause.strip()
+        if not clause:
+            continue
         parts = re.split(
             r"\b(?:chứng\s+minh|prove|show\s+that)\b",
             clause,
             maxsplit=1,
             flags=re.I,
         )
-        given = parts[0].strip()
-        if given:
-            facts.append(given)
+        if len(parts) == 2:
+            given = parts[0].strip()
+            if not in_proof and given:
+                facts.append(given)
+            in_proof = True
+        elif not in_proof:
+            facts.append(clause)
+        elif re.match(r"^theo\s+hình\s+vẽ\s*:", clause, re.I):
+            # OCR may append an explicit description of the referenced figure
+            # after all proof goals. This is source evidence, not a conclusion.
+            facts.append(clause)
+            in_figure_description = True
+        elif in_figure_description:
+            facts.append(clause)
+        elif re.match(r"^[a-z]\s*[)/]|^\d+\s*[)/]", clause, re.I) and re.search(
+            r"\b(?:kẻ|vẽ|dựng|gọi|lấy|cho\s+điểm)\b", clause, re.I,
+        ):
+            # A later exercise part can introduce a new construction.
+            facts.append(clause)
+            in_proof = False
         # A theorem of the form "chứng minh rằng nếu X thì Y" uses X as an
         # additional hypothesis.  Keep that antecedent for the diagram while
         # still excluding the conclusion Y.
@@ -290,6 +320,22 @@ def _drawing_facts_text(problem: str) -> str:
             if conditional:
                 facts.append(conditional.group(1).strip(" ,:"))
     return ". ".join(facts)
+
+
+def missing_reference_figure_points(problem: str) -> list[str]:
+    """Find proof-only points whose placement depends on an unseen numbered figure."""
+    if not re.search(r"\b(?:trong|theo|xem)\s+hình\s*\d+\b", problem, re.I):
+        return []
+    proof = re.search(r"\b(?:chứng\s+minh|prove|show\s+that)\b", problem, re.I)
+    if not proof:
+        return []
+    givens = _drawing_facts_text(problem)
+    given_tokens = re.findall(r"(?<![A-Z])([A-Z]{2,6})(?![A-Z])", givens)
+    goal_tokens = re.findall(r"(?<![A-Z])([A-Z]{2,6})(?![A-Z])", problem[proof.end():])
+    given_points = {point for token in given_tokens for point in token}
+    given_points.update(re.findall(r"\b[A-Z]\b", givens))
+    goal_points = {point for token in goal_tokens for point in token}
+    return sorted(goal_points - given_points)
 
 
 def validate_code(code: str, problem: str | None = None) -> None:
@@ -1427,10 +1473,166 @@ def _ensure_explicit_parallel_verifiers(code: str, problem: str | None) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _ordinary_polygons(problem: str | None) -> list[str]:
+    """Find original polygons described without a special type in the givens."""
+    if not problem:
+        return []
+    facts = _drawing_facts_text(problem)
+    found = []
+    for kind, size in (("tam\\s+giác", 3), ("tứ\\s+giác", 4)):
+        pattern = rf"\b{kind}\s+(?:\\?\(\s*)?([A-Z]{{{size}}})(?![A-Z])"
+        for match in re.finditer(pattern, facts, re.I):
+            names = match.group(1).upper()
+            if len(set(names)) != size or names in found:
+                continue
+            if size == 3:
+                special = (
+                    rf"tam\s+giác\s+(?:cân|đều|vuông)\s+{names}\b",
+                    rf"tam\s+giác\s+{names}\s+(?:là\s+)?(?:cân|đều|vuông)\b",
+                )
+            else:
+                special = (
+                    rf"(?:tứ\s+giác\s+)?{names}\s+là\s+hình\s+"
+                    r"(?:thang|bình\s+hành|chữ\s+nhật|vuông|thoi|diều)\b",
+                )
+            if not any(re.search(special_pattern, problem, re.I) for special_pattern in special):
+                found.append(names)
+    return found
+
+
+def _ensure_ordinary_polygon_checks(code: str, problem: str | None) -> str:
+    """Insert trusted numerical checks for ordinary base polygons, not proof goals."""
+    polygons = _ordinary_polygons(problem)
+    if not polygons:
+        return code
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    scene_class = next(
+        (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GeoScene"),
+        None,
+    )
+    construct = next(
+        (node for node in (scene_class.body if scene_class else [])
+         if isinstance(node, ast.FunctionDef) and node.name == "construct"),
+        None,
+    )
+    if construct is None:
+        return code
+    defined = {
+        target.id
+        for node in ast.walk(construct)
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(target, ast.Name) and re.fullmatch(r"[A-Z]", target.id)
+    }
+    fit_call = next(
+        (node for node in ast.walk(construct)
+         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+         and node.func.id == "fit_scene_to_frame"),
+        None,
+    )
+    if fit_call is None:
+        return code
+
+    facts = _drawing_facts_text(problem or "")
+    equality_pairs = [
+        (match.group(1).upper(), match.group(2).upper())
+        for match in re.finditer(
+            r"\b([A-Z]{2})\s*(?:=|bằng)\s*([A-Z]{2})\b", facts, re.I,
+        )
+    ]
+    measured = [
+        (match.group(1).upper(), float(match.group(2).replace(",", ".")))
+        for match in re.finditer(
+            r"\b([A-Z]{2})\s*(?:=|bằng)\s*(\d+(?:[.,]\d+)?)", facts, re.I,
+        )
+    ]
+    for index, (first, value) in enumerate(measured):
+        for second, other_value in measured[index + 1:]:
+            if abs(value - other_value) < 1e-9:
+                equality_pairs.append((first, second))
+    right_vertices = {
+        match.group(1).upper()
+        for match in re.finditer(r"\bvuông\s+tại\s+([A-Z])\b", facts, re.I)
+    }
+    right_vertices.update(
+        match.group(1).upper()
+        for match in re.finditer(
+            r"\bgóc\s+([A-Z])\s*(?:=|bằng)\s*90\s*(?:°|độ)?", facts, re.I,
+        )
+    )
+    for match in re.finditer(
+        r"\b([A-Z]{2})\s*(?:vuông\s+góc\s+với|⊥|\\perp)\s*([A-Z]{2})\b",
+        facts, re.I,
+    ):
+        shared = set(match.group(1).upper()) & set(match.group(2).upper())
+        if len(shared) == 1:
+            right_vertices.update(shared)
+    parallel_pairs = _explicit_parallel_relations(problem)
+    already_checked = {
+        keyword.value.value
+        for node in ast.walk(construct)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "ordinary_polygon_check"
+        for keyword in node.keywords
+        if keyword.arg == "names" and isinstance(keyword.value, ast.Constant)
+        and isinstance(keyword.value.value, str)
+    }
+
+    checks = []
+    for names in polygons:
+        if not set(names) <= defined or names in already_checked:
+            continue
+        edges = {
+            "".join(sorted((names[i], names[(i + 1) % len(names)])))
+            for i in range(len(names))
+        }
+        allowed_equals = [
+            pair for pair in equality_pairs
+            if all("".join(sorted(edge)) in edges for edge in pair)
+        ]
+        allowed_parallels = [
+            pair for pair in parallel_pairs
+            if all("".join(sorted(edge)) in edges for edge in pair)
+        ]
+        allowed_rights = tuple(name for name in names if name in right_vertices)
+        vertices = ", ".join(names)
+        checks.append(
+            f"ordinary_polygon_check(({vertices}), names={names!r}, "
+            f"allowed_equal_pairs={tuple(allowed_equals)!r}, "
+            f"allowed_right_vertices={allowed_rights!r}, "
+            f"allowed_parallel_pairs={tuple(allowed_parallels)!r})"
+        )
+    if not checks:
+        return code
+
+    lines = code.rstrip().splitlines()
+    insertion_index = fit_call.lineno - 1
+    indent = re.match(r"\s*", lines[insertion_index]).group(0)
+    lines[insertion_index:insertion_index] = [f"{indent}{check}" for check in checks]
+    imports_helper = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "geo_draw.geometry_primitives"
+        and any(alias.name in {"ordinary_polygon_check", "*"} for alias in node.names)
+        for node in tree.body
+    )
+    if not imports_helper:
+        import_nodes = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+        import_index = max(node.end_lineno or node.lineno for node in import_nodes)
+        lines.insert(
+            import_index,
+            "from geo_draw.geometry_primitives import ordinary_polygon_check",
+        )
+    return "\n".join(lines) + "\n"
+
+
 def sanitize_code(code: str, animate: bool, problem: str | None = None) -> str:
     del animate
     code = code.strip() + "\n"
     code = _ensure_explicit_parallel_verifiers(code, problem)
+    code = _ensure_ordinary_polygon_checks(code, problem)
     validate_code(code, problem=problem)
     return code
 
@@ -1528,7 +1730,11 @@ def extract_problem_from_image(
                     "Đọc chính xác đề bài hình học trong ảnh. Chỉ trả về nguyên văn đề bài, "
                     "không giải, không nhận xét, không thêm Markdown. Giữ nguyên tên điểm, số đo, "
                     "đơn vị, ký hiệu bằng nhau, song song, vuông góc và thứ tự các ý a), b), c). "
-                    "Chuẩn hóa lỗi xuống dòng nhưng không tự bổ sung dữ kiện không nhìn thấy."
+                    "Chuẩn hóa lỗi xuống dòng nhưng không tự bổ sung dữ kiện không nhìn thấy. "
+                    "Nếu đề nhắc đến một Hình đánh số và hình đó cũng hiện rõ trong ảnh, "
+                    "sau nguyên văn đề bài thêm một dòng bắt đầu bằng 'Theo hình vẽ:' "
+                    "mô tả vị trí các điểm, đoạn và quan hệ nhìn thấy được. "
+                    "Không suy đoán quan hệ bị khuất hoặc hình không có trong ảnh."
                 ),
             },
             {
@@ -1554,12 +1760,23 @@ def extract_problem_from_image(
 
 def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None) -> AiResult:
+    missing_points = missing_reference_figure_points(problem)
+    if missing_points:
+        return AiResult(
+            code="", raw="", ok=False,
+            error=(
+                "Đề nhắc đến hình minh họa nhưng chưa nêu vị trí các điểm "
+                + ", ".join(missing_points)
+                + ". Hãy cung cấp hình vẽ đầy đủ hoặc mô tả vị trí các điểm trước khi vẽ."
+            ),
+        )
     mode = ("Use self.play animations and finish with self.wait(0.5)." if animate else
             "Do not use self.play. Add all mobjects with self.add(...) and finish with self.wait(0.1).")
     user = f"Animation mode: {mode}\n\nGeometry problem:\n{problem.strip()}"
     if repair_log:
         user += ("\n\nA previous render failed. Return a complete corrected module for the same problem. "
-                 "If GEOMETRY_LAYOUT_CROWDED appears, change the main figure coordinates and "
+                 "If GEOMETRY_LAYOUT_CROWDED or GEOMETRY_ACCIDENTAL_SPECIAL appears, "
+                 "change the main figure coordinates and "
                  "recompute every dependent point; never weaken or remove the layout check. "
                  "Fix this error and improve the previous module:\n" + repair_log[-12000:])
     messages = [
