@@ -1,7 +1,10 @@
 import base64
 import json
 import mimetypes
+import os
 import re
+import time
+import uuid
 from pathlib import Path
 
 import streamlit as st
@@ -17,13 +20,21 @@ from geo_draw.ai_codegen import (
 )
 from geo_draw.engine import build_figure
 from geo_draw.geometry_knowledge import GEOMETRY_HELP_VI
+from geo_draw.accounts import (
+    MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, AccountStore, normalize_name, valid_password,
+)
+from geo_draw.history import HistoryEntry, HistoryStore
 from geo_draw.parser import parse_problem
 from geo_draw.renderer import render_scene
 from geo_draw.scene_builder import write_scene
 
 ROOT = Path(__file__).resolve().parent
-GENERATED = ROOT / "generated"
-LAST_RENDER_STATE = GENERATED / "last_render.json"
+# GEO_DRAW_DATA_DIR lets test runs use a temporary folder instead of the real data.
+GENERATED = Path(os.environ.get("GEO_DRAW_DATA_DIR") or ROOT / "generated")
+USERS_DIR = GENERATED / "users"
+SESSIONS_DIR = GENERATED / "sessions"
+HISTORY = HistoryStore(USERS_DIR)
+ACCOUNTS = AccountStore(USERS_DIR)
 load_dotenv(ROOT / ".env")
 
 EXAMPLES = {
@@ -159,10 +170,222 @@ def _decode_clipboard_image(payload) -> tuple[bytes, str] | None:
     return image_bytes, mime_type
 
 
-def _parser_scene(text: str, animate: bool) -> tuple[Path, str]:
+def _empty_manual_edits() -> dict:
+    return {
+        "hidden_labels": [], "hidden_points": [], "hidden_segments": [],
+        "added_segments": [], "segment_widths": {}, "constructions": [],
+    }
+
+
+def _current_user_id() -> str | None:
+    # The URL keeps a random session token (?session=...), so a page reload stays signed in
+    # without putting the name itself in the URL, which would bypass the secret code.
+    if "user_id" not in st.session_state:
+        token = st.query_params.get("session", "")
+        user_id = ACCOUNTS.session_user(token)
+        st.session_state["user_id"] = user_id or ""
+        st.session_state["session_token"] = token if user_id else ""
+        if token and not user_id:
+            st.query_params.pop("session", None)
+    return st.session_state["user_id"] or None
+
+
+def _sign_in(user_id: str) -> None:
+    token = ACCOUNTS.start_session(user_id)
+    st.session_state["user_id"] = user_id
+    st.session_state["session_token"] = token
+    st.query_params["session"] = token
+    st.session_state.pop("anonymous_mode", None)
+    # Show this account's last drawing (if any) instead of the anonymous one.
+    st.session_state.pop("render_state_restored", None)
+    _clear_auth_messages()
+
+
+def _continue_anonymously() -> None:
+    st.session_state["anonymous_mode"] = True
+
+
+def _go_to_login() -> None:
+    st.session_state.pop("anonymous_mode", None)
+    _show_auth_view("login")
+
+
+def _clear_auth_messages() -> None:
+    for key in ("login_error", "register_error", "register_suggestions"):
+        st.session_state.pop(key, None)
+
+
+def _locked_message(seconds: int) -> str:
+    return f"Nhập sai quá nhiều lần. Hãy thử lại sau {-(-seconds // 60)} phút."
+
+
+def _submit_login() -> None:
+    _clear_auth_messages()
+    name = normalize_name(st.session_state.get("login_username", ""))
+    password = st.session_state.get("login_password", "")
+    st.session_state["login_password"] = ""
+    if not name or not password:
+        st.session_state["login_error"] = "Hãy nhập tên đăng nhập và mật khẩu."
+        return
+    locked = ACCOUNTS.locked_seconds(name)
+    user_id = None if locked else ACCOUNTS.verify(name, password)
+    if user_id is None:
+        locked = locked or ACCOUNTS.locked_seconds(name)
+        st.session_state["login_error"] = (
+            _locked_message(locked) if locked else "Sai tên đăng nhập hoặc mật khẩu."
+        )
+        return
+    _sign_in(user_id)
+
+
+def _submit_register() -> None:
+    _clear_auth_messages()
+    name = normalize_name(st.session_state.get("register_username", ""))
+    password = st.session_state.get("register_password", "")
+    confirm = st.session_state.get("register_password_confirm", "")
+    if not name:
+        st.session_state["register_error"] = "Hãy nhập tên đăng nhập."
+    elif ACCOUNTS.name_exists(name):
+        st.session_state["register_error"] = (
+            f"Tên đăng nhập «{name}» đã có người dùng. Hãy chọn một tên khác."
+        )
+        st.session_state["register_suggestions"] = ACCOUNTS.suggest_names(name)
+    elif not valid_password(password):
+        st.session_state["register_error"] = (
+            f"Mật khẩu phải có từ {MIN_PASSWORD_LENGTH} đến {MAX_PASSWORD_LENGTH} ký tự."
+        )
+    elif password != confirm:
+        st.session_state["register_error"] = "Hai lần nhập mật khẩu không khớp."
+    else:
+        try:
+            user_id = ACCOUNTS.create(name, password)
+        except ValueError as exc:  # Someone registered the same name a moment earlier.
+            st.session_state["register_error"] = str(exc)
+        else:
+            st.session_state["register_password"] = ""
+            st.session_state["register_password_confirm"] = ""
+            _sign_in(user_id)
+
+
+def _use_suggested_name(name: str) -> None:
+    st.session_state["register_username"] = name
+    st.session_state.pop("register_error", None)
+    st.session_state.pop("register_suggestions", None)
+
+
+def _logout() -> None:
+    ACCOUNTS.end_session(st.session_state.get("session_token", ""))
+    st.session_state["user_id"] = ""
+    st.session_state["session_token"] = ""
+    st.query_params.pop("session", None)
+    st.session_state.pop("anonymous_mode", None)
+    _show_auth_view("login")
+    # Shared classroom computers: don't leave the previous user's drawing on screen.
+    for key in ("problem", "last_scene_path", "last_image_path", "last_video_path",
+                "last_render_log", "last_summary"):
+        st.session_state.pop(key, None)
+
+
+def _show_auth_view(view: str) -> None:
+    st.session_state["auth_view"] = view
+    _clear_auth_messages()
+
+
+def _login_page() -> None:
+    """Entry screen shown before the main page until the user signs in or goes anonymous.
+
+    ``session_state["auth_view"]`` switches the card between "login" and "register".
+    """
+    view = st.session_state.setdefault("auth_view", "login")
+    # A fixed width keeps the card compact on wide screens (a column ratio grows with them).
+    page = st.container(horizontal_alignment="center")
+    with page, st.container(width=380):
+        st.space("small")
+        st.markdown(
+            "<div style='text-align:center'>"
+            "<div style='font-size:2.6rem;line-height:1'>📐</div>"
+            "<h1 style='padding:0.4rem 0 0.2rem'>geo-draw</h1>"
+            "<p style='opacity:0.65;margin:0'>Vẽ hình học THCS từ đề bài hoặc ảnh chụp</p>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.space("medium")
+        with st.container(border=True):
+            if view == "login":
+                _login_form()
+            else:
+                _register_form()
+        st.space("small")
+        with st.container(horizontal=True, horizontal_alignment="center"):
+            st.button("Dùng thử không cần tài khoản →", key="continue_anonymous",
+                      type="tertiary", on_click=_continue_anonymously)
+        st.markdown(
+            "<p style='text-align:center;opacity:0.55;font-size:0.85rem;margin-top:-0.6rem'>"
+            "Hình vẽ khi dùng thử sẽ không được lưu vào lịch sử.</p>",
+            unsafe_allow_html=True,
+        )
+
+
+def _login_form() -> None:
+    st.markdown("#### Đăng nhập")
+    st.caption("Đăng nhập để xem lại lịch sử hình đã vẽ.")
+    with st.form("login_form", border=False):
+        st.text_input("Tên đăng nhập", key="login_username", max_chars=40)
+        st.text_input("Mật khẩu", key="login_password", type="password",
+                      max_chars=MAX_PASSWORD_LENGTH)
+        st.form_submit_button("Đăng nhập", type="primary", width="stretch",
+                              on_click=_submit_login)
+    if st.session_state.get("login_error"):
+        st.error(st.session_state["login_error"])
+    with st.container(horizontal=True, horizontal_alignment="center",
+                      vertical_alignment="center", gap="xxsmall"):
+        st.caption("Chưa có tài khoản?", width="content")
+        st.button(":blue[Đăng ký ngay]", key="to_register", type="tertiary",
+                  on_click=_show_auth_view, args=("register",))
+
+
+def _register_form() -> None:
+    st.markdown("#### Tạo tài khoản")
+    st.caption("Tài khoản giúp lưu lại lịch sử hỏi đáp và hình đã vẽ.")
+    with st.form("register_form", border=False):
+        st.text_input("Tên đăng nhập", key="register_username", max_chars=40,
+                      placeholder="Ví dụ: an.nguyen.7a")
+        st.text_input("Mật khẩu", key="register_password", type="password",
+                      max_chars=MAX_PASSWORD_LENGTH,
+                      placeholder=f"Ít nhất {MIN_PASSWORD_LENGTH} ký tự")
+        st.text_input("Nhập lại mật khẩu", key="register_password_confirm",
+                      type="password", max_chars=MAX_PASSWORD_LENGTH)
+        st.form_submit_button("Đăng ký", type="primary", width="stretch",
+                              on_click=_submit_register)
+    if st.session_state.get("register_error"):
+        st.error(st.session_state["register_error"])
+    suggestions = st.session_state.get("register_suggestions", [])
+    if suggestions:
+        st.caption("Gợi ý tên còn trống (bấm để dùng):")
+        with st.container(horizontal=True):
+            for suggestion in suggestions:
+                st.button(suggestion, key=f"suggest_{suggestion}",
+                          on_click=_use_suggested_name, args=(suggestion,))
+    with st.container(horizontal=True, horizontal_alignment="center",
+                      vertical_alignment="center", gap="xxsmall"):
+        st.caption("Đã có tài khoản?", width="content")
+        st.button(":blue[Đăng nhập]", key="to_login", type="tertiary",
+                  on_click=_show_auth_view, args=("login",))
+
+
+def _workspace() -> Path:
+    """Logged-in users keep one folder across sessions; each anonymous session gets its own."""
+    user_id = _current_user_id()
+    if user_id:
+        return USERS_DIR / user_id
+    session_id = st.session_state.setdefault("anonymous_session_id", uuid.uuid4().hex[:16])
+    return SESSIONS_DIR / session_id
+
+
+def _parser_scene(text: str, animate: bool, scene_path: Path) -> tuple[Path, str]:
     problem = parse_problem(text)
     figure = build_figure(problem)
-    path = write_scene(figure, GENERATED / "scene.py", animate=animate)
+    path = write_scene(figure, scene_path, animate=animate)
     summary = f"Parser · hình {problem.figure} · điểm: {', '.join(sorted(figure.points))}"
     return path, summary
 
@@ -299,8 +522,9 @@ def _save_render_state(result, scene_path: Path, summary: str,
     # that key during the same run raises StreamlitWidgetAlreadyInstantiatedError.
     # Persist the submitted value directly instead of mutating widget state.
     saved_problem = problem if problem is not None else st.session_state.get("problem", "")
-    GENERATED.mkdir(parents=True, exist_ok=True)
-    LAST_RENDER_STATE.write_text(json.dumps({
+    state_path = _workspace() / "last_render.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps({
         "problem": saved_problem,
         "scene_path": str(scene_path.resolve()),
         "image_path": str(result.image_path.resolve()) if result.image_path else "",
@@ -317,7 +541,7 @@ def _restore_render_state() -> None:
         return
     st.session_state["render_state_restored"] = True
     try:
-        saved = json.loads(LAST_RENDER_STATE.read_text(encoding="utf-8"))
+        saved = json.loads((_workspace() / "last_render.json").read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError):
         return
     scene_path = Path(str(saved.get("scene_path", "")))
@@ -338,15 +562,12 @@ def _manual_editor(scene_path: Path, quality: str, animate: bool) -> None:
     if not names:
         return
     offsets = st.session_state.setdefault("label_offsets", {})
-    edits = st.session_state.setdefault("manual_edits", {
-        "hidden_labels": [], "hidden_points": [], "hidden_segments": [],
-        "added_segments": [], "segment_widths": {}, "constructions": [],
-    })
+    edits = st.session_state.setdefault("manual_edits", _empty_manual_edits())
 
     def rerender() -> None:
         with st.spinner("Đang cập nhật hình tại máy, không gọi DeepSeek..."):
             result = render_scene(
-                scene_path, GENERATED / "media", quality=quality, animate=animate,
+                scene_path, _workspace() / "media", quality=quality, animate=animate,
                 label_offsets=offsets, manual_edits=edits,
             )
         if result.ok and result.image_path:
@@ -522,10 +743,7 @@ def _manual_editor(scene_path: Path, quality: str, animate: bool) -> None:
         if st.button("Khôi phục toàn bộ chỉnh sửa", key="manual_reset_all"):
             offsets.clear()
             edits.clear()
-            edits.update({
-                "hidden_labels": [], "hidden_points": [], "hidden_segments": [],
-                "added_segments": [], "segment_widths": {}, "constructions": [],
-            })
+            edits.update(_empty_manual_edits())
             rerender()
 
 
@@ -533,15 +751,14 @@ def _display_saved_render() -> bool:
     image_path = Path(st.session_state.get("last_image_path", ""))
     scene_path = Path(st.session_state.get("last_scene_path", ""))
     if not image_path.is_file() or not scene_path.is_file():
-        scene_path = GENERATED / "scene.py"
-        candidates = list((GENERATED / "media").rglob("*.png")) if (GENERATED / "media").exists() else []
+        workspace = _workspace()
+        scene_path = workspace / "scene.py"
+        media_dir = workspace / "media"
+        candidates = list(media_dir.rglob("*.png")) if media_dir.exists() else []
         image_path = max(candidates, key=lambda path: path.stat().st_mtime) if candidates else Path("")
         if image_path.is_file() and scene_path.is_file():
             st.session_state.setdefault("label_offsets", {})
-            st.session_state.setdefault("manual_edits", {
-                "hidden_labels": [], "hidden_points": [], "hidden_segments": [],
-                "added_segments": [], "segment_widths": {}, "constructions": [],
-            })
+            st.session_state.setdefault("manual_edits", _empty_manual_edits())
             st.session_state["last_image_path"] = str(image_path)
             st.session_state["last_scene_path"] = str(scene_path)
             st.session_state["last_summary"] = "Bản vẽ gần nhất · chỉnh tại máy"
@@ -565,14 +782,59 @@ def _display_saved_render() -> bool:
     return True
 
 
+def _open_history_entry(entry: HistoryEntry) -> None:
+    # Runs as a button callback, i.e. before the problem text area exists in the next run.
+    st.session_state["problem"] = entry.problem
+    st.session_state["label_offsets"] = {}
+    st.session_state["manual_edits"] = _empty_manual_edits()
+    st.session_state["last_scene_path"] = str(entry.scene_path)
+    st.session_state["last_image_path"] = str(entry.image_path)
+    st.session_state["last_video_path"] = ""
+    st.session_state["last_render_log"] = ""
+    st.session_state["last_summary"] = entry.summary
+    st.session_state["last_quality"] = "l"
+    st.session_state["last_animate"] = False
+
+
+def _account_sidebar(user_id: str) -> None:
+    st.header("Tài khoản")
+    st.write(f"👤 {ACCOUNTS.display_name(user_id) or 'Người dùng'}")
+    st.button("Đăng xuất", on_click=_logout)
+    entries = HISTORY.list(user_id)
+    with st.expander(f"Lịch sử hỏi đáp ({len(entries)})"):
+        if not entries:
+            st.caption("Chưa có hình nào được lưu. Hình vẽ thành công sẽ tự lưu vào đây.")
+        for entry in entries:
+            when = time.strftime("%d/%m %H:%M", time.localtime(entry.created_at))
+            title = " ".join(entry.problem.split())
+            if len(title) > 48:
+                title = title[:48] + "…"
+            st.button(
+                f"{when} · {title}", key=f"history_{entry.id}", width="stretch",
+                on_click=_open_history_entry, args=(entry,),
+            )
+
+
 def main() -> None:
     st.set_page_config(page_title="geo-draw", layout="wide")
+    user_id = _current_user_id()
+    if user_id is None and not st.session_state.get("anonymous_mode"):
+        _login_page()
+        return
+
     _restore_render_state()
     st.title("geo-draw")
     st.caption("Nhập văn bản hoặc tải ảnh đề hình học — DeepSeek đọc đề, tạo mã Manim và vẽ hình.")
+    if user_id is None:
+        notice, action = st.columns([5, 1], vertical_alignment="center")
+        notice.info("Đăng nhập để lưu lại lịch sử hỏi đáp", icon="🔐")
+        action.button("Đăng nhập", type="primary", width="stretch", on_click=_go_to_login)
 
     env = settings_from_env()
     with st.sidebar:
+        if user_id:
+            _account_sidebar(user_id)
+            st.divider()
         st.header("Tùy chọn")
         mode = st.radio(
             "Cách dựng hình",
@@ -685,12 +947,13 @@ def main() -> None:
             return
 
     st.session_state["label_offsets"] = {}
-    st.session_state["manual_edits"] = {
-        "hidden_labels": [], "hidden_points": [], "hidden_segments": [],
-        "added_segments": [], "segment_widths": {}, "constructions": [],
-    }
+    st.session_state["manual_edits"] = _empty_manual_edits()
 
-    scene_path: Path
+    workspace = _workspace()
+    workspace.mkdir(parents=True, exist_ok=True)
+    scene_path = workspace / "scene.py"
+    media_dir = workspace / "media"
+    summary: str
     summary: str
     if mode == "DeepSeek AI":
         settings = AiSettings(
@@ -702,16 +965,14 @@ def main() -> None:
         if not generated.ok:
             st.error(generated.error)
             return
-        GENERATED.mkdir(parents=True, exist_ok=True)
-        scene_path = GENERATED / "scene.py"
         scene_path.write_text(generated.code, encoding="utf-8")
         summary = f"DeepSeek AI · {model}"
     else:
-        scene_path, summary = _parser_scene(text, animate)
+        scene_path, summary = _parser_scene(text, animate, scene_path)
 
     with st.spinner("Manim đang render..."):
         result = render_scene(
-            scene_path, GENERATED / "media", quality=quality, animate=animate,
+            scene_path, media_dir, quality=quality, animate=animate,
             label_offsets=st.session_state["label_offsets"],
             manual_edits=st.session_state["manual_edits"],
         )
@@ -734,7 +995,7 @@ def main() -> None:
                 break
             scene_path.write_text(repaired.code, encoding="utf-8")
             result = render_scene(
-                scene_path, GENERATED / "media", quality=quality, animate=animate,
+                scene_path, media_dir, quality=quality, animate=animate,
                 label_offsets=st.session_state["label_offsets"],
                 manual_edits=st.session_state["manual_edits"],
             )
@@ -743,6 +1004,9 @@ def main() -> None:
 
     if result.ok and result.image_path:
         _save_render_state(result, scene_path, summary, quality, animate, problem=text)
+        if user_id:
+            HISTORY.add(user_id, text, summary, scene_path, result.image_path)
+            st.toast("Đã lưu hình vào lịch sử hỏi đáp.")
         _manual_editor(scene_path, quality, animate)
         _zoomable_image(result.image_path, "Khung hình Manim")
     else:
