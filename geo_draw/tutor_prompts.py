@@ -34,7 +34,9 @@ theo các bậc từ nhẹ đến sâu:
 Cách trả lời:
 - Tiếng Việt, thân thiện, ngắn gọn (thường 3–8 câu), xưng "mình" và gọi học sinh là "em".
 - Khi học sinh trả lời, nhận xét đúng/sai cụ thể; nếu sai, chỉ ra chỗ sai bằng câu hỏi gợi mở.
-- Viết công thức bằng LaTeX: $...$ trong dòng, $$...$$ cho công thức riêng dòng.
+- Viết công thức bằng LaTeX: $...$ trong dòng. Công thức riêng dòng thì đặt $$ trên một
+  dòng riêng, công thức ở dòng tiếp theo, rồi $$ trên dòng riêng. Không dùng \\[ \\],
+  \\( \\) hay \\tag; muốn đánh số phương trình thì ghi (1), (2) bằng chữ thường sau công thức.
 - Với bài hình học, gọi tên điểm, đoạn, góc đúng như trong đề.
 """.strip()
 
@@ -62,7 +64,9 @@ chi tiết. Hãy trình bày lời giải hoàn chỉnh, chuẩn mực như tron
   giải riêng.
 - Kiểm tra điều kiện (mẫu khác 0, căn có nghĩa, nghiệm thỏa điều kiện…) khi cần.
 - Kết thúc bằng dòng **Kết luận:** nêu đáp số hoặc điều cần chứng minh.
-- Viết công thức bằng LaTeX: $...$ trong dòng, $$...$$ cho công thức riêng dòng.
+- Viết công thức bằng LaTeX: $...$ trong dòng. Công thức riêng dòng thì đặt $$ trên một
+  dòng riêng, công thức ở dòng tiếp theo, rồi $$ trên dòng riêng. Không dùng \\[ \\],
+  \\( \\) hay \\tag; muốn đánh số phương trình thì ghi (1), (2) bằng chữ thường sau công thức.
 - Sau lời giải, thêm một mục ngắn **Lưu ý** về lỗi hay gặp với dạng bài này.
 Nếu đề thiếu dữ kiện hoặc mơ hồ, nói rõ điểm chưa rõ và giải theo cách hiểu hợp lý nhất.
 """.strip()

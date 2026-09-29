@@ -4,6 +4,7 @@ import Markdown from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
 
+import { normalizeMath } from '@/lib/math'
 import { cn } from '@/lib/utils'
 
 export function MathMarkdown({ children, className }: { children: string; className?: string }) {
@@ -13,7 +14,7 @@ export function MathMarkdown({ children, className }: { children: string; classN
         remarkPlugins={[remarkMath]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
       >
-        {children}
+        {normalizeMath(children)}
       </Markdown>
     </div>
   )
