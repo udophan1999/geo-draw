@@ -19,7 +19,7 @@ def list_conversations(owner: Owner = Depends(get_owner)) -> list[dict]:
 def get_conversation(conversation_id: str, owner: Owner = Depends(get_owner)) -> dict:
     conversation = owned_conversation(owner, conversation_id)
     return {
-        "conversation": conversation_json(conversation),
+        "conversation": conversation_json(conversation, owner.store.problem_of(conversation)),
         "messages": [message_json(m) for m in owner.store.messages(conversation.id)],
     }
 

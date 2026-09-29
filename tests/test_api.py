@@ -9,12 +9,19 @@ from fastapi.testclient import TestClient
 
 from api.main import create_app
 from geo_draw.ai_codegen import AiSettings
-from geo_draw.conversations import ASSISTANT, USER
+from geo_draw.conversations import ASSISTANT, CHAT, FIGURE, USER
 from geo_draw.renderer import render_scene
 
 from tests.test_pipeline import AI_SCENE
 
 TRIANGLE = "Cho tam giác ABC vuông tại A, AB = 3, AC = 4."
+EQUATION = "Giải phương trình $x^2 - 5x + 6 = 0$."
+HINT_REPLY = ("Em thử nhớ lại ", "định lý Pythagore: $a^2 + b^2 = c^2$ nhé. ", "BC bằng bao nhiêu?")
+
+
+def fake_stream(ai, messages, **_):
+    """Stands in for DeepSeek: the tutor's reply arrives in three pieces."""
+    yield from HINT_REPLY
 
 
 def read_events(client: TestClient, job_id: str) -> list[tuple[str, object]]:
@@ -31,12 +38,17 @@ def read_events(client: TestClient, job_id: str) -> list[tuple[str, object]]:
 
 class ApiTestCase(unittest.TestCase):
     ai = AiSettings(api_key="")
+    limit_guest, limit_user = 1, 2
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.data = Path(self._tmp.name)
-        self.app = create_app(self.data, ai=self.ai, daily_limit_guest=1, daily_limit_user=2)
+        self.app = create_app(self.data, ai=self.ai, daily_limit_guest=self.limit_guest,
+                              daily_limit_user=self.limit_user)
         self.state = self.app.state.geo
+        tutor = patch("geo_draw.tutor.stream_chat", side_effect=fake_stream)
+        self.tutor_stream = tutor.start()
+        self.addCleanup(tutor.stop)
 
     def tearDown(self):
         self.state.jobs.shutdown()
@@ -53,11 +65,17 @@ class ApiTestCase(unittest.TestCase):
                                                       "quality": "l", "animate": False})
         self.assertEqual(response.status_code, 200)
 
-    def send(self, client: TestClient, text: str, conversation_id: str | None = None):
+    def send(self, client: TestClient, text: str, conversation_id: str | None = None,
+             action: str | None = None):
         data = {"text": text}
         if conversation_id:
             data["conversation_id"] = conversation_id
+        if action:
+            data["action"] = action
         return client.post("/api/messages", data=data)
+
+    def figure(self, client: TestClient, conversation_id: str, text: str = ""):
+        return client.post(f"/api/conversations/{conversation_id}/figure", json={"text": text})
 
 
 class AuthTests(ApiTestCase):
@@ -102,38 +120,78 @@ class AuthTests(ApiTestCase):
 
 
 class ChatTests(ApiTestCase):
-    def test_parser_turn_streams_progress_and_saves_messages(self):
+    ai = AiSettings(api_key="test-key")
+    limit_guest, limit_user = 50, 50
+
+    def test_tutor_turn_streams_the_reply_and_saves_messages(self):
         client = self.client()
         self.register(client)
-        self.use_parser(client)
-        started = self.send(client, TRIANGLE)
+        started = self.send(client, EQUATION)
         self.assertEqual(started.status_code, 202)
         conversation_id = started.json()["conversation"]["id"]
         events = read_events(client, started.json()["job_id"])
         kinds = [kind for kind, _ in events]
-        self.assertEqual(kinds, ["message", "progress", "message", "done"])
-        user_message, reply = events[0][1], events[2][1]
-        self.assertEqual((user_message["role"], user_message["text"]), (USER, TRIANGLE))
-        self.assertEqual(reply["role"], ASSISTANT)
-        self.assertTrue(reply["has_drawing"])
-        self.assertTrue(client.get(reply["image_url"]).content.startswith(b"\x89PNG"))
-        self.assertIn("class GeoScene", client.get(f"/api/messages/{reply['id']}/scene").text)
+        self.assertEqual(kinds, ["message", "progress", "delta", "delta", "delta", "message",
+                                 "conversation", "done"])
+        question, reply = events[0][1], events[5][1]
+        self.assertEqual((question["role"], question["channel"], question["text"]),
+                         (USER, CHAT, EQUATION))
+        self.assertEqual(reply["text"], "".join(HINT_REPLY))
+        self.assertEqual(reply["meta"]["hint_level"], 1)
+        conversation = events[6][1]
+        self.assertEqual((conversation["problem"], conversation["is_geometry"]), (EQUATION, False))
 
-        # A follow-up in the same conversation redraws with the extra request.
-        follow = self.send(client, "Vẽ thêm trung điểm M của BC", conversation_id)
-        events = read_events(client, follow.json()["job_id"])
-        self.assertIn("M", events[-2][1]["text"])
+        deeper = self.send(client, "", conversation_id, action="deeper")
+        read_events(client, deeper.json()["job_id"])
         detail = client.get(f"/api/conversations/{conversation_id}").json()
-        self.assertEqual([m["role"] for m in detail["messages"]], [USER, ASSISTANT, USER, ASSISTANT])
-        self.assertEqual([c["id"] for c in client.get("/api/conversations").json()],
-                         [conversation_id])
+        self.assertEqual(detail["conversation"]["hint_level"], 2)
+        self.assertEqual([m["channel"] for m in detail["messages"]], [CHAT] * 4)
+        solution = self.send(client, "", conversation_id, action="solution")
+        read_events(client, solution.json()["job_id"])
+        self.assertEqual(client.get(f"/api/conversations/{conversation_id}").json()
+                         ["conversation"]["mode"], "solution")
+
+    def test_geometry_problems_are_drawn_automatically(self):
+        client = self.client()
+        self.register(client)
+        self.use_parser(client)
+        started = self.send(client, TRIANGLE).json()
+        events = read_events(client, started["job_id"])
+        figure_jobs = [data["job_id"] for kind, data in events if kind == "figure_job"]
+        self.assertEqual(len(figure_jobs), 1)
+        drawing = [data for kind, data in read_events(client, figure_jobs[0]) if kind == "message"]
+        self.assertTrue(drawing[-1]["has_drawing"])
+        self.assertEqual(drawing[-1]["channel"], FIGURE)
+        self.assertTrue(client.get(drawing[-1]["image_url"]).content.startswith(b"\x89PNG"))
+        self.assertIn("class GeoScene", client.get(f"/api/messages/{drawing[-1]['id']}/scene").text)
+
+        # A refinement redraws with the extra request; the tutor chat is untouched.
+        conversation_id = started["conversation"]["id"]
+        refine = self.figure(client, conversation_id, "Vẽ thêm trung điểm M của BC")
+        self.assertEqual(refine.status_code, 202)
+        events = read_events(client, refine.json()["job_id"])
+        self.assertIn("M", [data for kind, data in events if kind == "message"][-1]["text"])
+        messages = client.get(f"/api/conversations/{conversation_id}").json()["messages"]
+        self.assertEqual([(m["channel"], m["role"]) for m in messages if m["channel"] == FIGURE],
+                         [(FIGURE, ASSISTANT), (FIGURE, USER), (FIGURE, ASSISTANT)])
+        self.assertEqual(len([m for m in messages if m["channel"] == CHAT]), 2)
+
+    def test_other_problems_are_not_drawn_but_can_be(self):
+        client = self.client()
+        self.use_parser(client)
+        started = self.send(client, EQUATION).json()
+        events = read_events(client, started["job_id"])
+        self.assertNotIn("figure_job", [kind for kind, _ in events])
+        self.assertEqual(self.figure(client, started["conversation"]["id"]).status_code, 202)
 
     def test_other_users_and_guests_cannot_see_a_conversation(self):
         alice = self.client()
         self.register(alice, "alice")
         self.use_parser(alice)
         started = self.send(alice, TRIANGLE).json()
-        reply = read_events(alice, started["job_id"])[-2][1]
+        figure_job = next(d["job_id"] for k, d in read_events(alice, started["job_id"])
+                          if k == "figure_job")
+        drawing = [d for k, d in read_events(alice, figure_job) if k == "message"][-1]
         conversation_id = started["conversation"]["id"]
 
         bob = self.client()
@@ -141,63 +199,80 @@ class ChatTests(ApiTestCase):
         guest = self.client()
         for client in (bob, guest):
             self.assertEqual(client.get(f"/api/conversations/{conversation_id}").status_code, 404)
-            self.assertEqual(client.get(reply["image_url"]).status_code, 404)
+            self.assertEqual(client.get(drawing["image_url"]).status_code, 404)
             self.assertEqual(client.get(f"/api/jobs/{started['job_id']}/events").status_code, 404)
             self.assertEqual(self.send(client, "Kẻ AM", conversation_id).status_code, 404)
+            self.assertEqual(self.figure(client, conversation_id).status_code, 404)
             self.assertEqual(client.get("/api/conversations").json(), [])
 
     def test_rename_and_delete(self):
         client = self.client()
-        self.use_parser(client)  # as a guest
-        started = self.send(client, TRIANGLE).json()
+        started = self.send(client, EQUATION).json()  # as a guest
         read_events(client, started["job_id"])
         conversation_id = started["conversation"]["id"]
-        renamed = client.patch(f"/api/conversations/{conversation_id}", json={"title": "Tam giác"})
-        self.assertEqual(renamed.json()["title"], "Tam giác")
+        renamed = client.patch(f"/api/conversations/{conversation_id}", json={"title": "PT bậc hai"})
+        self.assertEqual(renamed.json()["title"], "PT bậc hai")
         self.assertEqual(client.delete(f"/api/conversations/{conversation_id}").status_code, 204)
         self.assertEqual(client.get("/api/conversations").json(), [])
 
     def test_bad_input_is_rejected(self):
         client = self.client()
         self.assertEqual(self.send(client, "   ").status_code, 422)
+        self.assertEqual(self.send(client, "", action="deeper").status_code, 422)
+        self.assertEqual(self.send(client, "x", action="nonsense").status_code, 422)
         bad = client.post("/api/messages", data={"text": "x"},
                           files={"image": ("de.txt", b"hello", "text/plain")})
         self.assertEqual(bad.status_code, 415)
 
     def test_a_crashing_turn_ends_with_failed(self):
         client = self.client()
-        self.use_parser(client)
-        with patch("api.routers.messages.run_turn", side_effect=RuntimeError("boom")), \
+        with patch("api.routers.messages.run_tutor_turn", side_effect=RuntimeError("boom")), \
                 self.assertLogs("api.jobs", level="ERROR"):
-            started = self.send(client, TRIANGLE).json()
+            started = self.send(client, EQUATION).json()
             events = read_events(client, started["job_id"])
         self.assertEqual([kind for kind, _ in events], ["failed"])
         self.assertIn("Máy chủ gặp lỗi", events[0][1]["detail"])
 
-    def test_ai_mode_without_server_key_is_unavailable(self):
-        response = self.send(self.client(), TRIANGLE)  # default settings: AI mode
+
+class NoServerKeyTests(ApiTestCase):
+    def test_the_tutor_needs_the_server_key_but_parser_drawing_does_not(self):
+        client = self.client()
+        response = self.send(client, TRIANGLE)
         self.assertEqual(response.status_code, 503)
+        self.assertIn("DeepSeek API key", response.json()["detail"])
+        self.assertEqual(client.get("/api/conversations").json(), [])
 
 
 class QuotaTests(ApiTestCase):
     ai = AiSettings(api_key="test-key")
+    limit_guest, limit_user = 2, 5
 
     def test_guest_ai_turns_stop_at_the_daily_limit(self):
         client = self.client()
-        with patch("api.routers.messages.run_turn") as run_turn:
-            first = self.send(client, TRIANGLE)
-            self.assertEqual(first.status_code, 202)
-            read_events(client, first.json()["job_id"])
-            second = self.send(client, TRIANGLE)
+        first = self.send(client, TRIANGLE)  # tutor turn 1 + automatic AI drawing 2
+        self.assertEqual(first.status_code, 202)
+        with patch("api.routers.messages.run_figure_turn") as figure_turn:
+            events = read_events(client, first.json()["job_id"])
+            figure_job = next(d["job_id"] for k, d in events if k == "figure_job")
+            read_events(client, figure_job)
+        self.assertEqual(figure_turn.call_args.kwargs["ai"].api_key, "test-key")
+        self.assertEqual(client.get("/api/auth/me").json()["quota"], {"used": 2, "limit": 2})
+        second = self.send(client, "Em chưa hiểu", first.json()["conversation"]["id"])
         self.assertEqual(second.status_code, 429)
         self.assertIn("Đăng nhập để có thêm lượt", second.json()["detail"])
-        self.assertEqual(run_turn.call_count, 1)
-        self.assertEqual(run_turn.call_args.kwargs["ai"].api_key, "test-key")
-        self.assertEqual(client.get("/api/auth/me").json()["quota"], {"used": 1, "limit": 1})
-        # Parser turns never count.
+        # Parser drawings never count.
         self.use_parser(client)
-        with patch("api.routers.messages.run_turn"):
-            self.assertEqual(self.send(client, TRIANGLE).status_code, 202)
+        with patch("api.routers.messages.run_figure_turn"):
+            self.assertEqual(self.figure(client, first.json()["conversation"]["id"]).status_code, 202)
+
+    def test_quota_left_for_the_tutor_but_not_the_drawing_skips_the_drawing(self):
+        self.state.daily_limit_guest = 1
+        client = self.client()
+        events = read_events(client, self.send(client, TRIANGLE).json()["job_id"])
+        skipped = [data for kind, data in events if kind == "figure_skipped"]
+        self.assertEqual(len(skipped), 1)
+        self.assertIn("lượt", skipped[0]["detail"])
+        self.assertEqual(events[-1][0], "done")
 
 
 class EditorTests(ApiTestCase):

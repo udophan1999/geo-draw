@@ -12,7 +12,7 @@ import mimetypes
 import streamlit as st
 
 from geo_draw.ai_codegen import extract_problem_from_image
-from geo_draw.conversations import ASSISTANT, USER, Conversation, Message, compose_problem
+from geo_draw.conversations import ASSISTANT, FIGURE, USER, Conversation, Message, compose_problem
 from geo_draw.examples import EXAMPLES
 from streamlit_app import session, settings, styles
 from streamlit_app.components.manual_editor import manual_editor
@@ -30,7 +30,7 @@ def dashboard_page(user_id: str | None) -> None:
     store = session.conversations()
     conversation_id = session.current_conversation_id()
     conversation = store.get(session.owner(), conversation_id) if conversation_id else None
-    messages = store.messages(conversation.id) if conversation else []
+    messages = store.messages(conversation.id, FIGURE) if conversation else []
     drawings = [message for message in messages
                 if message.has_drawing and message.image_path.is_file()]
     wanted = st.session_state.get("viewing_message_id")

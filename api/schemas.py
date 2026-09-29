@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from geo_draw.conversations import Conversation, Message
+from geo_draw.tutor import is_geometry_problem
 
 MODELS = ("deepseek-v4-flash", "deepseek-v4-pro")
 
@@ -26,6 +27,10 @@ class Settings(BaseModel):
 
 class TitleUpdate(BaseModel):
     title: str = Field(min_length=1, max_length=120)
+
+
+class FigureRequest(BaseModel):
+    text: str = Field("", max_length=2000)
 
 
 class ManualEdits(BaseModel):
@@ -52,13 +57,21 @@ def message_json(message: Message) -> dict:
         "video_url": f"{base}/video?v={_version(video)}" if video else None,
         "has_drawing": message.has_drawing and image is not None,
         "has_log": bool(message.log),
+        "channel": message.channel,
+        "meta": message.meta,
     }
 
 
-def conversation_json(conversation: Conversation) -> dict:
+def conversation_json(conversation: Conversation, problem: str | None = None) -> dict:
+    """``problem`` overrides the stored one (older conversations derive it from messages)."""
+    problem = conversation.problem if problem is None else problem
     return {
         "id": conversation.id,
         "title": conversation.title,
         "created_at": conversation.created_at,
         "updated_at": conversation.updated_at,
+        "problem": problem,
+        "mode": conversation.mode,
+        "hint_level": conversation.hint_level,
+        "is_geometry": is_geometry_problem(problem),
     }

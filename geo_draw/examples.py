@@ -18,3 +18,25 @@ EXAMPLES = {
         "Đánh dấu các góc bằng nhau và các góc vuông."
     ),
 }
+
+# Offered by the web app, which solves any math problem and draws geometry figures.
+MATH_EXAMPLES = [
+    {"topic": "Phương trình", "name": "Phương trình bậc hai",
+     "problem": "Giải phương trình $x^2 - 5x + 6 = 0$."},
+    {"topic": "Hệ phương trình", "name": "Bài toán thực tế",
+     "problem": ("Một mảnh vườn hình chữ nhật có chu vi 34 m. Nếu tăng chiều dài thêm 3 m và "
+                 "tăng chiều rộng thêm 2 m thì diện tích tăng thêm 45 m². Tính chiều dài và "
+                 "chiều rộng của mảnh vườn.")},
+    {"topic": "Hàm số", "name": "Hàm số bậc nhất",
+     "problem": ("Cho hàm số $y = (m - 1)x + 2m - 3$. Tìm $m$ để đồ thị hàm số song song với "
+                 "đường thẳng $y = 3x + 1$.")},
+    {"topic": "Hình học", "name": "Tam giác vuông, đường cao",
+     "problem": ("Cho tam giác ABC vuông tại A, AB = 6 cm, AC = 8 cm, đường cao AH. "
+                 "a) Tính BC và AH. b) Gọi M là trung điểm BC. Chứng minh AM = BC/2.")},
+    {"topic": "Hình học", "name": "Đường tròn, tiếp tuyến",
+     "problem": ("Cho đường tròn tâm O bán kính 3 cm và điểm A nằm ngoài đường tròn sao cho "
+                 "OA = 5 cm. Từ A kẻ hai tiếp tuyến AB, AC với đường tròn (B, C là tiếp điểm). "
+                 "a) Tính AB. b) Chứng minh OA vuông góc với BC.")},
+    {"topic": "Bất đẳng thức", "name": "Cauchy",
+     "problem": "Cho $a, b > 0$ và $a + b = 2$. Chứng minh rằng $ab \\le 1$."},
+]
