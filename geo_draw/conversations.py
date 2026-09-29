@@ -78,7 +78,8 @@ def compose_problem(requests: list[str]) -> str:
 
 
 def make_title(text: str) -> str:
-    title = " ".join(text.split())
+    # Titles are plain text in the sidebar: drop the LaTeX math delimiters.
+    title = " ".join(text.replace("$", "").split())
     return title if len(title) <= TITLE_LENGTH else title[:TITLE_LENGTH].rstrip() + "…"
 
 

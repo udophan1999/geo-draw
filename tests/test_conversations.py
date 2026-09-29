@@ -20,6 +20,8 @@ class ComposeProblemTests(unittest.TestCase):
 
     def test_titles_are_one_short_line(self):
         self.assertEqual(make_title("Cho\n tam   giác"), "Cho tam giác")
+        self.assertEqual(make_title("Giải phương trình $x^2 - 5x + 6 = 0$."),
+                         "Giải phương trình x^2 - 5x + 6 = 0.")
         self.assertLessEqual(len(make_title("x" * 200)), TITLE_LENGTH + 1)
 
 
