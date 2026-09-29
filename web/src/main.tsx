@@ -7,6 +7,7 @@ import './index.css'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ApiError } from '@/lib/api'
+import { useNewVersionNotice } from '@/lib/version'
 import { AppLayout } from '@/routes/AppLayout'
 import { LoginPage, RegisterPage } from '@/routes/auth'
 
@@ -43,12 +44,18 @@ const router = createBrowserRouter([
   { path: '*', element: <Navigate to="/" replace /> },
 ])
 
+function VersionWatcher() {
+  useNewVersionNotice()
+  return null
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <RouterProvider router={router} />
         <Toaster position="top-center" richColors />
+        <VersionWatcher />
       </TooltipProvider>
     </QueryClientProvider>
   </StrictMode>,

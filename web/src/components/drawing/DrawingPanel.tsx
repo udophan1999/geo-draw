@@ -55,8 +55,8 @@ export function DrawingPanel({ figureMessages, drawings, shown, onShow, busyLabe
               Vẽ hình
             </Button>
           )}
+          {failure && <div className="mt-3 w-full max-w-md text-left">{status}</div>}
         </div>
-        {!busy && status}
       </div>
     )
   }
