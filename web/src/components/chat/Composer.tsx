@@ -1,6 +1,7 @@
-import { ArrowUp, ImagePlus, Loader2, X } from 'lucide-react'
+import { ArrowUp, ImagePlus, Loader2, Omega, Sigma, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { FormulaDialog, SymbolBar } from '@/components/chat/MathInput'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { IMAGE_TYPES, acceptImage } from '@/lib/images'
@@ -18,6 +19,25 @@ export function Composer({ image, onImage, onSend, busy, placeholder }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const [showSymbols, setShowSymbols] = useState(false)
+  const [formulaOpen, setFormulaOpen] = useState(false)
+
+  /** Put ``snippet`` at the caret (replacing any selection) and keep typing after it. */
+  const insert = (snippet: string, spaced = false) => {
+    const el = textarea.current
+    const start = el?.selectionStart ?? text.length
+    const end = el?.selectionEnd ?? text.length
+    if (spaced) {
+      // A formula is a word of its own: keep it apart from the text around it.
+      if (start > 0 && !/\s/.test(text[start - 1])) snippet = ' ' + snippet
+      if (!/^\s/.test(text.slice(end))) snippet += ' '
+    }
+    setText(text.slice(0, start) + snippet + text.slice(end))
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(start + snippet.length, start + snippet.length)
+    })
+  }
   const preview = useMemo(() => (image ? URL.createObjectURL(image) : null), [image])
   useEffect(() => () => {
     if (preview) URL.revokeObjectURL(preview)
@@ -64,6 +84,7 @@ export function Composer({ image, onImage, onSend, busy, placeholder }: Props) {
             </div>
           </div>
         )}
+        {showSymbols && <SymbolBar onInsert={insert} />}
         <textarea
           ref={textarea}
           rows={1}
@@ -87,14 +108,33 @@ export function Composer({ image, onImage, onSend, busy, placeholder }: Props) {
           className="block max-h-[200px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-sm outline-none placeholder:text-muted-foreground"
         />
         <div className="flex items-center justify-between px-2 pb-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Đính kèm ảnh đề" onClick={() => fileInput.current?.click()}>
-                <ImagePlus />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Đính kèm ảnh đề (hoặc dán Ctrl+V, kéo thả)</TooltipContent>
-          </Tooltip>
+          <div className="flex items-center gap-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Đính kèm ảnh đề" onClick={() => fileInput.current?.click()}>
+                  <ImagePlus />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Đính kèm ảnh đề (hoặc dán Ctrl+V, kéo thả)</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={showSymbols ? 'secondary' : 'ghost'} size="icon" aria-label="Ký hiệu toán"
+                        aria-pressed={showSymbols} onClick={() => setShowSymbols((on) => !on)}>
+                  <Omega />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Ký hiệu toán: ², √, π, ≤, ⊥, ∠…</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Nhập công thức" onClick={() => setFormulaOpen(true)}>
+                  <Sigma />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Nhập công thức (phân số, căn, số mũ…)</TooltipContent>
+            </Tooltip>
+          </div>
           <input
             ref={fileInput}
             type="file"
@@ -113,6 +153,7 @@ export function Composer({ image, onImage, onSend, busy, placeholder }: Props) {
       <p className="mt-2 text-center text-xs text-muted-foreground">
         Enter để gửi · Shift+Enter để xuống dòng
       </p>
+      <FormulaDialog open={formulaOpen} onOpenChange={setFormulaOpen} onInsert={(formula) => insert(formula, true)} />
     </div>
   )
 }
