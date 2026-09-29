@@ -13,6 +13,10 @@ import { api, type Message } from '@/lib/api'
 import { keys } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 
+// The manual editor, scene code and render log under a drawing are hidden for now; set this to
+// true to bring them back.
+const SHOW_ADVANCED = false
+
 type Props = {
   /** Figure-channel messages: drawing requests (user) and drawings or failures (assistant). */
   figureMessages: Message[]
@@ -97,7 +101,7 @@ export function DrawingPanel({ figureMessages, drawings, shown, onShow, busyLabe
         <video src={shown.video_url} controls className="w-full rounded-xl border bg-black" />
       )}
 
-      <AdvancedOptions key={shown.id} drawing={shown} />
+      {SHOW_ADVANCED && <AdvancedOptions key={shown.id} drawing={shown} />}
     </div>
   )
 }
