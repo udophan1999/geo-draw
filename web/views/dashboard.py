@@ -1,220 +1,201 @@
-"""Dashboard (/dashboard): problem input (text or image) → DeepSeek/parser → Manim render → result."""
+"""Dashboard (/dashboard): chat on the left, the latest drawing on the right.
+
+The first user message of a conversation is the problem; later messages are extra
+requests. Each turn redraws from ``compose_problem`` of all user messages, passing the
+previous drawing's code so DeepSeek keeps the layout.
+"""
 
 from __future__ import annotations
 
-from pathlib import Path
+import mimetypes
 
 import streamlit as st
 
-from geo_draw.ai_codegen import (
-    extract_problem_from_image,
-    generate_manim_code,
-    missing_reference_figure_points,
-    settings_from_env,
-)
-from geo_draw.renderer import render_scene
-from web import auth, config, session
-from web.components.clipboard_image import CLIPBOARD_IMAGE, decode_clipboard_image
+from geo_draw.ai_codegen import extract_problem_from_image
+from geo_draw.conversations import ASSISTANT, USER, Conversation, Message, compose_problem
+from web import config, session, settings, styles
 from web.components.manual_editor import manual_editor
-from web.components.sidebar import DrawOptions, account_section, options_section
+from web.components.sidebar import sidebar
 from web.components.zoomable_image import zoomable_image
-from web.rendering import parser_scene, render_error_summary
+from web.drawing import draw
+
+IMAGE_TYPES = ["png", "jpg", "jpeg", "webp", "gif"]
+ASSISTANT_AVATAR = "📐"
 
 
 def dashboard_page(user_id: str | None) -> None:
-    session.restore_render_state()
-    _header(user_id)
-    with st.sidebar:
-        if user_id:
-            account_section(user_id)
-            st.divider()
-        options = options_section(settings_from_env())
+    styles.dashboard()
+    sidebar(user_id)
+    store = session.conversations()
+    conversation_id = session.current_conversation_id()
+    conversation = store.get(session.owner(), conversation_id) if conversation_id else None
+    messages = store.messages(conversation.id) if conversation else []
+    drawings = [message for message in messages
+                if message.has_drawing and message.image_path.is_file()]
+    wanted = st.session_state.get("viewing_message_id")
+    shown = next((d for d in drawings if d.id == wanted), drawings[-1] if drawings else None)
 
-    st.subheader("Đề bài")
-    _image_to_text(options)
-    text = st.text_area(
-        "Nội dung đề bài",
-        value=st.session_state.get("problem", config.EXAMPLES["Tam giác + nhiều yêu cầu"]),
-        height=160,
-        key="problem",
+    chat_column, drawing_column = st.columns([1, 1.2], gap="large")
+    with chat_column:
+        _chat(conversation, messages, shown)
+    with drawing_column:
+        _drawing_panel(drawings, shown)
+
+
+# Chat ----------------------------------------------------------------------------------
+
+def _chat(conversation: Conversation | None, messages: list[Message],
+          shown: Message | None) -> None:
+    history = st.container(height=640, border=False, key="chat_history")
+    with history:
+        if not messages:
+            _welcome()
+        for message in messages:
+            _show_message(message, shown)
+
+    submitted = st.chat_input(
+        "Yêu cầu chỉnh hình, vd: vẽ thêm đường cao AH"
+        if messages else "Nhập đề bài hoặc đính kèm ảnh đề…",
+        key="chat_input", accept_file=True, file_type=IMAGE_TYPES, max_upload_size=20,
     )
-    if st.button("Vẽ hình", type="primary"):
-        _draw(text, options, user_id)
-    elif not _show_saved_drawing():
-        st.info("Chọn DeepSeek AI cho đề có nhiều điểm, giao tuyến, tiếp tuyến, đường phụ hoặc ký hiệu.")
-
-
-def _header(user_id: str | None) -> None:
-    st.title("geo-draw")
-    st.caption("Nhập văn bản hoặc tải ảnh đề hình học — DeepSeek đọc đề, tạo mã Manim và vẽ hình.")
-    if user_id is None:
-        notice, action = st.columns([5, 1], vertical_alignment="center")
-        notice.info("Đăng nhập để lưu lại lịch sử hỏi đáp", icon="🔐")
-        action.button("Đăng nhập", type="primary", width="stretch", on_click=auth.go_to_login)
-
-
-def _selected_problem_image() -> tuple[bytes, str] | None:
-    clipboard_state = st.session_state.get("clipboard_problem_image", {})
-    clipboard_result = CLIPBOARD_IMAGE(
-        key="clipboard_problem_image",
-        data={"image": clipboard_state.get("image")},
-        default={"image": None},
-        on_image_change=lambda: None,
-    )
-    image = decode_clipboard_image(getattr(clipboard_result, "image", None))
-
-    with st.expander("Hoặc chọn tệp ảnh"):
-        uploaded = st.file_uploader(
-            "Chọn ảnh đề bài",
-            type=["png", "jpg", "jpeg", "webp", "gif"],
-            max_upload_size=20,
-            help="Phương án dự phòng nếu trình duyệt không cho phép dán clipboard.",
-            label_visibility="collapsed",
-        )
-    if image is None and uploaded is not None:
-        image = (uploaded.getvalue(), uploaded.type)
-        st.image(uploaded, caption="Ảnh đề bài đã chọn", width=520)
-    return image
-
-
-def _image_to_text(options: DrawOptions) -> None:
-    """Optional OCR step: fills the problem text area from a pasted or uploaded image."""
-    image = _selected_problem_image()
-    st.caption("Dán ảnh → bấm Đọc đề từ ảnh → kiểm tra văn bản → bấm Vẽ hình.")
-    if image is not None and st.button("Đọc đề từ ảnh", type="secondary"):
-        if not options.uses_ai:
-            st.error("Hãy chọn DeepSeek AI để đọc nội dung từ ảnh.")
-        elif not options.ai.api_key:
-            st.error("Cần DeepSeek API key để đọc đề từ ảnh.")
-        else:
-            try:
-                with st.spinner("DeepSeek đang đọc đề bài trong ảnh..."):
-                    recognized = extract_problem_from_image(image[0], image[1], options.ai)
-            except ValueError as exc:
-                st.error(str(exc))
-            else:
-                # Set before the text area exists in the next run.
-                st.session_state["problem"] = recognized
-                st.session_state["ocr_success"] = True
-                st.rerun()
-    if st.session_state.pop("ocr_success", False):
-        st.success("Đã đọc đề từ ảnh. Bạn hãy kiểm tra nội dung bên dưới trước khi vẽ.")
-
-
-def _draw(text: str, options: DrawOptions, user_id: str | None) -> None:
-    if not text.strip():
-        st.error("Chưa có đề bài.")
+    pending = st.session_state.pop("pending_prompt", None)
+    if submitted is not None:
+        text = (submitted.text or "").strip()
+        image = submitted.files[0] if submitted.files else None
+    elif pending:
+        text, image = pending, None
+    else:
         return
-    if options.uses_ai:
-        missing_points = missing_reference_figure_points(text)
-        if missing_points:
-            st.error(
-                "Đề nhắc đến hình minh họa nhưng chưa nêu vị trí các điểm "
-                + ", ".join(missing_points)
-                + ". Hãy dán ảnh có đầy đủ hình vẽ hoặc bổ sung các quan hệ "
-                "của những điểm này vào đề trước khi vẽ."
-            )
-            return
-
-    st.session_state["label_offsets"] = {}
-    st.session_state["manual_edits"] = session.empty_manual_edits()
-    workspace = session.workspace()
-    workspace.mkdir(parents=True, exist_ok=True)
-    scene_path = workspace / "scene.py"
-    media_dir = workspace / "media"
-
-    def render():
-        return render_scene(
-            scene_path, media_dir, quality=options.quality, animate=options.animate,
-            label_offsets=st.session_state["label_offsets"],
-            manual_edits=st.session_state["manual_edits"],
-        )
-
-    if options.uses_ai:
-        with st.spinner("DeepSeek đang phân tích đề và viết mã Manim..."):
-            generated = generate_manim_code(text, options.ai, options.animate)
-        if not generated.ok:
-            st.error(generated.error)
-            return
-        scene_path.write_text(generated.code, encoding="utf-8")
-        summary = f"DeepSeek AI · {options.ai.model}"
-    else:
-        scene_path, summary = parser_scene(text, options.animate, scene_path)
-
-    with st.spinner("Manim đang render..."):
-        result = render()
-
-    if not result.ok and options.uses_ai:
-        for repair_attempt in range(1, 4):
-            with st.spinner(
-                f"Bản vẽ chưa đạt — DeepSeek đang tự cân chỉnh lần {repair_attempt}/3..."
-            ):
-                previous_code = scene_path.read_text(encoding="utf-8")
-                repair_context = (
-                    result.log[-4500:]
-                    + "\n\nPrevious module to improve:\n"
-                    + previous_code[-9000:]
-                )
-                repaired = generate_manim_code(
-                    text, options.ai, options.animate, repair_log=repair_context,
-                )
-            if not repaired.ok:
-                break
-            scene_path.write_text(repaired.code, encoding="utf-8")
-            result = render()
-            if result.ok:
-                break
-
-    if result.ok and result.image_path:
-        session.save_render_state(result, scene_path, summary, options.quality, options.animate,
-                                  problem=text)
-        if user_id:
-            config.HISTORY.add(user_id, text, summary, scene_path, result.image_path)
-            st.toast("Đã lưu hình vào lịch sử hỏi đáp.")
-    else:
-        st.error("Manim render thất bại: " + render_error_summary(result.log))
-    _show_drawing(scene_path, result.image_path if result.ok else None, result.video_path,
-                  result.log, options.quality, options.animate)
+    if not text and image is None:
+        return
+    with history:
+        _run_turn(conversation, messages, text, image)
+    st.rerun()
 
 
-def _show_saved_drawing() -> bool:
-    """Show the drawing kept in session state (or the newest one in the workspace)."""
-    image_path = Path(st.session_state.get("last_image_path", ""))
-    scene_path = Path(st.session_state.get("last_scene_path", ""))
-    if not image_path.is_file() or not scene_path.is_file():
-        workspace = session.workspace()
-        scene_path = workspace / "scene.py"
-        media_dir = workspace / "media"
-        candidates = list(media_dir.rglob("*.png")) if media_dir.exists() else []
-        image_path = max(candidates, key=lambda path: path.stat().st_mtime) if candidates else Path("")
-        if image_path.is_file() and scene_path.is_file():
-            st.session_state.setdefault("label_offsets", {})
-            st.session_state.setdefault("manual_edits", session.empty_manual_edits())
-            st.session_state["last_image_path"] = str(image_path)
-            st.session_state["last_scene_path"] = str(scene_path)
-            st.session_state["last_summary"] = "Bản vẽ gần nhất · chỉnh tại máy"
-            st.session_state["last_quality"] = "l"
-            st.session_state["last_animate"] = False
-    if not image_path.is_file() or not scene_path.is_file():
-        return False
-    video_path = Path(st.session_state.get("last_video_path", ""))
-    _show_drawing(
-        scene_path, image_path, video_path if video_path.is_file() else None,
-        st.session_state.get("last_render_log", ""),
-        st.session_state.get("last_quality", "l"),
-        st.session_state.get("last_animate", False),
+def _welcome() -> None:
+    st.markdown("#### Chào bạn! 👋")
+    st.markdown(
+        "Gửi một đề hình học phẳng — gõ trực tiếp hoặc bấm 📎 để đính kèm ảnh chụp đề. "
+        "Sau khi có hình, bạn có thể nhắn thêm yêu cầu như *“vẽ thêm đường tròn ngoại tiếp”* "
+        "để chỉnh tiếp."
     )
-    return True
+    st.caption("Thử một đề mẫu:")
+    for name, problem in config.EXAMPLES.items():
+        st.button(f"💡 {name}", key=f"example_{name}", width="stretch",
+                  on_click=_queue_prompt, args=(problem,))
 
 
-def _show_drawing(scene_path: Path, image_path: Path | None, video_path: Path | None,
-                  log: str, quality: str, animate: bool) -> None:
-    if image_path:
-        manual_editor(scene_path, quality, animate)
-        zoomable_image(image_path, "Khung hình Manim")
-    if video_path and video_path.exists():
-        st.video(str(video_path))
+def _queue_prompt(text: str) -> None:
+    st.session_state["pending_prompt"] = text
+
+
+def _show_message(message: Message, shown: Message | None) -> None:
+    if message.role == USER:
+        with st.chat_message("user"):
+            if message.image_path and message.image_path.is_file():
+                st.image(str(message.image_path), width=260)
+            if message.text:
+                st.markdown(message.text)
+        return
+    with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
+        st.markdown(message.text)
+        if message.has_drawing and message.image_path.is_file():
+            st.image(str(message.image_path), width=220)
+            if shown is None or message.id != shown.id:
+                st.button("Xem hình này", key=f"view_{message.id}", type="tertiary",
+                          on_click=session.view_message, args=(message.id,))
+
+
+def _run_turn(conversation: Conversation | None, messages: list[Message],
+              text: str, image) -> None:
+    """Handle one submitted message: optional OCR, then a full redraw."""
+    store, owner, options = session.conversations(), session.owner(), settings.current()
+    if conversation is None:
+        conversation = store.create(owner, text or "Đề từ ảnh")
+        session.open_conversation(conversation.id)
+
+    user_message_id, user_dir = store.new_message_dir(owner, conversation.id)
+    image_path = None
+    if image is not None:
+        suffix = mimetypes.guess_extension(image.type or "") or ".png"
+        image_path = user_dir / f"problem{suffix}"
+        image_path.write_bytes(image.getvalue())
+
+    with st.chat_message("user"):
+        if image_path:
+            st.image(str(image_path), width=260)
+        if text:
+            st.markdown(text)
+
+    with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
+        request, reply_prefix = text, ""
+        if image_path:
+            recognized, error = _read_problem_image(image, options)
+            if error:
+                store.add_message(conversation.id, USER, text, message_id=user_message_id,
+                                  image_path=image_path)
+                store.add_message(conversation.id, ASSISTANT, error)
+                return
+            request = recognized + (f"\n\n{text}" if text else "")
+            reply_prefix = f"**Đề đọc được từ ảnh:**\n\n{recognized}\n\n"
+            st.markdown(reply_prefix)
+            if not messages:
+                store.rename(owner, conversation.id, recognized)
+        store.add_message(conversation.id, USER, request, message_id=user_message_id,
+                          image_path=image_path)
+
+        requests = [message.text for message in messages if message.role == USER] + [request]
+        drawings = [message for message in messages if message.has_drawing]
+        previous_code = (drawings[-1].scene_path.read_text(encoding="utf-8")
+                         if drawings and drawings[-1].scene_path.is_file() else None)
+        reply_id, reply_dir = store.new_message_dir(owner, conversation.id)
+        outcome = draw(compose_problem(requests), options, reply_dir, previous_code)
+        store.add_message(
+            conversation.id, ASSISTANT, reply_prefix + outcome.message, message_id=reply_id,
+            image_path=outcome.image_path, scene_path=outcome.scene_path if outcome.ok else None,
+            video_path=outcome.video_path, log=outcome.log,
+        )
+    st.session_state.pop("viewing_message_id", None)  # show the newest drawing
+    session.reset_manual_edits()
+
+
+def _read_problem_image(image, options: settings.DrawOptions) -> tuple[str, str]:
+    """Return ``(recognized_text, error_message)``."""
+    if not options.uses_ai:
+        return "", "Đọc đề từ ảnh cần chế độ **DeepSeek AI**. Hãy đổi trong **Cài đặt**."
+    if not options.ai.api_key:
+        return "", "Cần DeepSeek API key để đọc đề từ ảnh. Mở **Cài đặt** ở cuối thanh bên để nhập key."
+    try:
+        with st.spinner("DeepSeek đang đọc đề bài trong ảnh..."):
+            return extract_problem_from_image(image.getvalue(), image.type, options.ai), ""
+    except ValueError as exc:
+        return "", str(exc)
+
+
+# Drawing panel ------------------------------------------------------------------------
+
+def _drawing_panel(drawings: list[Message], shown: Message | None) -> None:
+    if shown is None:
+        with st.container(border=True, height=640, vertical_alignment="center",
+                          horizontal_alignment="center"):
+            st.markdown("<div style='text-align:center;opacity:0.6'>"
+                        "<div style='font-size:3rem'>📐</div>"
+                        "Hình vẽ sẽ hiện ở đây</div>", unsafe_allow_html=True)
+        return
+
+    number = drawings.index(shown) + 1
+    label = "mới nhất" if shown is drawings[-1] else f"{number}/{len(drawings)}"
+    zoomable_image(shown.image_path, f"Hình vẽ · phiên bản {label}")
+    if shown is not drawings[-1]:
+        st.button("↩ Về hình mới nhất", key="view_latest", type="tertiary",
+                  on_click=session.view_message, args=(drawings[-1].id,))
+    if shown.video_path and shown.video_path.is_file():
+        st.video(str(shown.video_path))
+    options = settings.current()
+    manual_editor(shown, options.quality, options.animate)
     with st.expander("Mã Manim đã sinh"):
-        st.code(scene_path.read_text(encoding="utf-8"), language="python")
-    with st.expander("Log render"):
-        st.text(log[-8000:])
+        st.code(shown.scene_path.read_text(encoding="utf-8"), language="python")
+    if shown.log:
+        with st.expander("Log render"):
+            st.text(shown.log[-8000:])

@@ -15,9 +15,15 @@ def _sign_in(user_id: str) -> None:
     st.session_state["session_token"] = token
     st.query_params["session"] = token
     st.session_state.pop("anonymous_mode", None)
-    # Show this account's last drawing (if any) instead of the anonymous one.
-    st.session_state.pop("render_state_restored", None)
+    _forget_user_state()
     _clear_auth_messages()
+
+
+def _forget_user_state() -> None:
+    """Drop the open chat and settings (incl. a typed API key) when the user changes."""
+    for key in ("conversation_id", "viewing_message_id", "edits_for", "settings",
+                "history_imported_for"):
+        st.session_state.pop(key, None)
 
 
 def continue_anonymously() -> None:
@@ -104,7 +110,5 @@ def logout() -> None:
     st.query_params.pop("session", None)
     st.session_state.pop("anonymous_mode", None)
     show_auth_view("login")
-    # Shared classroom computers: don't leave the previous user's drawing on screen.
-    for key in ("problem", "last_scene_path", "last_image_path", "last_video_path",
-                "last_render_log", "last_summary"):
-        st.session_state.pop(key, None)
+    # Shared classroom computers: don't leave the previous user's chat or key on screen.
+    _forget_user_state()

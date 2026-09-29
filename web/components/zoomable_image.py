@@ -28,7 +28,7 @@ def zoomable_image(path: Path, caption: str) -> None:
           html, body {{ margin: 0; background: transparent; overflow: hidden; }}
           .viewport {{
             position: relative; width: 100%; height: 560px; overflow: hidden;
-            border-radius: 14px; background: #17172a; cursor: grab; user-select: none;
+            border-radius: 14px; background: #f3f4f6; border: 1px solid #e5e7eb; cursor: grab; user-select: none;
           }}
           .viewport.dragging {{ cursor: grabbing; }}
           #drawing {{

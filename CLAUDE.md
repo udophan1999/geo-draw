@@ -25,22 +25,25 @@ DeepSeek configuration is read from `.env` (see `.env.example`: `DEEPSEEK_API_KE
 
 ### Layout
 
-- `geo_draw/`: the shared core, with no Streamlit imports: geometry, AI code generation, rendering, accounts and history. A future `mobile/` app should reuse it.
+- `geo_draw/`: the shared core, with no Streamlit imports: geometry, AI code generation, rendering, accounts and chat conversations (`conversations.py`). A future `mobile/` app should reuse it.
 - `web/`: the Streamlit UI.
-  - `web/app.py`: routing. The login page is shown until the user signs in or chooses anonymous mode; after that the main page is shown.
-  - `web/config.py`: data paths, the shared `ACCOUNTS` and `HISTORY` stores, and the example problems.
-  - `web/session.py`: per-session state: the current user, the workspace folder, and saving or restoring the last drawing.
+  - `web/app.py`: routes and the access guard, built with `st.navigation(position="hidden")`. `/login` is the login/register page, `/dashboard` is the main page, and `/` redirects. Anyone who is not signed in and not in anonymous mode is sent to `/login`; anyone else who opens `/login` or `/` is sent to `/dashboard`. The redirects use `st.switch_page` and always carry `?session=<token>`. All access checks live here; views never redirect themselves. Pages are created inside `main()` on every run, because `st.Page` needs a script-run context.
+  - `web/config.py`: data paths, the shared `ACCOUNTS`, `CONVERSATIONS` and legacy `HISTORY` stores, and the example problems.
+  - `web/session.py`: per-session state: the current user, the workspace folder, the open conversation and which drawing is shown.
+  - `web/settings.py`: `DrawOptions` (mode, API key, model, quality, video), set in the settings dialog.
+  - `web/drawing.py`: one drawing turn (DeepSeek or parser → render → up to 3 AI repairs) shown with `st.status`.
+  - `web/styles.py`: CSS for things Streamlit has no option for: the sidebar layout with the account box at the bottom, and one-line chat titles.
   - `web/auth.py`: login, register and logout callbacks.
   - `web/rendering.py`: `parser_scene` and `render_error_summary`.
-  - `web/views/`: the pages, `login.py` and `main.py`. The folder is not called `pages/`, because Streamlit treats a `pages/` folder as multipage routing.
-  - `web/components/`: the paste-image component, the zoomable image, the manual editor and the sidebar sections (`DrawOptions` comes from `options_section`).
+  - `web/views/`: the pages, `login.py` and `dashboard.py`. The folder is not called `pages/`, because Streamlit treats a `pages/` folder as multipage routing.
+  - `web/components/`: the sidebar (chat list and account box), the settings dialog, the zoomable image and the manual editor.
 - `app.py` at the root only calls `web.app.main()`, so the app is still started with `streamlit run app.py` from the repo root. The Manim subprocess imports `geo_draw` from the working directory, so the app must be started from the repo root.
 
-Modules import each other as modules (`from web import session` → `session.workspace()`). The dependency order is `config` → `session`/`auth`/`rendering` → `components` → `views` → `app`; keep it one-way.
+Modules import each other as modules (`from web import session` → `session.workspace()`). The dependency order is `config` → `session` → `settings`/`auth`/`rendering` → `drawing` → `components` → `views` → `app`; keep it one-way.
 
 ### Rendering
 
-Every render is a **subprocess**: `renderer.render_scene` runs `python -m manim render <scene.py> GeoScene` into a fresh `<workspace>/media/run-<uuid>/` directory (see below). The separate directory exists because Windows keeps displayed files locked. State passes from the app to the scene only through environment variables:
+Every render is a **subprocess**: `renderer.render_scene` runs `python -m manim render <scene.py> GeoScene` into a fresh `<message folder>/media/run-<uuid>/` directory (see below). The separate directory exists because Windows keeps displayed files locked. State passes from the app to the scene only through environment variables:
 - `GEO_DRAW_LABEL_OFFSETS`: per-label nudges, read by `safe_point_label`.
 - `GEO_DRAW_MANUAL_EDITS`: hidden labels, points and segments, added segments, stroke widths and manual constructions (perpendicular, angle bisector, perpendicular bisector, median). These are applied inside `fit_scene_to_frame`.
 
@@ -54,7 +57,7 @@ Because of this, the "Chỉnh hình thủ công" editor (`web/components/manual_
    - DeepSeek is called with `SYSTEM_PROMPT`, which is built from the inline rules, `MIDDLE_SCHOOL_GEOMETRY_RULES` and `DRAWING_ERROR_MEMORY` from `geometry_knowledge.py`.
    - The reply goes through `extract_python`, then `_ensure_light_theme` (injects `apply_light_theme(self)`), then `sanitize_code` (auto-injects parallel and ordinary-polygon verifier calls), then `validate_code`.
    - When validation fails, the error is sent back to DeepSeek, up to 3 retries in the same conversation.
-   - In `web/views/main.py` (`_draw`), a failed Manim render triggers up to 3 more `generate_manim_code(..., repair_log=...)` calls that include the render log and the previous code. The README says "once"; the code is authoritative.
+   - In `web/views/dashboard.py` (`_draw`), a failed Manim render triggers up to 3 more `generate_manim_code(..., repair_log=...)` calls that include the render log and the previous code. The README says "once"; the code is authoritative.
 
 `extract_problem_from_image` uses the vision model for OCR only. It returns the problem text, which the user reviews before drawing.
 
@@ -74,23 +77,27 @@ The AI-generated scenes import these helpers. Examples: `safe_point_label`, `int
 
 Helpers raise `ValueError`s with codes such as `GEOMETRY_LAYOUT_CROWDED`, `GEOMETRY_ACCIDENTAL_SPECIAL`, `GEOMETRY_INVALID_SEGMENT` and `GEOMETRY_PARALLEL_NO_SEGMENT`. The repair prompt and `web.rendering.render_error_summary` match on these codes, so keep them stable.
 
-### Users, workspaces and history
+### Users and accounts
 
-The app opens on a separate login screen (`web/views/login.py`); `web/app.py` renders the main page only when the user is signed in or has clicked "Dùng ngay, không cần đăng nhập" (`session_state["anonymous_mode"]`). Anonymous users see the notice "Đăng nhập để lưu lại lịch sử hỏi đáp" on the main page, with a button back to the login screen. Signing in clears `render_state_restored`, so the account's last drawing is restored. Accounts are a username and password (6–64 characters), managed by `geo_draw/accounts.py` (`AccountStore`, `generated/users/accounts.sqlite3`). The login screen is one fixed-width (380px) card whose content is switched by `session_state["auth_view"]` (`"login"` or `"register"`); there are no tabs:
+The app opens on a separate login screen (`web/views/login.py`); `web/app.py` sends the user to `/dashboard` only when the user is signed in or has clicked "Dùng thử không cần tài khoản →" (`session_state["anonymous_mode"]`). Anonymous users see the notice "Đăng nhập để lưu lại lịch sử hỏi đáp" on the main page, with a button back to the login screen. Signing in clears `render_state_restored`, so the account's last drawing is restored. Accounts are a username and password (6–64 characters), managed by `geo_draw/accounts.py` (`AccountStore`, `generated/users/accounts.sqlite3`). The login screen is one fixed-width (380px) card whose content is switched by `session_state["auth_view"]` (`"login"` or `"register"`); there are no tabs:
 - **Đăng nhập** (`auth.submit_login`): for a wrong password and for an unknown username it shows the same message, "Sai tên đăng nhập hoặc mật khẩu." After 5 wrong passwords the username is locked for 5 minutes; the lock is stored in the database, not in the session.
 - **Đăng ký** (`auth.submit_register`): usernames are unique ignoring case and extra spaces. A taken name shows an error plus three free suggestions; clicking a suggestion fills the username field.
 
 Passwords are stored as salted PBKDF2 hashes; the column is still called `code_hash` so that existing databases keep working. After sign-in the URL carries a random session token (`?session=...`, looked up in the `sessions` table) so that a reload keeps the user signed in. Never put the name itself in the URL, because that would bypass the password. `auth.logout` deletes the token and clears the displayed drawing. `user_id` is `history.user_id_for(name.casefold())`.
 
-All render files go in a per-user workspace (`session.workspace()`), never directly in `generated/`:
-- Signed-in user: `generated/users/<user_id>/`. This folder persists across sessions.
-- Anonymous user: `generated/sessions/<random id kept in session_state>/`. Nothing is restored after a restart.
+### Dashboard = chat
 
-Each workspace holds `scene.py`, `media/run-*/` and `last_render.json`; the last of these restores the last problem, scene and image after a Streamlit restart. For signed-in users, every successful drawing is also saved by `geo_draw/history.py` (`HistoryStore`): a row in `generated/users/history.sqlite3` plus copies of the scene and image under `<user_id>/history/<entry_id>/`. The copies are needed because the next drawing overwrites `scene.py`. The history list is in the sidebar, and opening an entry is a button `on_click` callback.
+`/dashboard` (`web/views/dashboard.py`) has two columns: the chat on the left and the drawing on the right. The sidebar holds "Cuộc trò chuyện mới", the list of conversations, and an account box at the bottom. For signed-in users the account box is a popover with "Cài đặt" (a `st.dialog`) and "Đăng xuất". For guests it shows "Đăng nhập để lưu lại lịch sử hỏi đáp", a login button and ⚙️.
 
-Use `session.empty_manual_edits()` to create or reset the manual-edits dict. Do not assign `st.session_state["problem"]` after the text area is created in the same run, because Streamlit raises `StreamlitWidgetAlreadyInstantiatedError` (see the comment in `session.save_render_state`); set it from a callback or earlier in the run. `generated/` is gitignored.
+- **Continuous chat**: the first user message is the problem, and later messages are extra requests. Every turn redraws `compose_problem(all user texts)` ("…\n\nYêu cầu bổ sung (áp dụng theo thứ tự): 1. …"). The previous drawing's code is passed as `generate_manim_code(..., previous_code=...)` so DeepSeek keeps the layout. To start a different problem, the user opens a new conversation.
+- **Images**: `st.chat_input(accept_file=True)` handles 📎, drag-and-drop and Ctrl+V paste. An attached image goes through OCR, and the recognized text (plus any typed text) becomes that turn's request. OCR needs DeepSeek AI mode and a key.
+- **Storage** (`geo_draw/conversations.py`): `ConversationStore` keeps conversations and messages in SQLite. Every message can own a folder `<root>/<owner>/conversations/<cid>/<mid>/` holding the pasted image, or the `scene.py` and `media/` of a drawing. A message is a drawing when it is an assistant message with both `scene_path` and `image_path`. Signed-in users use `config.CONVERSATIONS` (root `generated/users/`, owner = user_id). Guests get a store inside their session folder (`generated/sessions/<id>/`, owner `guest`), so nothing is kept after the session.
+- **Right panel**: shows the newest drawing, or the one picked with "Xem hình này" (`session_state["viewing_message_id"]`), with zoom, video, the manual editor, the code and the log. The manual editor re-renders into that message's folder, calls `update_drawing`, and saves its state in `edits.json` next to the scene so that edits accumulate across reloads.
+- **Settings**: kept in `session_state["settings"]`. For signed-in users they are also written to `<workspace>/settings.json` (`generated/users/<user_id>/`), but the API key is never written to disk. Signing in or out clears the open conversation and the settings, including a typed key.
+- **Legacy history**: drawings saved by the old `HistoryStore` (`history.sqlite3`) are imported once per session as one-turn conversations with id `h<entry id>`. The import is idempotent.
+- Streamlit keeps the imported `web.*` modules in memory, so a running server may keep serving the old UI after an edit. Restart the server to be sure.
 
-To drive the app in tests, use `streamlit.testing.v1.AppTest` and **always set `GEO_DRAW_DATA_DIR` to a temporary folder**. Without it, the run writes accounts, history and renders into the real `generated/` folder, which holds the user's data. To simulate a signed-in user, create the account with `AccountStore(...).create(...)` and `start_session(...)`, then set `at.query_params["session"] = token` before `run()`. When a test creates several `AppTest` instances in one process, delete the `web` and `web.*` entries from `sys.modules` before each one. Each AppTest has its own runtime, and the paste-image component is registered when its module is imported (the pattern Streamlit recommends). Without the reload you get "Component 'geo_draw_clipboard_image' is not registered"; this only happens in tests, not on a real server.
+To drive the app in tests, use `streamlit.testing.v1.AppTest` and **always set `GEO_DRAW_DATA_DIR` to a temporary folder**. Without it, the run writes accounts, history and renders into the real `generated/` folder, which holds the user's data. To simulate a signed-in user, create the account with `AccountStore(...).create(...)` and `start_session(...)`, then set `at.query_params["session"] = token` before `run()`. `AppTest` always starts on the default route `/`, and its `switch_page()` only handles file-based pages. Before interacting with the dashboard, run the app once and then select the route with `at._page_hash = next(h for h, i in at._registered_pages.items() if i.get("url_pathname") == "dashboard")` (a private API). Without this step, every rerun goes through the `/` redirect and button clicks are lost. Check the URLs and redirects themselves in a real browser. When a test creates several `AppTest` instances in one process, delete the `web` and `web.*` entries from `sys.modules` before each one. Each AppTest has its own runtime, and the paste-image component is registered when its module is imported (the pattern Streamlit recommends). Without the reload you get "Component 'geo_draw_clipboard_image' is not registered"; this only happens in tests, not on a real server.
 
 ## Drawing rules (from `.cursor/rules/geo-draw-regressions.mdc`, always applied)
 

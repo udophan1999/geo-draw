@@ -7,6 +7,7 @@ from pathlib import Path
 
 from geo_draw.accounts import AccountStore
 from geo_draw.ai_codegen import load_dotenv
+from geo_draw.conversations import ConversationStore
 from geo_draw.history import HistoryStore
 
 
@@ -18,6 +19,8 @@ USERS_DIR = GENERATED / "users"
 SESSIONS_DIR = GENERATED / "sessions"
 HISTORY = HistoryStore(USERS_DIR)
 ACCOUNTS = AccountStore(USERS_DIR)
+# Signed-in users' chats; a guest's chats use a store in their session folder.
+CONVERSATIONS = ConversationStore(USERS_DIR)
 load_dotenv(ROOT / ".env")
 
 EXAMPLES = {

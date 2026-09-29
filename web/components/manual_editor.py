@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 import streamlit as st
 
+from geo_draw.conversations import Message
 from geo_draw.renderer import render_scene
 
-from web import rendering
-from web import session
+from web import rendering, session
 
 
 def _scene_label_names(scene_path: Path) -> list[str]:
@@ -47,28 +48,41 @@ def _suggest_point_name(names: list[str], edits: dict, preferred: str) -> str:
     return next((name for name in choices if name not in occupied), "")
 
 
-def manual_editor(scene_path: Path, quality: str, animate: bool) -> None:
+def manual_editor(message: Message, quality: str, animate: bool) -> None:
+    """Edit the drawing of ``message``; a successful re-render replaces its image."""
+    scene_path = message.scene_path
     names = _scene_label_names(scene_path)
     if not names:
         return
-    offsets = st.session_state.setdefault("label_offsets", {})
-    edits = st.session_state.setdefault("manual_edits", session.empty_manual_edits())
+    # Edits are saved next to the scene so they survive reloads and keep accumulating.
+    edits_file = scene_path.parent / "edits.json"
+    if st.session_state.get("edits_for") != message.id:
+        try:
+            saved = json.loads(edits_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            saved = {}
+        st.session_state["label_offsets"] = saved.get("label_offsets", {})
+        st.session_state["manual_edits"] = {**session.empty_manual_edits(),
+                                            **saved.get("manual_edits", {})}
+        st.session_state["edits_for"] = message.id
+    offsets = st.session_state["label_offsets"]
+    edits = st.session_state["manual_edits"]
 
     def rerender() -> None:
         with st.spinner("Đang cập nhật hình tại máy, không gọi DeepSeek..."):
             result = render_scene(
-                scene_path, session.workspace() / "media", quality=quality, animate=animate,
+                scene_path, scene_path.parent / "media", quality=quality, animate=animate,
                 label_offsets=offsets, manual_edits=edits,
             )
         if result.ok and result.image_path:
-            session.save_render_state(
-                result, scene_path, st.session_state.get("last_summary", "Manim"),
-                quality, animate,
-            )
+            edits_file.write_text(json.dumps({"label_offsets": offsets, "manual_edits": edits},
+                                             ensure_ascii=False), encoding="utf-8")
+            session.conversations().update_drawing(message.id, result.image_path,
+                                                   result.video_path)
             st.rerun()
         st.error("Không thể cập nhật hình: " + rendering.render_error_summary(result.log))
 
-    with st.expander("🛠️ Chỉnh hình thủ công", expanded=True):
+    with st.expander("🛠️ Chỉnh hình thủ công", expanded=False):
         st.caption(
             "Các thao tác ở đây chỉ render lại trên máy, không gửi yêu cầu mới tới DeepSeek. "
             "Tọa độ hình học gốc được giữ nguyên để không làm sai dữ kiện."

@@ -1759,7 +1759,8 @@ def extract_problem_from_image(
 
 
 def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
-                        repair_log: str | None = None) -> AiResult:
+                        repair_log: str | None = None,
+                        previous_code: str | None = None) -> AiResult:
     missing_points = missing_reference_figure_points(problem)
     if missing_points:
         return AiResult(
@@ -1773,6 +1774,13 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
     mode = ("Use self.play animations and finish with self.wait(0.5)." if animate else
             "Do not use self.play. Add all mobjects with self.add(...) and finish with self.wait(0.1).")
     user = f"Animation mode: {mode}\n\nGeometry problem:\n{problem.strip()}"
+    if previous_code:
+        # Chat follow-ups: the problem now ends with "Yêu cầu bổ sung"; update the last drawing.
+        user += ("\n\nThe current drawing was made for an earlier version of this problem. "
+                 "Return a complete updated module that satisfies the whole problem above, "
+                 "including every numbered 'Yêu cầu bổ sung'. Keep the existing coordinates, "
+                 "labels and objects unless a request changes them. Current module:\n"
+                 + previous_code[-9000:])
     if repair_log:
         user += ("\n\nA previous render failed. Return a complete corrected module for the same problem. "
                  "If GEOMETRY_LAYOUT_CROWDED or GEOMETRY_ACCIDENTAL_SPECIAL appears, "

@@ -1,16 +1,17 @@
-"""Per-browser-session state: signed-in user, workspace folder and the last drawing."""
+"""Per-browser-session state: signed-in user, workspace folder and the open conversation."""
 
 from __future__ import annotations
 
-import json
 import uuid
 from pathlib import Path
 
 import streamlit as st
 
-from geo_draw.history import HistoryEntry
+from geo_draw.conversations import ASSISTANT, USER, ConversationStore
 
 from web import config
+
+GUEST_OWNER = "guest"
 
 
 def empty_manual_edits() -> dict:
@@ -22,7 +23,7 @@ def empty_manual_edits() -> dict:
 
 def current_user_id() -> str | None:
     # The URL keeps a random session token (?session=...), so a page reload stays signed in
-    # without putting the name itself in the URL, which would bypass the secret code.
+    # without putting the name itself in the URL, which would bypass the password.
     if "user_id" not in st.session_state:
         token = st.query_params.get("session", "")
         user_id = config.ACCOUNTS.session_user(token)
@@ -42,63 +43,56 @@ def workspace() -> Path:
     return config.SESSIONS_DIR / session_id
 
 
-def save_render_state(result, scene_path: Path, summary: str,
-                       quality: str, animate: bool, problem: str | None = None) -> None:
-    st.session_state["last_scene_path"] = str(scene_path)
-    st.session_state["last_image_path"] = str(result.image_path) if result.image_path else ""
-    st.session_state["last_video_path"] = str(result.video_path) if result.video_path else ""
-    st.session_state["last_render_log"] = result.log
-    st.session_state["last_summary"] = summary
-    st.session_state["last_quality"] = quality
-    st.session_state["last_animate"] = animate
-    # The text area owns session_state["problem"] once instantiated. Writing
-    # that key during the same run raises StreamlitWidgetAlreadyInstantiatedError.
-    # Persist the submitted value directly instead of mutating widget state.
-    saved_problem = problem if problem is not None else st.session_state.get("problem", "")
-    state_path = workspace() / "last_render.json"
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(json.dumps({
-        "problem": saved_problem,
-        "scene_path": str(scene_path.resolve()),
-        "image_path": str(result.image_path.resolve()) if result.image_path else "",
-        "video_path": str(result.video_path.resolve()) if result.video_path else "",
-        "summary": summary,
-        "quality": quality,
-        "animate": animate,
-    }, ensure_ascii=False, indent=2), encoding="utf-8")
+def owner() -> str:
+    return current_user_id() or GUEST_OWNER
 
 
-def restore_render_state() -> None:
-    """Restore one coherent problem/scene/image bundle after a server restart."""
-    if st.session_state.get("render_state_restored"):
-        return
-    st.session_state["render_state_restored"] = True
-    try:
-        saved = json.loads((workspace() / "last_render.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError, TypeError):
-        return
-    scene_path = Path(str(saved.get("scene_path", "")))
-    image_path = Path(str(saved.get("image_path", "")))
-    if not scene_path.is_file() or not image_path.is_file():
-        return
-    st.session_state["problem"] = str(saved.get("problem", ""))
-    st.session_state["last_scene_path"] = str(scene_path)
-    st.session_state["last_image_path"] = str(image_path)
-    st.session_state["last_video_path"] = str(saved.get("video_path", ""))
-    st.session_state["last_summary"] = str(saved.get("summary", "Manim"))
-    st.session_state["last_quality"] = str(saved.get("quality", "l"))
-    st.session_state["last_animate"] = bool(saved.get("animate", False))
+def conversations() -> ConversationStore:
+    """Signed-in users share one store; a guest's store lives in their session folder."""
+    user_id = current_user_id()
+    if not user_id:
+        return ConversationStore(workspace())
+    if st.session_state.get("history_imported_for") != user_id:
+        _import_old_history(user_id)
+        st.session_state["history_imported_for"] = user_id
+    return config.CONVERSATIONS
 
 
-def open_history_entry(entry: HistoryEntry) -> None:
-    # Runs as a button callback, i.e. before the problem text area exists in the next run.
-    st.session_state["problem"] = entry.problem
-    st.session_state["label_offsets"] = {}
-    st.session_state["manual_edits"] = empty_manual_edits()
-    st.session_state["last_scene_path"] = str(entry.scene_path)
-    st.session_state["last_image_path"] = str(entry.image_path)
-    st.session_state["last_video_path"] = ""
-    st.session_state["last_render_log"] = ""
-    st.session_state["last_summary"] = entry.summary
-    st.session_state["last_quality"] = "l"
-    st.session_state["last_animate"] = False
+def _import_old_history(user_id: str) -> None:
+    """Turn drawings saved before chat existed (HistoryStore) into one-turn conversations."""
+    store = config.CONVERSATIONS
+    for entry in reversed(config.HISTORY.list(user_id, limit=1000)):
+        conversation_id = f"h{entry.id}"
+        if store.get(user_id, conversation_id):
+            continue
+        store.import_conversation(
+            user_id, conversation_id, entry.problem, entry.created_at,
+            [(USER, entry.problem, None, None), (ASSISTANT, entry.summary, entry.image_path,
+                                                  entry.scene_path)],
+        )
+
+
+# Open conversation and the drawing shown on the right --------------------------------
+
+def current_conversation_id() -> str | None:
+    return st.session_state.get("conversation_id") or None
+
+
+def open_conversation(conversation_id: str | None) -> None:
+    st.session_state["conversation_id"] = conversation_id or ""
+    st.session_state.pop("viewing_message_id", None)
+    reset_manual_edits()
+
+
+def new_conversation() -> None:
+    open_conversation(None)
+
+
+def view_message(message_id: str) -> None:
+    st.session_state["viewing_message_id"] = message_id
+    reset_manual_edits()
+
+
+def reset_manual_edits() -> None:
+    """Make the manual editor reload the saved edits of whichever drawing it shows next."""
+    st.session_state.pop("edits_for", None)
