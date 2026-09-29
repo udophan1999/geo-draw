@@ -1,4 +1,4 @@
-"""Main page: problem input (text or image) → DeepSeek/parser → Manim render → result."""
+"""Dashboard (/dashboard): problem input (text or image) → DeepSeek/parser → Manim render → result."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from web.components.zoomable_image import zoomable_image
 from web.rendering import parser_scene, render_error_summary
 
 
-def main_page(user_id: str | None) -> None:
+def dashboard_page(user_id: str | None) -> None:
     session.restore_render_state()
     _header(user_id)
     with st.sidebar:

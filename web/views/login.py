@@ -1,4 +1,4 @@
-"""Login / register screen shown before the main page."""
+"""Login / register screen (/login)."""
 
 from __future__ import annotations
 
