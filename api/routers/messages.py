@@ -77,7 +77,8 @@ async def send_message(
 
 @router.get("/jobs/{job_id}/events")
 async def job_events(job_id: str, request: Request, owner: Owner = Depends(get_owner)):
-    """Server-sent events: ``progress``, ``message`` (saved message JSON), then ``done`` or ``error``."""
+    """Server-sent events: ``progress``, ``message`` (saved message JSON), then ``done`` or
+    ``failed`` (not ``error``, which EventSource reserves for connection errors)."""
     job = app_state(request).jobs.get(job_id, owner.identity)
     if job is None:
         raise HTTPException(404, "Không tìm thấy lượt vẽ.")

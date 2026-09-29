@@ -32,7 +32,7 @@ class Job:
     def push(self, kind: str, data: object) -> None:
         with self._condition:
             self.events.append((kind, data))
-            if kind in ("done", "error"):
+            if kind in ("done", "failed"):
                 self.finished_at = time.time()
             self._condition.notify_all()
 
@@ -73,7 +73,7 @@ class JobManager:
             work(job.push)
         except Exception:  # noqa: BLE001 — report any failure to the waiting browser
             logger.exception("Drawing job %s failed", job.id)
-            job.push("error", {"detail": "Máy chủ gặp lỗi khi vẽ hình. Hãy thử lại."})
+            job.push("failed", {"detail": "Máy chủ gặp lỗi khi vẽ hình. Hãy thử lại."})
         else:
             job.push("done", {})
 

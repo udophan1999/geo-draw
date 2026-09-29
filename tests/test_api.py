@@ -164,6 +164,16 @@ class ChatTests(ApiTestCase):
                           files={"image": ("de.txt", b"hello", "text/plain")})
         self.assertEqual(bad.status_code, 415)
 
+    def test_a_crashing_turn_ends_with_failed(self):
+        client = self.client()
+        self.use_parser(client)
+        with patch("api.routers.messages.run_turn", side_effect=RuntimeError("boom")), \
+                self.assertLogs("api.jobs", level="ERROR"):
+            started = self.send(client, TRIANGLE).json()
+            events = read_events(client, started["job_id"])
+        self.assertEqual([kind for kind, _ in events], ["failed"])
+        self.assertIn("Máy chủ gặp lỗi", events[0][1]["detail"])
+
     def test_ai_mode_without_server_key_is_unavailable(self):
         response = self.send(self.client(), TRIANGLE)  # default settings: AI mode
         self.assertEqual(response.status_code, 503)
