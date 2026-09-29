@@ -72,6 +72,19 @@ Nếu đề thiếu dữ kiện hoặc mơ hồ, nói rõ điểm chưa rõ và 
 """.strip()
 
 
+# The tutor reports how far the student has come, so the level bar follows the lesson
+# instead of moving only on "Gợi ý sâu hơn". The app reads and removes the tag.
+PROGRESS_RULE = f"""
+=== BÁO TIẾN ĐỘ (ứng dụng tự đọc và ẩn đi, học sinh không thấy) ===
+Dòng cuối cùng của câu trả lời phải là đúng một thẻ, không thêm gì sau nó:
+- [[bac:N]], với N từ 1 đến {MAX_HINT_LEVEL} là bậc gợi ý của chính câu trả lời này. Khi học sinh
+  đã làm được ý của bậc hiện tại (trả lời đúng, tự tiến thêm một bước), hãy chuyển sang bậc
+  tiếp theo phù hợp với tiến độ đó. Bậc không bao giờ giảm.
+- [[xong]] khi học sinh đã tự tìm ra đáp số cuối cùng, hoặc đã chứng minh xong, cho mọi ý của
+  đề. Khi đó hãy khen và xác nhận kết quả của em; không cần kết thúc bằng câu hỏi.
+""".strip()
+
+
 def clamp_level(level: int) -> int:
     return min(max(int(level or 1), 1), MAX_HINT_LEVEL)
 
@@ -103,6 +116,7 @@ def build_system_prompt(problem: str, mode: str = HINT, level: int = 1,
     level = clamp_level(level)
     level_block = (
         f"=== BẬC GỢI Ý HIỆN TẠI: {level}/{MAX_HINT_LEVEL} ({HINT_LEVELS[level - 1]}) ===\n"
-        f"Chỉ đưa gợi ý ở đúng bậc {level}. Không nhảy bậc, không gộp nhiều bậc trong một lượt."
+        f"Đưa gợi ý ở bậc {level}. Không gộp nhiều bậc trong một lượt."
     )
-    return "\n\n".join([BASE_TUTOR_PROMPT, problem_block, figure_block, level_block, GUARDRAIL])
+    return "\n\n".join([BASE_TUTOR_PROMPT, problem_block, figure_block, level_block, GUARDRAIL,
+                         PROGRESS_RULE])

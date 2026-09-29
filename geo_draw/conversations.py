@@ -29,7 +29,7 @@ HINT = "hint"
 SOLUTION = "solution"
 TITLE_LENGTH = 60
 
-_CONVERSATION_COLUMNS = "id, title, created_at, updated_at, problem, mode, hint_level"
+_CONVERSATION_COLUMNS = "id, title, created_at, updated_at, problem, mode, hint_level, solved"
 _MESSAGE_COLUMNS = ("id, conversation_id, role, text, image_path, scene_path, video_path, "
                     "log, created_at, channel, meta")
 
@@ -43,6 +43,10 @@ class Conversation:
     problem: str = ""
     mode: str = HINT
     hint_level: int = 1
+    solved: bool = False  # the student reached the final answer in hint mode
+
+    def __post_init__(self) -> None:
+        self.solved = bool(self.solved)  # SQLite stores 0/1
 
 
 @dataclass
@@ -155,10 +159,12 @@ class ConversationStore:
         return Conversation(*row) if row else None
 
     def update(self, owner: str, conversation_id: str, *, problem: str | None = None,
-               mode: str | None = None, hint_level: int | None = None) -> None:
-        """Change the problem text, the tutor mode or the hint level."""
+               mode: str | None = None, hint_level: int | None = None,
+               solved: bool | None = None) -> None:
+        """Change the problem text, the tutor mode, the hint level or the solved flag."""
         changes = {key: value for key, value in
-                   (("problem", problem), ("mode", mode), ("hint_level", hint_level))
+                   (("problem", problem), ("mode", mode), ("hint_level", hint_level),
+                    ("solved", None if solved is None else int(solved)))
                    if value is not None}
         if not changes:
             return
@@ -290,7 +296,8 @@ def _message(row) -> Message:
 _ADDED_COLUMNS = {
     "conversations": [("problem", "TEXT NOT NULL DEFAULT ''"),
                       ("mode", f"TEXT NOT NULL DEFAULT '{HINT}'"),
-                      ("hint_level", "INTEGER NOT NULL DEFAULT 1")],
+                      ("hint_level", "INTEGER NOT NULL DEFAULT 1"),
+                      ("solved", "INTEGER NOT NULL DEFAULT 0")],
     "messages": [("channel", f"TEXT NOT NULL DEFAULT '{FIGURE}'"),
                  ("meta", "TEXT NOT NULL DEFAULT '{}'")],
 }

@@ -1,4 +1,4 @@
-import { BookOpenCheck, Lightbulb, Sparkles } from 'lucide-react'
+import { BookOpenCheck, CircleCheck, Lightbulb, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 
 import {
@@ -23,6 +23,8 @@ export function TutorBar({ conversation, busy, onAction }: Props) {
   const [confirmSolution, setConfirmSolution] = useState(false)
   const solution = conversation.mode === 'solution'
   const level = Math.min(Math.max(conversation.hint_level, 1), HINT_LEVELS.length)
+  // The tutor moves the level as the student progresses, and reports when the answer is found.
+  const solved = conversation.solved
   const modeButton = (active: boolean) =>
     cn('flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium transition disabled:opacity-60',
        active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')
@@ -42,6 +44,13 @@ export function TutorBar({ conversation, busy, onAction }: Props) {
 
       {solution ? (
         <span className="ml-auto text-xs text-muted-foreground">Đang xem lời giải đầy đủ</span>
+      ) : solved ? (
+        <span className="ml-auto flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="flex gap-0.5" aria-hidden="true">
+            {HINT_LEVELS.map((name) => <span key={name} className="h-1.5 w-3 rounded-full bg-emerald-500" />)}
+          </span>
+          <CircleCheck className="size-3.5" /> Đã giải xong
+        </span>
       ) : (
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground"

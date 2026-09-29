@@ -103,21 +103,64 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
     emit("progress", {"stage": "thinking",
                       "label": "Đang soạn lời giải..." if mode == SOLUTION else "Đang suy nghĩ..."})
     reply_text, reply_meta = "", dict(meta)
+    solved = conversation.solved
+    hidden = _ProgressTagFilter()
     try:
         for piece in stream_chat(ai, model_messages, max_tokens=6000 if mode == SOLUTION else 1500):
             reply_text += piece
-            emit("delta", {"text": piece})
+            shown = hidden.feed(piece)
+            if shown:
+                emit("delta", {"text": shown})
+        reply_text, reported_level, done = read_progress(reply_text)
         if not reply_text.strip():
             raise ValueError("AI không trả về nội dung. Hãy thử lại.")
+        if mode == HINT:
+            level = max(level, clamp_level(reported_level or level))
+            solved = solved or done
+        reply_meta = {**meta, "hint_level": level, "solved": solved}
     except ValueError as exc:
         reply_text, reply_meta = str(exc), {**meta, "error": True}
     reply = store.add_message(conversation_id, ASSISTANT, reply_text, channel=CHAT,
                               meta=reply_meta)
     emit("message", reply)
     if not reply_meta.get("error"):
-        store.update(owner, conversation_id, mode=mode, hint_level=level)
+        store.update(owner, conversation_id, mode=mode, hint_level=level, solved=solved)
     emit("conversation", store.get(owner, conversation_id))
     return [user_message, reply]
+
+
+_PROGRESS_TAG = re.compile(r"\[\[\s*(?:bac\s*:\s*(\d+)|(xong))\s*\]\]", re.IGNORECASE)
+
+
+def read_progress(text: str) -> tuple[str, int | None, bool]:
+    """Split the tutor's progress tag off a reply: (text, reported level, solved)."""
+    level, done = None, False
+    for match in _PROGRESS_TAG.finditer(text):
+        if match.group(1):
+            level = int(match.group(1))
+        else:
+            done = True
+    return _PROGRESS_TAG.sub("", text).rstrip(), level, done
+
+
+class _ProgressTagFilter:
+    """Hide the trailing progress tag from the streamed text (the tag comes last)."""
+
+    def __init__(self) -> None:
+        self._held = ""
+        self._stopped = False
+
+    def feed(self, piece: str) -> str:
+        if self._stopped:
+            return ""
+        text = self._held + piece
+        start = text.find("[[")
+        if start >= 0:
+            self._stopped = True
+            return text[:start].rstrip()
+        # A lone "[" at the end may be the start of a tag: hold it until the next piece.
+        self._held = "[" if text.endswith("[") else ""
+        return text[:-1] if self._held else text
 
 
 def record_canned_reply(store: ConversationStore, conversation_id: str, text: str,

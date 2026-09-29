@@ -16,6 +16,8 @@ export type Conversation = {
   problem: string
   mode: TutorMode
   hint_level: number
+  /** The student reached the final answer (reported by the tutor in hint mode). */
+  solved: boolean
   is_geometry: boolean
 }
 export type Role = 'user' | 'assistant'
@@ -32,7 +34,7 @@ export type Message = {
   has_log: boolean
   /** "chat": the tutor conversation. "figure": drawing requests and drawings. */
   channel: Channel
-  meta: { mode?: TutorMode; hint_level?: number; error?: boolean }
+  meta: { mode?: TutorMode; hint_level?: number; solved?: boolean; error?: boolean }
 }
 export type ConversationDetail = { conversation: Conversation; messages: Message[] }
 export type Settings = {

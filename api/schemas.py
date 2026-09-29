@@ -73,5 +73,6 @@ def conversation_json(conversation: Conversation, problem: str | None = None) ->
         "problem": problem,
         "mode": conversation.mode,
         "hint_level": conversation.hint_level,
+        "solved": conversation.solved,
         "is_geometry": is_geometry_problem(problem),
     }

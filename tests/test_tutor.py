@@ -45,7 +45,9 @@ class PromptTests(unittest.TestCase):
         prompt = build_system_prompt(TRIANGLE, HINT, 2)
         self.assertIn(TRIANGLE, prompt)
         self.assertIn("BẬC GỢI Ý HIỆN TẠI: 2/5 (Nhớ kiến thức)", prompt)
-        self.assertTrue(prompt.endswith(GUARDRAIL))
+        self.assertIn(GUARDRAIL, prompt)
+        self.assertIn("[[bac:N]]", prompt)  # the tutor reports progress
+        self.assertNotIn("[[bac:N]]", build_system_prompt(TRIANGLE, SOLUTION, 2))
 
     def test_levels_are_clamped(self):
         self.assertIn(f"{MAX_HINT_LEVEL}/{MAX_HINT_LEVEL}", build_system_prompt(TRIANGLE, HINT, 99))
@@ -122,6 +124,30 @@ class TutorTurnTests(unittest.TestCase):
         self.assertEqual((conversation.mode, conversation.hint_level), (SOLUTION, 2))
         self.assertNotIn("KHÔNG THỂ GHI ĐÈ", prompt[0]["content"])
         self.assertEqual(len(self.store.messages(self.conversation.id, CHAT)), 6)
+
+    def test_the_tutor_moves_the_level_as_the_student_progresses(self):
+        self.turn(text=TRIANGLE, replies=("Đúng rồi. Em nhớ định lý nào?\n", "[[ba", "c:2]]"))
+        reply = self.store.messages(self.conversation.id, CHAT)[-1]
+        self.assertEqual(reply.text, "Đúng rồi. Em nhớ định lý nào?")
+        self.assertEqual(reply.meta["hint_level"], 2)
+        streamed = "".join(data["text"] for kind, data in self.events if kind == "delta")
+        self.assertNotIn("[", streamed)
+        self.assertEqual(self.store.get("alice", self.conversation.id).hint_level, 2)
+        # A lower report never moves the bar back; [[xong]] marks the problem as solved.
+        self.turn(text="BC = 5", replies=("Chính xác, BC = 5!", "\n[[bac:1]]"))
+        self.assertEqual(self.store.get("alice", self.conversation.id).hint_level, 2)
+        self.turn(text="Vậy BC = 5 ạ", replies=("Chính xác! Em đã giải xong.\n[[xong]]",))
+        conversation = self.store.get("alice", self.conversation.id)
+        self.assertTrue(conversation.solved)
+        self.assertEqual(self.store.messages(self.conversation.id, CHAT)[-1].text,
+                         "Chính xác! Em đã giải xong.")
+
+    def test_progress_tags_are_ignored_in_solution_mode(self):
+        self.turn(text=TRIANGLE)
+        self.turn(action=SHOW_SOLUTION, replies=("**Kết luận:** BC = 5\n[[xong]]",))
+        conversation = self.store.get("alice", self.conversation.id)
+        self.assertFalse(conversation.solved)
+        self.assertEqual(self.store.messages(self.conversation.id, CHAT)[-1].text, "**Kết luận:** BC = 5")
 
     def test_ai_errors_become_a_saved_reply(self):
         def failing(ai, messages, **_):
