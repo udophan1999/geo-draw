@@ -1,5 +1,6 @@
 // Typing math without knowing LaTeX: a bar of common symbols (inserted as Unicode) and a
-// visual formula editor (MathLive) that inserts $LaTeX$, rendered by KaTeX in the chat.
+// visual formula editor (MathLive). The composer inserts its formula as plain Unicode when
+// possible (lib/plainMath.ts), else as $LaTeX$ with a rendered preview.
 import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -45,7 +46,7 @@ export function SymbolBar({ onInsert }: { onInsert: (text: string) => void }) {
 
 type MathField = HTMLElement & { getValue: (format?: string) => string; focus: () => void }
 
-/** Visual formula editor; ``onInsert`` receives ``$…$`` ready to put in the message. */
+/** Visual formula editor; ``onInsert`` receives the formula's LaTeX. */
 export function FormulaDialog({ open, onOpenChange, onInsert }: {
   open: boolean; onOpenChange: (open: boolean) => void; onInsert: (text: string) => void
 }) {
@@ -81,7 +82,7 @@ export function FormulaDialog({ open, onOpenChange, onInsert }: {
 
   const insert = () => {
     const latex = field.current?.getValue('latex').trim()
-    if (latex) onInsert(`$${latex}$`)
+    if (latex) onInsert(latex)
     onOpenChange(false)
   }
 

@@ -2,9 +2,11 @@ import { ArrowUp, ImagePlus, Loader2, Omega, Sigma, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { FormulaDialog, SymbolBar } from '@/components/chat/MathInput'
+import { MathMarkdown } from '@/components/MathMarkdown'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { IMAGE_TYPES, acceptImage } from '@/lib/images'
+import { latexToPlain } from '@/lib/plainMath'
 
 type Props = {
   image: File | null
@@ -85,6 +87,13 @@ export function Composer({ image, onImage, onSend, busy, placeholder }: Props) {
           </div>
         )}
         {showSymbols && <SymbolBar onInsert={insert} />}
+        {/\$|\\\(|\\\[/.test(text) && (
+          // The textarea shows LaTeX source; show how the message will look.
+          <div className="mx-3 mt-2 rounded-lg bg-muted/60 px-3 py-1.5" aria-label="Xem trước">
+            <span className="text-[11px] font-medium text-muted-foreground">Xem trước</span>
+            <MathMarkdown className="text-sm leading-relaxed">{text.replace(/\n/g, '  \n')}</MathMarkdown>
+          </div>
+        )}
         <textarea
           ref={textarea}
           rows={1}
@@ -153,7 +162,7 @@ export function Composer({ image, onImage, onSend, busy, placeholder }: Props) {
       <p className="mt-2 text-center text-xs text-muted-foreground">
         Enter để gửi · Shift+Enter để xuống dòng
       </p>
-      <FormulaDialog open={formulaOpen} onOpenChange={setFormulaOpen} onInsert={(formula) => insert(formula, true)} />
+      <FormulaDialog open={formulaOpen} onOpenChange={setFormulaOpen} onInsert={(latex) => insert(latexToPlain(latex) ?? `$${latex}$`, true)} />
     </div>
   )
 }
