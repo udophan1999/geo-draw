@@ -13,7 +13,7 @@ from geo_draw.conversations import (
 )
 from geo_draw.tutor import (
     DEEPER, GENERIC, SHOW_SOLUTION, SPECIFIC, drawing_request, is_geometry_problem,
-    record_canned_reply, run_tutor_turn,
+    record_canned_reply, run_tutor_turn, suggest_title,
 )
 from geo_draw.tutor_prompts import (
     FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN, GUARDRAIL, MAX_HINT_LEVEL, build_system_prompt,
@@ -95,7 +95,8 @@ class TutorTurnTests(unittest.TestCase):
             prompts.append(messages)
             yield from replies
 
-        with patch("geo_draw.tutor.stream_chat", side_effect=fake_stream):
+        with patch("geo_draw.tutor.stream_chat", side_effect=fake_stream), \
+                patch("geo_draw.tutor._request_chat", side_effect=ValueError("offline")):
             messages = run_tutor_turn(self.store, "alice", self.conversation.id, ai=AI,
                                       on_event=lambda kind, data: self.events.append((kind, data)),
                                       **kwargs)
@@ -148,6 +149,26 @@ class TutorTurnTests(unittest.TestCase):
         conversation = self.store.get("alice", self.conversation.id)
         self.assertFalse(conversation.solved)
         self.assertEqual(self.store.messages(self.conversation.id, CHAT)[-1].text, "**Kết luận:** BC = 5")
+
+    def test_the_first_reply_gives_the_conversation_a_short_ai_title(self):
+        long_problem = r"Tính tích phân sau: $\int_1^{10} (x^2 + 1)\,dx$ rồi so sánh với diện tích hình thang."
+        with patch("geo_draw.tutor.stream_chat", return_value=iter(["Gợi ý"])), \
+                patch("geo_draw.tutor._request_chat", return_value="Tên: “Tích phân x² + 1 từ 1 đến 10”.\n") as title:
+            run_tutor_turn(self.store, "alice", self.conversation.id, text=long_problem, ai=AI)
+        self.assertEqual(self.store.get("alice", self.conversation.id).title, "Tích phân x² + 1 từ 1 đến 10")
+        self.assertIn("LaTeX", title.call_args.args[1][0]["content"])
+        # Later turns keep the title.
+        with patch("geo_draw.tutor.stream_chat", return_value=iter(["Đúng"])), \
+                patch("geo_draw.tutor._request_chat") as title:
+            run_tutor_turn(self.store, "alice", self.conversation.id, text="x = 2", ai=AI)
+        title.assert_not_called()
+
+    def test_unusable_ai_titles_keep_the_problem_as_title(self):
+        for bad in ["$\\int_1^{10}$", "x" * 80, ""]:
+            with patch("geo_draw.tutor._request_chat", return_value=bad):
+                self.assertIsNone(suggest_title(TRIANGLE, AI), bad)
+        with patch("geo_draw.tutor._request_chat", side_effect=ValueError("offline")):
+            self.assertIsNone(suggest_title(TRIANGLE, AI))
 
     def test_ai_errors_become_a_saved_reply(self):
         def failing(ai, messages, **_):

@@ -13,7 +13,7 @@ import unicodedata
 from collections.abc import Callable
 from typing import Literal
 
-from .ai_codegen import AiSettings, extract_problem_from_image, stream_chat
+from .ai_codegen import AiSettings, _request_chat, extract_problem_from_image, stream_chat
 from .conversations import (
     ASSISTANT, CHAT, HINT, SOLUTION, USER, ConversationStore, Message,
 )
@@ -80,8 +80,9 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
                               str(exc), mode, level)
         request = recognized + (f"\n\n{text}" if text else "")
 
-    if not problem:
-        # The first message is the problem itself.
+    first_turn = not problem
+    if first_turn:
+        # The first message is the problem itself; an AI title replaces it after the reply.
         problem = request
         store.update(owner, conversation_id, problem=problem)
         store.rename(owner, conversation_id, problem)
@@ -125,8 +126,40 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
     emit("message", reply)
     if not reply_meta.get("error"):
         store.update(owner, conversation_id, mode=mode, hint_level=level, solved=solved)
+        if first_turn:
+            title = suggest_title(problem, ai)
+            if title:
+                store.rename(owner, conversation_id, title)
     emit("conversation", store.get(owner, conversation_id))
     return [user_message, reply]
+
+
+TITLE_PROMPT = """
+Đặt tên ngắn cho một bài toán để hiển thị trong danh sách các cuộc trò chuyện.
+- Tiếng Việt, tối đa 7 từ (khoảng 40 ký tự), nêu dạng bài và đối tượng chính.
+- Không dùng LaTeX, không có ký tự $ hay \\. Ký hiệu toán viết bằng Unicode nếu cần (x², √, ∫, △).
+- Không có dấu chấm cuối, không ngoặc kép, không giải thích. Chỉ trả về tên.
+Ví dụ: Phương trình bậc hai x² − 5x + 6 = 0 · Tích phân x² + 1 từ 1 đến 10 ·
+Tam giác vuông ABC, tính BC · Tìm m để hai đường thẳng song song ·
+Kích thước mảnh vườn hình chữ nhật
+""".strip()
+TITLE_MAX = 60
+
+
+def suggest_title(problem: str, ai: AiSettings) -> str | None:
+    """A short AI title for the conversation list, or None (the problem text stays)."""
+    try:
+        raw = _request_chat(ai, [{"role": "system", "content": TITLE_PROMPT},
+                                 {"role": "user", "content": problem[:3000]}],
+                            timeout=20, max_tokens=60)
+    except (ValueError, OSError):  # a title is never worth failing the turn
+        return None
+    lines = [line.strip() for line in raw.strip().splitlines() if line.strip()]
+    title = re.sub(r"^(?:tên|tiêu đề)\s*:\s*", "", lines[0] if lines else "", flags=re.IGNORECASE)
+    title = title.strip(" \"'“”*`.")
+    if not title or len(title) > TITLE_MAX or "$" in title or "\\" in title:
+        return None
+    return title
 
 
 _PROGRESS_TAG = re.compile(r"\[\[\s*(?:bac\s*:\s*(\d+)|(xong))\s*\]\]", re.IGNORECASE)

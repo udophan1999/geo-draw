@@ -52,6 +52,9 @@ class ApiTestCase(unittest.TestCase):
         tutor = patch("geo_draw.tutor.stream_chat", side_effect=fake_stream)
         self.tutor_stream = tutor.start()
         self.addCleanup(tutor.stop)
+        titles = patch("geo_draw.tutor._request_chat", return_value="Tên bài toán")  # no network
+        self.title_request = titles.start()
+        self.addCleanup(titles.stop)
 
     def tearDown(self):
         self.state.jobs.shutdown(wait=True)  # let background jobs finish before the dir goes
