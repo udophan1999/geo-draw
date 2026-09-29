@@ -28,6 +28,8 @@ python -m unittest tests.test_ai_codegen.AiCodegenTests.test_missing_referenced_
 
 There is no linter or build step. The theme (blue primary color, minimal toolbar) is set in `.streamlit/config.toml`, which is committed; only `.streamlit/secrets.toml` is gitignored. Static renders need only Manim (labels use `Text`, so no LaTeX is required). Video output needs FFmpeg.
 
+**Docker (production):** `Dockerfile` builds the web app (node 22), compiles the Python deps (without Streamlit and the test client), and runs one uvicorn worker as user `app` with `GEO_DRAW_DATA_DIR=/data` (volume `mathmate-data`) and `PYTHONPATH=/app` for the Manim subprocess. Keep it to one worker and one replica: jobs, SSE streams and `figure_jobs` live in process memory. `docker-compose.yml` publishes `${PORT:-8000}`; `docker-compose.traefik.yml` is an override for the server's existing Traefik (labels, external network `TRAEFIK_NETWORK`, no published port). Never add a Traefik `buffering` middleware, since it holds SSE back. `.env` reaches the container through `env_file`, so a local test run gets the real key: test only paths that make no AI call.
+
 DeepSeek configuration is read from `.env` (see `.env.example`: `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, `DEEPSEEK_VISION_MODEL`, `DEEPSEEK_BASE_URL`) by a small custom `load_dotenv` in `ai_codegen.py`. The API only ever uses this server key; the legacy Streamlit UI still lets users type a key in its settings. Never write the key into scenes, logs or code. The API also reads `GEO_DRAW_DAILY_LIMIT_USER` (default 100), `GEO_DRAW_DAILY_LIMIT_GUEST` (default 10), `GEO_DRAW_COOKIE_SECURE=1` (for HTTPS) and `GEO_DRAW_DATA_DIR`.
 
 ## Architecture

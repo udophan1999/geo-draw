@@ -1,0 +1,28 @@
+# MathMate in production.
+#
+#   cp .env.example .env              # fill in DEEPSEEK_API_KEY
+#   docker compose up -d --build      # http://<server>:8000
+#
+# Behind the Traefik already running on the server (HTTPS on your domain, no open port):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
+#
+# Data (accounts, conversations, drawings, daily usage) lives in the "mathmate-data" volume.
+
+services:
+  app:
+    build: .
+    image: mathmate:latest
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      GEO_DRAW_DATA_DIR: /data
+    volumes:
+      - mathmate-data:/data
+    ports:
+      - "${PORT:-8000}:8000"
+
+volumes:
+  mathmate-data:

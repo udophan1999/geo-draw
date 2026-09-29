@@ -1,0 +1,21 @@
+# Only geo_draw/, api/, web/ and requirements.txt go into the image.
+.git
+.venv*
+venv
+**/__pycache__
+**/*.py[cod]
+.env
+.env.*
+generated
+media
+media_cache
+.manim_cache
+web/node_modules
+web/dist
+tests
+streamlit_app
+.streamlit
+.claude
+.cursor
+*.log
+.DS_Store

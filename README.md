@@ -58,6 +58,25 @@ Mở `http://localhost:8000`. Nếu chạy sau HTTPS, đặt `GEO_DRAW_COOKIE_SE
 .venv/bin/streamlit run app.py
 ```
 
+## Chạy production bằng Docker
+
+Image gồm máy chủ API và giao diện đã build sẵn, kèm Cairo, Pango, FFmpeg để Manim vẽ hình và làm video. Dữ liệu (tài khoản, cuộc trò chuyện, hình vẽ, lượt dùng) nằm trong volume `mathmate-data`.
+
+```bash
+cp .env.example .env                 # điền DEEPSEEK_API_KEY
+docker compose up -d --build         # mở http://<máy chủ>:8000 (đổi cổng bằng PORT trong .env)
+```
+
+**Chạy sau Traefik** (HTTPS theo tên miền, không mở cổng 8000 ra ngoài). Trong `.env`, điền `DOMAIN`, đặt `GEO_DRAW_COOKIE_SECURE=1`, và nếu Traefik trên máy chủ dùng tên khác mặc định thì sửa `TRAEFIK_NETWORK` (mạng Docker của Traefik), `TRAEFIK_ENTRYPOINT` (`websecure`) và `TRAEFIK_CERTRESOLVER` (`letsencrypt`). Sau đó:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
+```
+
+Cập nhật phiên bản mới: `git pull` rồi chạy lại lệnh trên. Sao lưu dữ liệu: `docker run --rm -v geo-draw_mathmate-data:/data -v "$PWD":/backup alpine tar czf /backup/mathmate-data.tgz -C /data .` (tên volume có tiền tố là tên thư mục dự án; xem bằng `docker volume ls`).
+
+Máy chủ chỉ chạy **một** tiến trình uvicorn: các lượt đang chạy và luồng cập nhật trực tiếp nằm trong bộ nhớ của tiến trình đó, nên đừng tăng `--workers` hay chạy nhiều bản sao.
+
 ## Thiết lập DeepSeek
 
 Sao chép `.env.example` thành `.env` rồi điền:
