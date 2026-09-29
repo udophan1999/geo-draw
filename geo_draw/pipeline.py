@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .ai_codegen import AiSettings, generate_manim_code, missing_reference_figure_points
 from .engine import build_figure
+from .graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind, generate_graph_code
 from .parser import parse_problem
 from .renderer import render_scene
 from .scene_builder import write_scene
@@ -69,10 +70,17 @@ def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l
     extended by a chat follow-up; DeepSeek is asked to keep its layout.
     """
     report = on_progress or (lambda stage, label: None)
+    kind = drawing_kind(problem)
+    if kind is None:
+        return DrawingOutcome(False, NOT_DRAWABLE)
+    if kind == GRAPH and ai is None:
+        return DrawingOutcome(False, GRAPH_NEEDS_AI)
+    # Functions and integrals get axes and curves; the geometry prompt would invent a triangle.
+    generate = generate_graph_code if kind == GRAPH else generate_manim_code
     if ai is not None:
         if not ai.api_key:
             return DrawingOutcome(False, "Chưa có DeepSeek API key.")
-        missing_points = missing_reference_figure_points(problem)
+        missing_points = [] if kind == GRAPH else missing_reference_figure_points(problem)
         if missing_points:
             return DrawingOutcome(
                 False,
@@ -90,8 +98,9 @@ def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l
         return render_scene(scene_path, media_dir, quality=quality, animate=animate)
 
     if ai is not None:
-        report(GENERATING, "DeepSeek đang phân tích đề và viết mã Manim...")
-        generated = generate_manim_code(problem, ai, animate, previous_code=previous_code)
+        report(GENERATING, "DeepSeek đang vẽ đồ thị..." if kind == GRAPH else
+               "DeepSeek đang phân tích đề và viết mã Manim...")
+        generated = generate(problem, ai, animate, previous_code=previous_code)
         if not generated.ok:
             return DrawingOutcome(False, generated.error)
         scene_path.write_text(generated.code, encoding="utf-8")
@@ -110,7 +119,7 @@ def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l
                 + "\n\nPrevious module to improve:\n"
                 + scene_path.read_text(encoding="utf-8")[-9000:]
             )
-            repaired = generate_manim_code(problem, ai, animate, repair_log=repair_context)
+            repaired = generate(problem, ai, animate, repair_log=repair_context)
             if not repaired.ok:
                 break
             scene_path.write_text(repaired.code, encoding="utf-8")

@@ -23,6 +23,7 @@ from fastapi.responses import StreamingResponse
 from geo_draw.ai_codegen import AiSettings
 from geo_draw.chat import run_figure_turn
 from geo_draw.conversations import CHAT, FIGURE, USER, Conversation, Message
+from geo_draw.graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind
 from geo_draw.tutor import (
     ACTIONS, ASK, GENERIC, REPLY_DRAWING, REPLY_NOT_DRAWN, REPLY_SHOWN, SPECIFIC,
     drawing_request, is_geometry_problem, record_canned_reply, run_tutor_turn,
@@ -71,6 +72,12 @@ def start_figure_job(state: AppState, owner: Owner, conversation: Conversation,
     if not text and not owner.store.problem_of(conversation):
         raise HTTPException(422, "Chưa có đề bài để vẽ hình.")
     settings = load_settings(owner)
+    # Checked before any quota is spent: the AI would otherwise invent a figure.
+    kind = drawing_kind(owner.store.problem_of(conversation) or text)
+    if kind is None:
+        raise HTTPException(422, NOT_DRAWABLE)
+    if kind == GRAPH and settings.mode != "ai":
+        raise HTTPException(422, GRAPH_NEEDS_AI)
     ai = None
     if settings.mode == "ai":
         if not state.ai_available:

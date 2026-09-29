@@ -77,7 +77,13 @@ Every render is a **subprocess**: `renderer.render_scene` runs `python -m manim 
 
 Because of this, the "Chỉnh hình thủ công" editor (`streamlit_app/components/manual_editor.py`) re-renders the *same* scene file locally without calling DeepSeek. Any new manual-edit feature must be added in three places: `scene_info.empty_manual_edits()`, the env var, and the handling code in `geometry_primitives.py`.
 
-### Two generation paths
+### Generation paths
+
+`pipeline.draw` first calls `graphing.drawing_kind(problem)`:
+- `"geometry"` goes to the parser or geometry AI path below;
+- `"graph"` (hàm số, đồ thị, tích phân, `∫`, `y =`) goes to `graphing.generate_graph_code`. That path uses its own `GRAPH_PROMPT` (Axes, `axes.plot`, `axes.get_area`, `Text` labels only because there is no LaTeX) and `validate_graph_code`, which applies the safety checks and bans MathTex, `include_numbers` and the axis-label helpers. It needs the AI; the parser cannot draw graphs;
+- `None` (for example a plain equation) is refused with `NOT_DRAWABLE`, without calling the AI. `api/routers/messages.start_figure_job` makes the same check before it spends quota. Without this, the geometry prompt invented a triangle for an integral.
+
 
 1. **Parser path** (no API): `parser.parse_problem` (regex, produces `Problem`) → `engine.build_figure` (coordinates, produces `Figure`) → `scene_builder.write_scene` (emits a simple Manim module).
 2. **AI path** (`ai_codegen.generate_manim_code`):

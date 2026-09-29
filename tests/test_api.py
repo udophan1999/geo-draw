@@ -17,6 +17,7 @@ from tests.test_pipeline import AI_SCENE
 
 TRIANGLE = "Cho tam giác ABC vuông tại A, AB = 3, AC = 4."
 EQUATION = "Giải phương trình $x^2 - 5x + 6 = 0$."
+INTEGRAL = r"Tính tích phân $\int_1^{10} (x^2 + 1)\,dx$."
 WORD_PROBLEM = "Một mảnh vườn hình chữ nhật có chu vi 34 m. Tính chiều dài và chiều rộng."
 HINT_REPLY = ("Em thử nhớ lại ", "định lý Pythagore: $a^2 + b^2 = c^2$ nhé. ", "BC bằng bao nhiêu?")
 
@@ -178,13 +179,26 @@ class ChatTests(ApiTestCase):
                          [(FIGURE, ASSISTANT), (FIGURE, USER), (FIGURE, ASSISTANT)])
         self.assertEqual(len([m for m in messages if m["channel"] == CHAT]), 2)
 
-    def test_other_problems_are_not_drawn_but_can_be(self):
+    def test_problems_without_a_figure_are_never_drawn(self):
         client = self.client()
         self.use_parser(client)
         started = self.send(client, EQUATION).json()
         events = read_events(client, started["job_id"])
         self.assertNotIn("figure_job", [kind for kind, _ in events])
-        self.assertEqual(self.figure(client, started["conversation"]["id"]).status_code, 202)
+        # Refused outright, before any quota is spent, instead of inventing a triangle.
+        response = self.figure(client, started["conversation"]["id"])
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("không có hình", response.json()["detail"])
+
+    def test_graphs_are_drawn_on_request_and_need_the_ai(self):
+        client = self.client()
+        self.use_parser(client)
+        started = self.send(client, INTEGRAL).json()
+        events = read_events(client, started["job_id"])
+        self.assertNotIn("figure_job", [kind for kind, _ in events])
+        response = self.figure(client, started["conversation"]["id"])
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("DeepSeek", response.json()["detail"])
 
     def test_asking_for_a_drawing_in_the_chat_draws_it(self):
         client = self.client()
