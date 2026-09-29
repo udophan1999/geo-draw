@@ -11,11 +11,13 @@ from api.main import create_app
 from geo_draw.ai_codegen import AiSettings
 from geo_draw.conversations import ASSISTANT, CHAT, FIGURE, USER
 from geo_draw.renderer import render_scene
+from geo_draw.tutor import REPLY_DRAWING, REPLY_SHOWN
 
 from tests.test_pipeline import AI_SCENE
 
 TRIANGLE = "Cho tam giác ABC vuông tại A, AB = 3, AC = 4."
 EQUATION = "Giải phương trình $x^2 - 5x + 6 = 0$."
+WORD_PROBLEM = "Một mảnh vườn hình chữ nhật có chu vi 34 m. Tính chiều dài và chiều rộng."
 HINT_REPLY = ("Em thử nhớ lại ", "định lý Pythagore: $a^2 + b^2 = c^2$ nhé. ", "BC bằng bao nhiêu?")
 
 
@@ -51,7 +53,7 @@ class ApiTestCase(unittest.TestCase):
         self.addCleanup(tutor.stop)
 
     def tearDown(self):
-        self.state.jobs.shutdown()
+        self.state.jobs.shutdown(wait=True)  # let background jobs finish before the dir goes
         self._tmp.cleanup()
 
     def client(self) -> TestClient:
@@ -183,6 +185,38 @@ class ChatTests(ApiTestCase):
         events = read_events(client, started["job_id"])
         self.assertNotIn("figure_job", [kind for kind, _ in events])
         self.assertEqual(self.figure(client, started["conversation"]["id"]).status_code, 202)
+
+    def test_asking_for_a_drawing_in_the_chat_draws_it(self):
+        client = self.client()
+        self.use_parser(client)
+        started = self.send(client, WORD_PROBLEM).json()
+        read_events(client, started["job_id"])
+        conversation_id = started["conversation"]["id"]
+        system_prompt = self.tutor_stream.call_args.args[1][0]["content"]
+        self.assertIn("CHƯA có hình vẽ", system_prompt)  # the tutor must not invent a figure
+        tutor_calls = self.tutor_stream.call_count
+
+        # "vẽ giúp mình": the app draws and answers itself; no tutor turn.
+        ask = self.send(client, "Bạn vẽ giúp mình được không?", conversation_id)
+        self.assertEqual(ask.status_code, 202)
+        events = read_events(client, ask.json()["job_id"])
+        figure_job = next(data["job_id"] for kind, data in events if kind == "figure_job")
+        self.assertEqual(events[-2][1]["text"], REPLY_DRAWING)
+        self.assertTrue([d for k, d in read_events(client, figure_job) if k == "message"][-1]["has_drawing"])
+        self.assertEqual(self.tutor_stream.call_count, tutor_calls)
+
+        # Asked again once the figure exists: no second drawing.
+        again = read_events(client, self.send(client, "vẽ hình giúp em", conversation_id).json()["job_id"])
+        self.assertNotIn("figure_job", [kind for kind, _ in again])
+        self.assertEqual(again[-2][1]["text"], REPLY_SHOWN)
+
+        # A specific request refines the figure and the tutor answers, knowing it is drawn.
+        refine = self.send(client, "Kẻ thêm đường chéo AC", conversation_id)
+        events = read_events(client, refine.json()["job_id"])
+        figure_job = next(data["job_id"] for kind, data in events if kind == "figure_job")
+        read_events(client, figure_job)
+        self.assertEqual(self.tutor_stream.call_count, tutor_calls + 1)
+        self.assertIn("đang vẽ hình", self.tutor_stream.call_args.args[1][0]["content"])
 
     def test_other_users_and_guests_cannot_see_a_conversation(self):
         alice = self.client()

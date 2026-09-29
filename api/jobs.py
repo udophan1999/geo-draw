@@ -64,8 +64,8 @@ class JobManager:
             job = self._jobs.get(job_id)
         return job if job and job.owner == owner else None
 
-    def shutdown(self) -> None:
-        self._executor.shutdown(wait=False, cancel_futures=True)
+    def shutdown(self, wait: bool = False) -> None:
+        self._executor.shutdown(wait=wait, cancel_futures=not wait)
 
     @staticmethod
     def _run(job: Job, work: Callable[[Push], None]) -> None:

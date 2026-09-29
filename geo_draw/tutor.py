@@ -11,12 +11,13 @@ import mimetypes
 import re
 import unicodedata
 from collections.abc import Callable
+from typing import Literal
 
 from .ai_codegen import AiSettings, extract_problem_from_image, stream_chat
 from .conversations import (
     ASSISTANT, CHAT, HINT, SOLUTION, USER, ConversationStore, Message,
 )
-from .tutor_prompts import build_system_prompt, clamp_level
+from .tutor_prompts import FIGURE_NONE, build_system_prompt, clamp_level
 
 ASK = "ask"          # a normal message (the problem, or an answer to the tutor)
 DEEPER = "deeper"    # "Gợi ý sâu hơn": one hint level up
@@ -39,8 +40,13 @@ EventCallback = Callable[[str, object], None]
 def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *,
                    text: str = "", image: bytes | None = None, image_type: str | None = None,
                    action: str = ASK, ai: AiSettings,
+                   figure: Callable[[], str] = lambda: FIGURE_NONE,
                    on_event: EventCallback | None = None) -> list[Message]:
-    """Handle one chat message; return the saved user message and tutor reply."""
+    """Handle one chat message; return the saved user message and tutor reply.
+
+    ``figure()`` tells the prompt whether a figure is shown, being drawn, or missing. It is
+    called after the user message is saved, since that may start the automatic drawing.
+    """
     emit = on_event or (lambda kind, payload: None)
     if action not in ACTIONS:
         raise ValueError(f"Unknown tutor action: {action}")
@@ -87,7 +93,8 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
                                      image_path=image_path, channel=CHAT, meta=meta)
     emit("message", user_message)
 
-    model_messages = [{"role": "system", "content": build_system_prompt(problem, mode, level)}]
+    model_messages = [{"role": "system",
+                       "content": build_system_prompt(problem, mode, level, figure())}]
     for message in history[-HISTORY_LIMIT:]:
         if message.text:
             model_messages.append({"role": message.role, "content": message.text})
@@ -111,6 +118,18 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
         store.update(owner, conversation_id, mode=mode, hint_level=level)
     emit("conversation", store.get(owner, conversation_id))
     return [user_message, reply]
+
+
+def record_canned_reply(store: ConversationStore, conversation_id: str, text: str,
+                        reply: str, on_event: EventCallback | None = None) -> list[Message]:
+    """Save a chat exchange answered by the app itself (no AI call), e.g. "vẽ giúp mình"."""
+    emit = on_event or (lambda kind, payload: None)
+    meta = {"canned": True}
+    user_message = store.add_message(conversation_id, USER, text, channel=CHAT, meta=meta)
+    emit("message", user_message)
+    answer = store.add_message(conversation_id, ASSISTANT, reply, channel=CHAT, meta=meta)
+    emit("message", answer)
+    return [user_message, answer]
 
 
 def _framed(request: str, problem: str, history: list[Message], mode: str) -> str:
@@ -181,3 +200,37 @@ def is_geometry_problem(text: str) -> bool:
     if _mentions(plain, _FIGURES):
         return True
     return _mentions(plain, _RELATIONS) and not _mentions(plain, _ALGEBRA)
+
+
+# Drawing requests typed in the chat ------------------------------------------------------
+
+# The app's own replies to "vẽ giúp mình" (no AI call).
+REPLY_DRAWING = ("Mình đang vẽ hình ở khung bên cạnh nhé (trên điện thoại, chọn mục **Hình vẽ** ở "
+                 "trên). Trong lúc chờ, em thử nghĩ tiếp câu hỏi lúc nãy của mình xem sao?")
+REPLY_SHOWN = ("Hình vẽ của bài đang ở khung bên cạnh (trên điện thoại, chọn mục **Hình vẽ** ở trên). "
+               "Muốn thêm chi tiết thì em nhắn cụ thể, ví dụ “vẽ thêm đường cao AH”.")
+REPLY_NOT_DRAWN = "Mình chưa vẽ được hình: {detail}"
+
+GENERIC = "generic"    # "vẽ giúp mình", "nên vẽ hình trước": draw the figure, no tutor reply
+SPECIFIC = "specific"  # "kẻ thêm đường cao AH": refine the figure and let the tutor answer
+
+# Matched on accented lowercase text: without accents "vẽ" would also match "về".
+_DRAW_VERB = re.compile(r"(?<!\w)(vẽ|kẻ|dựng)(?!\w)")
+_GENERIC_ASK = re.compile(
+    r"(?<!\w)vẽ\s+(?:giúp|hộ|dùm|giùm|cho|ra|đi|lại hình|hình|thử|được không)(?!\w)"
+)
+_OBJECTS = [
+    "đường cao", "trung điểm", "trung tuyến", "phân giác", "trung trực", "đường tròn",
+    "tiếp tuyến", "đường thẳng", "đoạn", "tia", "góc", "hình chiếu", "giao điểm",
+    "song song", "vuông góc", "đường chéo", "bán kính", "đường kính",
+]
+
+
+def drawing_request(text: str) -> Literal["generic", "specific"] | None:
+    """Whether a chat message asks the app to draw, and how specifically."""
+    lower = unicodedata.normalize("NFC", text.lower())
+    if not _DRAW_VERB.search(lower):
+        return None
+    if _NAMED_POINTS.search(text) or any(word in lower for word in _OBJECTS):
+        return SPECIFIC
+    return GENERIC if _GENERIC_ASK.search(lower) else None

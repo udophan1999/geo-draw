@@ -2,7 +2,9 @@
 
 - ``POST /api/messages``: a message to the tutor (the problem, an answer, or an action such
   as "Gợi ý sâu hơn"). The first message of a plane-geometry problem also starts a figure
-  job, announced on the tutor's event stream as ``figure_job``.
+  job, announced on the tutor's event stream as ``figure_job``. Drawing requests typed in
+  the chat are routed to the figure: "vẽ giúp mình" draws it and gets a canned reply (no AI
+  tutor turn); "kẻ thêm đường cao AH" refines it and the tutor still answers.
 - ``POST /api/conversations/{id}/figure``: draw the figure, or refine it with a request.
 - ``GET /api/jobs/{id}/events``: ``progress``, ``delta`` (tutor text as it arrives),
   ``message`` (saved message JSON), ``conversation``, ``figure_job``, then ``done`` or
@@ -13,14 +15,19 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from geo_draw.ai_codegen import AiSettings
 from geo_draw.chat import run_figure_turn
-from geo_draw.conversations import CHAT, USER, Conversation, Message
-from geo_draw.tutor import ACTIONS, ASK, is_geometry_problem, run_tutor_turn
+from geo_draw.conversations import CHAT, FIGURE, USER, Conversation, Message
+from geo_draw.tutor import (
+    ACTIONS, ASK, GENERIC, REPLY_DRAWING, REPLY_NOT_DRAWN, REPLY_SHOWN, SPECIFIC,
+    drawing_request, is_geometry_problem, record_canned_reply, run_tutor_turn,
+)
+from geo_draw.tutor_prompts import FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN
 
 from ..deps import Owner, app_state, get_owner, owned_conversation
 from ..jobs import Job
@@ -72,13 +79,25 @@ def start_figure_job(state: AppState, owner: Owner, conversation: Conversation,
         _consume_ai_turn(state, owner)
         ai = _ai(state, settings.model)
     convert = _event_payload(owner)
+    # Mark the conversation as being drawn before the job starts: a fast (parser) job
+    # could otherwise finish before the mark is set and leave it behind for good.
+    marker = uuid.uuid4().hex
+    state.figure_jobs[conversation.id] = marker
 
     def work(push) -> None:
-        run_figure_turn(owner.store, owner.store_owner, conversation.id, text=text, ai=ai,
-                        quality=settings.quality, animate=settings.animate,
-                        on_event=lambda kind, payload: push(kind, convert(payload)))
+        try:
+            run_figure_turn(owner.store, owner.store_owner, conversation.id, text=text, ai=ai,
+                            quality=settings.quality, animate=settings.animate,
+                            on_event=lambda kind, payload: push(kind, convert(payload)))
+        finally:
+            if state.figure_jobs.get(conversation.id) == marker:
+                del state.figure_jobs[conversation.id]
 
     return state.jobs.submit(owner.identity, work)
+
+
+def _has_drawing(owner: Owner, conversation: Conversation) -> bool:
+    return any(m.has_drawing for m in owner.store.messages(conversation.id, FIGURE))
 
 
 @router.post("/messages", status_code=202)
@@ -109,31 +128,69 @@ async def send_message(
     conversation = owned_conversation(owner, conversation_id) if conversation_id else None
     if conversation is None and action != ASK:
         raise HTTPException(422, "Hãy gửi đề bài trước.")
+    first_turn = conversation is None or not owner.store.messages(conversation.id, CHAT)
+    wants_drawing = (drawing_request(text) if action == ASK and not first_turn and not image_bytes
+                     else None)
+    if wants_drawing == GENERIC:
+        return _answer_drawing_request(state, owner, conversation, text)
     if not state.ai_available:
         raise HTTPException(503, "Máy chủ chưa cấu hình DeepSeek API key nên chưa giải toán được.")
     _consume_ai_turn(state, owner)
     if conversation is None:
         conversation = owner.store.create(owner.store_owner, text or "Đề từ ảnh")
-    first_turn = not owner.store.messages(conversation.id, CHAT)
     ai = _ai(state, load_settings(owner).model)
     convert = _event_payload(owner)
 
+    def figure_state() -> str:
+        if conversation.id in state.figure_jobs:
+            return FIGURE_DRAWING
+        return FIGURE_SHOWN if _has_drawing(owner, conversation) else FIGURE_NONE
+
     def work(push) -> None:
+        def start_figure(request: str = "") -> None:
+            try:
+                figure = start_figure_job(state, owner, conversation, request)
+            except HTTPException as exc:
+                push("figure_skipped", {"detail": exc.detail})
+            else:
+                push("figure_job", {"job_id": figure.id})
+
         def on_event(kind: str, payload: object) -> None:
             push(kind, convert(payload))
+            if kind != "message" or payload.role != USER:
+                return
             # Once the problem is known (typed or read from a photo), draw plane geometry.
-            if (first_turn and kind == "message" and payload.role == USER
-                    and is_geometry_problem(payload.text)):
-                try:
-                    figure = start_figure_job(state, owner, conversation)
-                except HTTPException as exc:
-                    push("figure_skipped", {"detail": exc.detail})
-                else:
-                    push("figure_job", {"job_id": figure.id})
+            if first_turn and is_geometry_problem(payload.text):
+                start_figure()
+            elif wants_drawing == SPECIFIC:
+                start_figure(text)  # "kẻ thêm đường cao AH": refine, and the tutor answers too
 
         run_tutor_turn(owner.store, owner.store_owner, conversation.id, text=text,
                        image=image_bytes, image_type=image_type, action=action, ai=ai,
-                       on_event=on_event)
+                       figure=figure_state, on_event=on_event)
+
+    job = state.jobs.submit(owner.identity, work)
+    return {"conversation": conversation_json(conversation), "job_id": job.id}
+
+
+def _answer_drawing_request(state: AppState, owner: Owner, conversation: Conversation,
+                            text: str) -> dict:
+    """ "vẽ giúp mình" in the chat: draw (unless a figure exists) and reply without the AI."""
+    convert = _event_payload(owner)
+
+    def work(push) -> None:
+        if _has_drawing(owner, conversation) or conversation.id in state.figure_jobs:
+            reply = REPLY_SHOWN if _has_drawing(owner, conversation) else REPLY_DRAWING
+        else:
+            try:
+                figure = start_figure_job(state, owner, conversation)
+            except HTTPException as exc:
+                reply = REPLY_NOT_DRAWN.format(detail=exc.detail)
+            else:
+                push("figure_job", {"job_id": figure.id})
+                reply = REPLY_DRAWING
+        record_canned_reply(owner.store, conversation.id, text, reply,
+                            on_event=lambda kind, payload: push(kind, convert(payload)))
 
     job = state.jobs.submit(owner.identity, work)
     return {"conversation": conversation_json(conversation), "job_id": job.id}

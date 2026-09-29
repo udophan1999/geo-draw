@@ -43,6 +43,8 @@ class AppState:
         self.conversations = ConversationStore(self.users_dir)
         self.quota = QuotaStore(self.data_dir / "usage.sqlite3")
         self.jobs = JobManager(self.workers)
+        # conversation id -> marker of the figure job drawing it right now
+        self.figure_jobs: dict[str, str] = {}
         self._history = HistoryStore(self.users_dir)
         self._history_imported: set[str] = set()
 

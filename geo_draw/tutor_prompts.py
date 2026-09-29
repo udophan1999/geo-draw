@@ -35,8 +35,7 @@ Cách trả lời:
 - Tiếng Việt, thân thiện, ngắn gọn (thường 3–8 câu), xưng "mình" và gọi học sinh là "em".
 - Khi học sinh trả lời, nhận xét đúng/sai cụ thể; nếu sai, chỉ ra chỗ sai bằng câu hỏi gợi mở.
 - Viết công thức bằng LaTeX: $...$ trong dòng, $$...$$ cho công thức riêng dòng.
-- Với bài hình học, gọi tên điểm, đoạn, góc đúng như trong đề. Ứng dụng tự vẽ hình ở khung
-  bên cạnh, nên bạn có thể nhắc học sinh quan sát hình.
+- Với bài hình học, gọi tên điểm, đoạn, góc đúng như trong đề.
 """.strip()
 
 GUARDRAIL = """
@@ -73,14 +72,33 @@ def clamp_level(level: int) -> int:
     return min(max(int(level or 1), 1), MAX_HINT_LEVEL)
 
 
-def build_system_prompt(problem: str, mode: str = HINT, level: int = 1) -> str:
+# What the tutor may say about the figure panel: it must never mention a figure that
+# does not exist (the app, not the tutor, draws; students ask for it in the chat).
+FIGURE_SHOWN = "shown"
+FIGURE_DRAWING = "drawing"
+FIGURE_NONE = "none"
+FIGURE_NOTES = {
+    FIGURE_SHOWN: ("=== HÌNH VẼ ===\nKhung bên cạnh đang hiển thị hình vẽ của bài. Bạn có thể nhắc học "
+                   "sinh quan sát hình khi hữu ích."),
+    FIGURE_DRAWING: ("=== HÌNH VẼ ===\nỨng dụng đang vẽ hình của bài ở khung bên cạnh; hình sẽ hiện "
+                     "sau ít giây."),
+    FIGURE_NONE: ("=== HÌNH VẼ ===\nHiện CHƯA có hình vẽ nào. Không được nói là đã có hình hay bảo "
+                  "học sinh nhìn hình. Bạn không tự vẽ được, nhưng ứng dụng vẽ được: nếu hình giúp "
+                  "ích, hãy nói em nhắn \"vẽ hình\" (hoặc bấm nút Vẽ hình) để ứng dụng vẽ ở khung "
+                  "bên cạnh."),
+}
+
+
+def build_system_prompt(problem: str, mode: str = HINT, level: int = 1,
+                        figure: str = FIGURE_NONE) -> str:
     """The system prompt for one tutor reply about ``problem``."""
     problem_block = "=== ĐỀ BÀI ===\n" + (problem.strip() or "(Học sinh chưa đưa đề bài.)")
+    figure_block = FIGURE_NOTES.get(figure, FIGURE_NOTES[FIGURE_NONE])
     if mode == SOLUTION:
-        return "\n\n".join([SOLUTION_PROMPT, problem_block])
+        return "\n\n".join([SOLUTION_PROMPT, problem_block, figure_block])
     level = clamp_level(level)
     level_block = (
         f"=== BẬC GỢI Ý HIỆN TẠI: {level}/{MAX_HINT_LEVEL} ({HINT_LEVELS[level - 1]}) ===\n"
         f"Chỉ đưa gợi ý ở đúng bậc {level}. Không nhảy bậc, không gộp nhiều bậc trong một lượt."
     )
-    return "\n\n".join([BASE_TUTOR_PROMPT, problem_block, level_block, GUARDRAIL])
+    return "\n\n".join([BASE_TUTOR_PROMPT, problem_block, figure_block, level_block, GUARDRAIL])

@@ -11,8 +11,13 @@ from geo_draw.chat import run_figure_turn
 from geo_draw.conversations import (
     ASSISTANT, CHAT, FIGURE, HINT, SOLUTION, USER, ConversationStore,
 )
-from geo_draw.tutor import DEEPER, SHOW_SOLUTION, is_geometry_problem, run_tutor_turn
-from geo_draw.tutor_prompts import GUARDRAIL, MAX_HINT_LEVEL, build_system_prompt
+from geo_draw.tutor import (
+    DEEPER, GENERIC, SHOW_SOLUTION, SPECIFIC, drawing_request, is_geometry_problem,
+    record_canned_reply, run_tutor_turn,
+)
+from geo_draw.tutor_prompts import (
+    FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN, GUARDRAIL, MAX_HINT_LEVEL, build_system_prompt,
+)
 
 AI = AiSettings(api_key="test-key")
 TRIANGLE = "Cho tam giác ABC vuông tại A, AB = 3, AC = 4. Tính BC."
@@ -45,6 +50,12 @@ class PromptTests(unittest.TestCase):
     def test_levels_are_clamped(self):
         self.assertIn(f"{MAX_HINT_LEVEL}/{MAX_HINT_LEVEL}", build_system_prompt(TRIANGLE, HINT, 99))
         self.assertIn(f"1/{MAX_HINT_LEVEL}", build_system_prompt(TRIANGLE, HINT, 0))
+
+    def test_the_prompt_says_whether_a_figure_exists(self):
+        self.assertIn("CHƯA có hình vẽ", build_system_prompt(TRIANGLE, HINT, 1, FIGURE_NONE))
+        self.assertIn("đang vẽ hình", build_system_prompt(TRIANGLE, HINT, 1, FIGURE_DRAWING))
+        self.assertIn("đang hiển thị hình vẽ", build_system_prompt(TRIANGLE, SOLUTION, 1, FIGURE_SHOWN))
+        self.assertIn("CHƯA có hình vẽ", build_system_prompt(TRIANGLE))  # default: no figure
 
     def test_solution_prompt_has_no_guardrail(self):
         prompt = build_system_prompt(TRIANGLE, SOLUTION, 3)
@@ -173,6 +184,30 @@ class MigrationTests(unittest.TestCase):
                              (HINT, 1, ""))
             self.assertEqual(store.problem_of(conversation), "Cho tam giác ABC.")
             self.assertEqual(store.messages("c1")[0].channel, FIGURE)
+
+
+class DrawingRequestTests(unittest.TestCase):
+    def test_kinds_of_requests(self):
+        cases = {
+            "Em nghĩ mình nên vẽ hình trước": GENERIC,
+            "Bạn vẽ giúp mình được không?": GENERIC,
+            "Vẽ thêm đường cao AH": SPECIFIC,
+            "Em kẻ thêm AH vuông góc BC": SPECIFIC,
+            "Em nghĩ về chu vi trước": None,  # "về", not "vẽ"
+            "Em không biết vẽ": None,
+            "a = 1, b = -5, c = 6": None,
+        }
+        for text, kind in cases.items():
+            self.assertEqual(drawing_request(text), kind, text)
+
+    def test_canned_replies_are_saved_without_ai(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ConversationStore(Path(tmp))
+            conversation = store.create("alice", "Đề", problem=TRIANGLE)
+            question, answer = record_canned_reply(store, conversation.id, "Vẽ giúp mình", "Đang vẽ")
+            self.assertEqual([(m.role, m.channel) for m in store.messages(conversation.id)],
+                             [(USER, CHAT), (ASSISTANT, CHAT)])
+            self.assertTrue(answer.meta["canned"])
 
 
 class GeometryDetectionTests(unittest.TestCase):
