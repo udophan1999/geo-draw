@@ -14,9 +14,13 @@ type Props = {
   onSend: (text: string, image: File | null) => Promise<boolean>
   busy: boolean
   placeholder: string
+  /** Shown as a strip on top of the box (the tutor controls). */
+  header?: React.ReactNode
+  /** Extra buttons next to "Gửi" (e.g. "Vẽ hình"). */
+  actions?: React.ReactNode
 }
 
-export function Composer({ image, onImage, onSend, busy, placeholder }: Props) {
+export function Composer({ image, onImage, onSend, busy, placeholder, header, actions }: Props) {
   const [text, setText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const textarea = useRef<HTMLTextAreaElement>(null)
@@ -69,8 +73,9 @@ export function Composer({ image, onImage, onSend, busy, placeholder }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-4">
-      <div className="rounded-2xl border bg-background shadow-sm transition focus-within:border-primary/50 focus-within:ring-3 focus-within:ring-primary/10">
+    <div className="mx-auto w-full max-w-3xl px-4 pb-3">
+      <div className="overflow-hidden rounded-2xl border bg-background shadow-sm transition focus-within:border-primary/50 focus-within:ring-3 focus-within:ring-primary/10">
+        {header}
         {preview && (
           <div className="px-3 pt-3">
             <div className="relative inline-block">
@@ -154,12 +159,15 @@ export function Composer({ image, onImage, onSend, busy, placeholder }: Props) {
               event.target.value = ''
             }}
           />
-          <Button size="icon" className="rounded-full" aria-label="Gửi" disabled={!canSend} onClick={() => void submit()}>
-            {disabled ? <Loader2 className="animate-spin" /> : <ArrowUp />}
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {actions}
+            <Button size="icon" className="rounded-full" aria-label="Gửi" disabled={!canSend} onClick={() => void submit()}>
+              {disabled ? <Loader2 className="animate-spin" /> : <ArrowUp />}
+            </Button>
+          </div>
         </div>
       </div>
-      <p className="mt-2 text-center text-xs text-muted-foreground">
+      <p className="mt-1.5 hidden text-center text-[11px] text-muted-foreground/70 sm:block">
         Enter để gửi · Shift+Enter để xuống dòng
       </p>
       <FormulaDialog open={formulaOpen} onOpenChange={setFormulaOpen} onInsert={(latex) => insert(latexToPlain(latex) ?? `$${latex}$`, true)} />

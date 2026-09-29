@@ -1,5 +1,6 @@
 // "/" (new problem) and "/c/:conversationId": the tutor chat, plus the figure panel on the
 // right for geometry problems (or once a figure was drawn on request).
+import { PenTool } from 'lucide-react'
 import { useState } from 'react'
 import { Navigate, useParams } from 'react-router'
 
@@ -7,6 +8,7 @@ import { Composer } from '@/components/chat/Composer'
 import { MessageList } from '@/components/chat/MessageList'
 import { TutorBar } from '@/components/chat/TutorBar'
 import { DrawingPanel } from '@/components/drawing/DrawingPanel'
+import { Button } from '@/components/ui/button'
 import { ApiError, type TutorAction } from '@/lib/api'
 import { useChat } from '@/lib/chat'
 import { acceptImage } from '@/lib/images'
@@ -73,9 +75,12 @@ export function ChatPage() {
           ))}
         </div>
       )}
-      <div className={cn('grid min-h-0 flex-1', hasFigurePanel && 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]')}>
+      {/* minmax(0,…) columns: a long display formula scrolls inside its message instead of
+          widening the whole page (which pushed the send button off narrow screens). */}
+      <div className={cn('grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)]',
+                         hasFigurePanel && 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]')}>
         <section
-          className={cn('relative flex min-h-0 flex-col', hasFigurePanel && 'lg:border-r',
+          className={cn('relative flex min-h-0 min-w-0 flex-col', hasFigurePanel && 'lg:border-r',
                         hasFigurePanel && mobileView !== 'chat' && 'hidden lg:flex')}
           onDragOver={(event) => {
             if (event.dataTransfer.types.includes('Files')) {
@@ -102,20 +107,20 @@ export function ChatPage() {
               onExample={(example) => void sendMessage(example.problem, null)}
             />
           </div>
-          {info && (chatMessages.length > 0 || legacyProblem) && (
-            <TutorBar
-              conversation={info}
-              busy={busy}
-              onAction={act}
-              drawing={Boolean(figureTurn)}
-              onDrawFigure={hasFigurePanel && drawings.length ? undefined : () => void refine('')}
-            />
-          )}
           <Composer
             image={image}
             onImage={setImage}
             onSend={sendMessage}
             busy={busy}
+            header={info && (chatMessages.length > 0 || legacyProblem)
+              ? <TutorBar conversation={info} busy={busy} onAction={act} />
+              : undefined}
+            actions={info && !hasFigurePanel && (
+              <Button variant="ghost" size="sm" className="text-muted-foreground" disabled={Boolean(figureTurn)}
+                      onClick={() => void refine('')}>
+                <PenTool /> {figureTurn ? 'Đang vẽ…' : 'Vẽ hình'}
+              </Button>
+            )}
             placeholder={info ? 'Trả lời câu hỏi của trợ giảng, hoặc hỏi thêm…' : 'Nhập đề bài hoặc đính kèm ảnh đề…'}
           />
           {dragging && (
@@ -125,7 +130,7 @@ export function ChatPage() {
           )}
         </section>
         {hasFigurePanel && (
-          <section className={cn('min-h-0 overflow-y-auto bg-muted/30', mobileView !== 'drawing' && 'hidden lg:block')}>
+          <section className={cn('min-h-0 min-w-0 overflow-y-auto bg-muted/30', mobileView !== 'drawing' && 'hidden lg:block')}>
             <DrawingPanel
               figureMessages={figureMessages}
               drawings={drawings}
