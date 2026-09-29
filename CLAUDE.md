@@ -11,6 +11,8 @@ A Streamlit app that takes a Vietnamese middle-school (THCS) plane-geometry prob
 No virtualenv is committed. The README uses Windows paths (`.venv-codex`/`.venv`); on macOS/Linux create one with `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
 
 ```bash
+./start.sh                                             # build web if changed + serve API and app on :8000 (PORT, HOST env)
+./start.sh dev                                         # uvicorn --reload on :8000 + Vite on :5173 (Ctrl+C stops both)
 uvicorn api.main:app --reload                          # API server (http://localhost:8000, docs at /docs)
 nvm use && npm --prefix web install                    # frontend deps (Node 22)
 npm --prefix web run dev                               # React dev server (http://localhost:5173, proxies /api to :8000)

@@ -8,9 +8,12 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: { '@': path.resolve(__dirname, './src') },
+    alias: { '@': path.resolve(import.meta.dirname, './src') },
   },
+  // One single-page app bundle (~240 kB gzipped), loaded once: no need to split it.
+  build: { chunkSizeWarningLimit: 1000 },
   server: {
-    proxy: { '/api': 'http://localhost:8000' },
+    // start.sh passes GEO_DRAW_API_PORT when the API runs on another port.
+    proxy: { '/api': `http://localhost:${process.env.GEO_DRAW_API_PORT ?? 8000}` },
   },
 })

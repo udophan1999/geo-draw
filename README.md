@@ -25,6 +25,17 @@ Trên Windows dùng `.venv\Scripts\pip` và `.venv\Scripts\python` thay cho `.ve
 
 ## Chạy ứng dụng
 
+Cách nhanh nhất là dùng script, script tự cài những gì còn thiếu (môi trường Python, thư viện, Node 22 qua nvm):
+
+```bash
+./start.sh          # chạy thật: tự build giao diện khi có thay đổi, mở http://localhost:8000
+./start.sh dev      # phát triển: API tự nạp lại + giao diện http://localhost:5173
+```
+
+Đổi cổng bằng `PORT=9000 ./start.sh`; cho máy khác trong mạng truy cập bằng `HOST=0.0.0.0 ./start.sh`.
+
+Hoặc chạy từng lệnh:
+
 **Khi phát triển** (hai terminal, sửa code là trang tự cập nhật):
 
 ```bash
