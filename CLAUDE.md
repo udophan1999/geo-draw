@@ -12,6 +12,10 @@ No virtualenv is committed. The README uses Windows paths (`.venv-codex`/`.venv`
 
 ```bash
 uvicorn api.main:app --reload                          # API server (http://localhost:8000, docs at /docs)
+nvm use && npm --prefix web install                    # frontend deps (Node 22)
+npm --prefix web run dev                               # React dev server (http://localhost:5173, proxies /api to :8000)
+npm --prefix web run build                             # build web/dist; uvicorn then serves the app itself
+npx --prefix web tsc -b web && npm --prefix web run lint    # type-check + oxlint
 streamlit run app.py                                   # legacy Streamlit UI (http://localhost:8501)
 python -m unittest discover -s tests -v                # all tests
 python -m unittest tests.test_geometry_primitives -v   # one file
@@ -35,9 +39,15 @@ DeepSeek configuration is read from `.env` (see `.env.example`: `DEEPSEEK_API_KE
 
 - `api/`: FastAPI server. `create_app(data_dir, **AppState options)` builds one `AppState` (`api/state.py`), stored at `app.state.geo`, which holds the stores, the quota and the job manager; tests build their own app on a temp dir.
   - **Identity** (`api/deps.py`): an HttpOnly `geo_session` cookie (a token in `AccountStore`'s sessions table) means a signed-in user. Otherwise the caller is a guest, identified by a `geo_guest` cookie that middleware issues to everyone. `Owner` bundles the conversation store, the store's owner column, the workspace and `identity` (the key used for quota and jobs). Always load data through `owned_conversation` / `owned_message`, which return 404 for other people's data.
-  - **Chat turn**: `POST /api/messages` (multipart: `text`, optional `conversation_id`, optional `image`) checks ownership, then quota, then starts `geo_draw.chat.run_turn` in `JobManager` (a pool of 2 threads) and returns `{conversation, job_id}` at once. `GET /api/jobs/{id}/events` is SSE with `message` (saved message JSON), `progress`, then `done` or `error`. The job saves its results itself, so a closed tab loses nothing.
+  - **Chat turn**: `POST /api/messages` (multipart: `text`, optional `conversation_id`, optional `image`) checks ownership, then quota, then starts `geo_draw.chat.run_turn` in `JobManager` (a pool of 2 threads) and returns `{conversation, job_id}` at once. `GET /api/jobs/{id}/events` is SSE with `message` (saved message JSON), `progress`, then `done` or `failed` (not `error`, which `EventSource` reserves for connection problems). The job saves its results itself, so a closed tab loses nothing.
   - **Quota** (`api/quota.py`): each AI turn (drawing or OCR) costs one unit of a daily limit per identity, stored in `usage.sqlite3`; it returns 429 when the limit is used up. Parser turns are free. When there is no server key, AI mode returns 503.
   - JSON shapes live in `api/schemas.py` (`message_json` adds `image_url`/`video_url` with a `?v=` cache-busting version, since a re-render writes a new file). Settings are stored per workspace in `settings.json`, with `mode` `"ai"`/`"parser"`; `load_settings` also accepts the Streamlit app's Vietnamese mode labels.
+- `web/`: React 19 + Vite + TypeScript, with Tailwind v4 and shadcn/ui (radix-nova preset; generated components live in `src/components/ui/`, add more with `npx shadcn@latest add <name>`). Routes (React Router 8, `src/main.tsx`): `/login` and `/register` (`routes/auth.tsx`), then `AppLayout`, which guards `/` and `/c/:conversationId` (`routes/ChatPage.tsx`). A visitor without an account is sent to `/login` unless they chose "Dùng thử", stored in localStorage (`lib/guest.ts`).
+  - `lib/api.ts`: the typed API client and `followJob` (an `EventSource` on the job events). Reuse it for mobile.
+  - `lib/queries.ts`: TanStack Query hooks and keys. `upsertMessage` patches a cached conversation from SSE events or re-renders.
+  - `lib/chat.tsx`: `ChatProvider` sits above the routes and tracks running turns (`pending[conversationId]`: optimistic user bubble and progress label). It navigates from `/` to `/c/:id` when a turn creates a conversation, and re-fetches the conversation when the job ends.
+  - `components/`: `Sidebar` (conversation list with rename/delete, account menu at the bottom), `SettingsDialog`, `chat/` (`MessageList`, `Composer` with paste/drag-drop/📎 images), and `drawing/` (`DrawingPanel` with versions and tabs, `ZoomImage`, `ManualEditor`, a port of the Streamlit editor that commits edits only after a successful re-render).
+  - In production `api/main.py` serves `web/dist` when it exists, and unknown non-`/api` paths return `index.html`.
 - `streamlit_app/`: the legacy Streamlit UI. It stays runnable until the React app reaches parity.
   - `streamlit_app/app.py`: routes and the access guard, built with `st.navigation(position="hidden")`. `/login` is the login/register page, `/dashboard` is the main page, and `/` redirects. Anyone who is not signed in and not in anonymous mode is sent to `/login`; anyone else who opens `/login` or `/` is sent to `/dashboard`. The redirects use `st.switch_page` and always carry `?session=<token>`. All access checks live here; views never redirect themselves. Pages are created inside `main()` on every run, because `st.Page` needs a script-run context.
   - `streamlit_app/config.py`: data paths, the shared `ACCOUNTS`, `CONVERSATIONS` and legacy `HISTORY` stores, and the example problems.
@@ -68,7 +78,7 @@ Because of this, the "Chỉnh hình thủ công" editor (`streamlit_app/componen
    - DeepSeek is called with `SYSTEM_PROMPT`, which is built from the inline rules, `MIDDLE_SCHOOL_GEOMETRY_RULES` and `DRAWING_ERROR_MEMORY` from `geometry_knowledge.py`.
    - The reply goes through `extract_python`, then `_ensure_light_theme` (injects `apply_light_theme(self)`), then `sanitize_code` (auto-injects parallel and ordinary-polygon verifier calls), then `validate_code`.
    - When validation fails, the error is sent back to DeepSeek, up to 3 retries in the same conversation.
-   - In `geo_draw/pipeline.py` (`draw`), a failed Manim render triggers up to 3 more `generate_manim_code(..., repair_log=...)` calls that include the render log and the previous code. The README says "once"; the code is authoritative.
+   - In `geo_draw/pipeline.py` (`draw`), a failed Manim render triggers up to 3 more `generate_manim_code(..., repair_log=...)` calls that include the render log and the previous code.
 
 `extract_problem_from_image` uses the vision model for OCR only. It returns the problem text, which the user reviews before drawing.
 
