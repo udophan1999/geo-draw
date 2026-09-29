@@ -1,14 +1,18 @@
 // Typing math without knowing LaTeX: a bar of common symbols (inserted as Unicode) and a
 // visual formula editor (MathLive). The composer inserts its formula as plain Unicode when
 // possible (lib/plainMath.ts), else as $LaTeX$ with a rendered preview.
+import katex from 'katex'
 import { Loader2 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { FORMULA_GROUPS } from '@/components/chat/formulaTemplates'
+import { cn } from '@/lib/utils'
 
 const SYMBOLS: [string, string][] = [
   ['²', 'Bình phương'], ['³', 'Lập phương'], ['√', 'Căn bậc hai'], ['∛', 'Căn bậc ba'],
@@ -44,11 +48,27 @@ export function SymbolBar({ onInsert }: { onInsert: (text: string) => void }) {
   )
 }
 
-type MathField = HTMLElement & { getValue: (format?: string) => string; focus: () => void }
+type InsertOptions = { focus?: boolean; selectionMode?: 'placeholder' | 'after' }
+type MathField = HTMLElement & {
+  getValue: (format?: string) => string
+  insert: (latex: string, options?: InsertOptions) => boolean
+  focus: () => void
+}
 
-/** Visual formula editor; ``onInsert`` receives the formula's LaTeX. */
+/** A template drawn as it will look, with empty slots shown as boxes. */
+function TemplatePreview({ latex, large = false }: { latex: string; large?: boolean }) {
+  // Tiles use \displaystyle: full-size fractions and roots, as in Word's gallery.
+  const html = useMemo(
+    () => katex.renderToString((large ? '\\displaystyle ' : '') + latex.replace(/#[?@]/g, '\\square'),
+                               { throwOnError: false, strict: false }),
+    [latex, large],
+  )
+  return <span className="pointer-events-none whitespace-nowrap" dangerouslySetInnerHTML={{ __html: html }} />
+}
+
+/** Visual formula editor with a Word-like gallery; ``onInsert`` receives the formula's LaTeX. */
 export function FormulaDialog({ open, onOpenChange, onInsert }: {
-  open: boolean; onOpenChange: (open: boolean) => void; onInsert: (text: string) => void
+  open: boolean; onOpenChange: (open: boolean) => void; onInsert: (latex: string) => void
 }) {
   const host = useRef<HTMLDivElement>(null)
   const field = useRef<MathField | null>(null)
@@ -66,8 +86,8 @@ export function FormulaDialog({ open, onOpenChange, onInsert }: {
       MathfieldElement.soundsDirectory = null
       const element = new MathfieldElement() as unknown as MathField
       element.setAttribute('aria-label', 'Công thức')
-      element.style.cssText = 'display:block;width:100%;font-size:1.4rem;padding:0.5rem 0.75rem;' +
-        'border:1px solid var(--border);border-radius:0.6rem;'
+      element.style.cssText = 'display:block;width:100%;min-height:4.5rem;font-size:1.75rem;' +
+        'padding:0.75rem 1rem;border:1px solid var(--border);border-radius:0.75rem;'
       host.current.replaceChildren(element)
       field.current = element
       setReady(true)
@@ -80,6 +100,9 @@ export function FormulaDialog({ open, onOpenChange, onInsert }: {
     }
   }, [open])
 
+  const add = (latex: string) => {
+    field.current?.insert(latex, { focus: true, selectionMode: 'placeholder' })
+  }
   const insert = () => {
     const latex = field.current?.getValue('latex').trim()
     if (latex) onInsert(latex)
@@ -88,21 +111,72 @@ export function FormulaDialog({ open, onOpenChange, onInsert }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Nhập công thức</DialogTitle>
           <DialogDescription>
-            Gõ như viết trên giấy: <kbd>/</kbd> để tạo phân số, <kbd>^</kbd> cho số mũ, gõ <kbd>sqrt</kbd> cho căn.
-            Trên điện thoại, dùng bàn phím toán hiện ra bên dưới.
+            Chọn mẫu bên dưới rồi điền vào các ô trống, hoặc gõ trực tiếp: <kbd>/</kbd> tạo phân số,
+            <kbd>^</kbd> số mũ, <kbd>Tab</kbd> chuyển sang ô trống kế tiếp.
           </DialogDescription>
         </DialogHeader>
-        <div ref={host} className="min-h-14" onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault()
-            insert()
-          }
-        }} />
+        <div
+          ref={host}
+          className="min-h-[4.5rem] min-w-0"
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault()
+              insert()
+            }
+          }}
+        />
         {!ready && <Loader2 className="mx-auto animate-spin text-muted-foreground" />}
+        {/* min-w-0: inside the dialog's grid, the wide tab list must scroll, not stretch it. */}
+        <Tabs defaultValue={FORMULA_GROUPS[0].id} className="w-full min-w-0">
+          {/* Scrolls sideways on narrow screens instead of wrapping over the gallery. */}
+          <TabsList className="w-full max-w-full min-w-0 justify-start overflow-x-auto">
+            {FORMULA_GROUPS.map((group) => (
+              <TabsTrigger key={group.id} value={group.id} className="flex-none">{group.name}</TabsTrigger>
+            ))}
+          </TabsList>
+          {FORMULA_GROUPS.map((group) => (
+            <TabsContent key={group.id} value={group.id} className="min-h-72 pt-2">
+              <div className={group.wide
+                ? 'grid gap-2 sm:grid-cols-2'
+                : 'grid grid-cols-3 gap-2 sm:grid-cols-6'}>
+                {group.items.map((item) => (
+                  <Tooltip key={item.label}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={item.label}
+                        disabled={!ready}
+                        // Keep the focus (and caret) inside the formula while clicking.
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => add(item.latex)}
+                        className={cn(
+                          'flex items-center rounded-lg border bg-background px-2 transition',
+                          'hover:border-primary/50 hover:bg-primary/5 disabled:opacity-50',
+                          group.wide
+                            ? 'min-h-14 flex-col items-start gap-1 py-2 text-left text-base sm:flex-row sm:items-center sm:justify-between sm:gap-3'
+                            : 'min-h-20 flex-col justify-center gap-1 py-2 text-lg',
+                        )}
+                      >
+                        {group.wide && <span className="text-xs text-muted-foreground">{item.label}</span>}
+                        <TemplatePreview latex={item.latex} large={!group.wide} />
+                        {!group.wide && (
+                          <span className="line-clamp-1 text-[11px] leading-tight text-muted-foreground">
+                            {item.label}
+                          </span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{item.label}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Hủy</Button>
           <Button onClick={insert} disabled={!ready}>Chèn vào tin nhắn</Button>
