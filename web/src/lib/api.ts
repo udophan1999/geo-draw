@@ -7,8 +7,19 @@ export type Me = {
   quota: { used: number; limit: number }
   ai_available: boolean
 }
-export type Conversation = { id: string; title: string; created_at: number; updated_at: number }
+export type TutorMode = 'hint' | 'solution'
+export type Conversation = {
+  id: string
+  title: string
+  created_at: number
+  updated_at: number
+  problem: string
+  mode: TutorMode
+  hint_level: number
+  is_geometry: boolean
+}
 export type Role = 'user' | 'assistant'
+export type Channel = 'chat' | 'figure'
 export type Message = {
   id: string
   conversation_id: string
@@ -19,6 +30,9 @@ export type Message = {
   video_url: string | null
   has_drawing: boolean
   has_log: boolean
+  /** "chat": the tutor conversation. "figure": drawing requests and drawings. */
+  channel: Channel
+  meta: { mode?: TutorMode; hint_level?: number; error?: boolean }
 }
 export type ConversationDetail = { conversation: Conversation; messages: Message[] }
 export type Settings = {
@@ -27,7 +41,7 @@ export type Settings = {
   quality: 'l' | 'm' | 'h'
   animate: boolean
 }
-export type Example = { name: string; problem: string }
+export type Example = { topic: string; name: string; problem: string }
 export type ManualEdits = {
   hidden_labels: string[]
   hidden_points: string[]
@@ -44,6 +58,7 @@ export type EditorState = {
   manual_edits: ManualEdits
 }
 export type Progress = { stage: string; label: string }
+export type TutorAction = 'ask' | 'deeper' | 'solution' | 'hint'
 
 export class ApiError extends Error {
   status: number
@@ -101,16 +116,24 @@ export const api = {
   deleteConversation: (id: string) =>
     request<void>(`/conversations/${id}`, { method: 'DELETE' }),
 
-  sendMessage: (input: { text: string; conversationId?: string; image?: File | null }) => {
+  /** A message to the tutor; ``action`` is "deeper", "solution" or "hint" for the buttons. */
+  sendMessage: (input: { text: string; conversationId?: string; image?: File | null; action?: TutorAction }) => {
     const form = new FormData()
     form.set('text', input.text)
     if (input.conversationId) form.set('conversation_id', input.conversationId)
     if (input.image) form.set('image', input.image)
+    if (input.action) form.set('action', input.action)
     return request<{ conversation: Conversation; job_id: string }>('/messages', {
       method: 'POST',
       body: form,
     })
   },
+  /** Draw the figure (empty text) or refine it with a request. */
+  drawFigure: (conversationId: string, text = '') =>
+    request<{ job_id: string }>(`/conversations/${conversationId}/figure`, {
+      method: 'POST',
+      body: json({ text }),
+    }),
 
   scene: (messageId: string) => request<string>(`/messages/${messageId}/scene`),
   log: (messageId: string) => request<string>(`/messages/${messageId}/log`),
@@ -127,6 +150,12 @@ export type JobHandlers = {
   onProgress: (progress: Progress) => void
   onDone: () => void
   onFailed: (detail: string) => void
+  /** A piece of the tutor's reply as it is written. */
+  onDelta?: (text: string) => void
+  onConversation?: (conversation: Conversation) => void
+  /** The first message of a geometry problem started a drawing job. */
+  onFigureJob?: (jobId: string) => void
+  onFigureSkipped?: (detail: string) => void
 }
 
 /** Follow a drawing job over SSE. Returns a function that stops listening. */
@@ -139,6 +168,12 @@ export function followJob(jobId: string, handlers: JobHandlers): () => void {
   }
   source.addEventListener('message', (event) => handlers.onMessage(JSON.parse(event.data)))
   source.addEventListener('progress', (event) => handlers.onProgress(JSON.parse(event.data)))
+  source.addEventListener('delta', (event) => handlers.onDelta?.(JSON.parse(event.data).text))
+  source.addEventListener('conversation', (event) => handlers.onConversation?.(JSON.parse(event.data)))
+  source.addEventListener('figure_job', (event) => handlers.onFigureJob?.(JSON.parse(event.data).job_id))
+  source.addEventListener('figure_skipped', (event) =>
+    handlers.onFigureSkipped?.(JSON.parse(event.data).detail),
+  )
   source.addEventListener('done', () => {
     finish()
     handlers.onDone()

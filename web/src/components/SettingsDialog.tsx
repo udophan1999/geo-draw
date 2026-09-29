@@ -56,14 +56,14 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Cài đặt</DialogTitle>
-          <DialogDescription>Áp dụng cho các lượt vẽ tiếp theo.</DialogDescription>
+          <DialogDescription>Trợ giảng giải toán luôn dùng DeepSeek AI; các lựa chọn dưới đây áp dụng cho việc vẽ hình.</DialogDescription>
         </DialogHeader>
         {!draft ? (
           <div className="flex justify-center py-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
         ) : (
           <div className="grid gap-5">
             <div className="grid gap-2">
-              <Label>Cách dựng hình</Label>
+              <Label>Cách vẽ hình</Label>
               <RadioGroup value={draft.mode} onValueChange={(mode) => set({ mode: mode as Settings['mode'] })}>
                 <label className="flex items-start gap-3 rounded-lg border p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
                   <RadioGroupItem value="ai" disabled={!aiAvailable} className="mt-0.5" />
@@ -71,7 +71,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                     <span className="text-sm font-medium">DeepSeek AI</span>
                     <span className="text-xs text-muted-foreground">
                       {aiAvailable
-                        ? `Hiểu đề phức tạp và đọc được đề từ ảnh.${quota ? ` Hôm nay đã dùng ${quota.used}/${quota.limit} lượt.` : ''}`
+                        ? `Vẽ được đề phức tạp. Mỗi lần vẽ tốn 1 lượt AI.${quota ? ` Hôm nay đã dùng ${quota.used}/${quota.limit} lượt.` : ''}`
                         : 'Máy chủ chưa cấu hình DeepSeek API key.'}
                     </span>
                   </span>

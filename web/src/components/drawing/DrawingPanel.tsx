@@ -1,28 +1,62 @@
 import { useQuery } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { Loader2, RotateCcw, Send, TriangleAlert } from 'lucide-react'
+import { useState } from 'react'
 
 import { Logo } from '@/components/Logo'
 import { ManualEditor } from '@/components/drawing/ManualEditor'
 import { ZoomImage } from '@/components/drawing/ZoomImage'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api, type Message } from '@/lib/api'
 import { keys } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 
 type Props = {
+  /** Figure-channel messages: drawing requests (user) and drawings or failures (assistant). */
+  figureMessages: Message[]
   drawings: Message[]
   shown: Message | null
   onShow: (messageId: string) => void
-  busy: boolean
+  /** Progress label while a drawing runs, else null. */
+  busyLabel: string | null
+  onRefine: (text: string) => Promise<boolean>
 }
 
-export function DrawingPanel({ drawings, shown, onShow, busy }: Props) {
+export function DrawingPanel({ figureMessages, drawings, shown, onShow, busyLabel, onRefine }: Props) {
+  const busy = busyLabel !== null
+  const requests = figureMessages.filter((m) => m.role === 'user')
+  const last = figureMessages.at(-1)
+  const failure = !busy && last?.role === 'assistant' && !last.has_drawing ? last : null
+
+  const refineBox = <RefineBox busy={busy} hasDrawing={Boolean(shown)} requests={requests.map((r) => r.text)} onRefine={onRefine} />
+  const status = busy ? (
+    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="size-4 animate-spin" /> {busyLabel}
+    </p>
+  ) : failure ? (
+    <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+      <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+      <span className="flex-1">{failure.text}</span>
+      <Button variant="ghost" size="xs" onClick={() => void onRefine('')}>
+        <RotateCcw /> Vẽ lại
+      </Button>
+    </div>
+  ) : null
+
   if (!shown) {
     return (
-      <div className="flex h-full min-h-80 flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
-        {busy ? <Loader2 className="size-10 animate-spin opacity-50" /> : <Logo className="size-14 opacity-30 grayscale" />}
-        <p className="text-sm">{busy ? 'Đang vẽ hình…' : 'Hình vẽ sẽ hiện ở đây'}</p>
+      <div className="mx-auto flex h-full min-h-80 w-full max-w-3xl flex-col gap-4 p-4 lg:p-6">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+          {busy ? <Loader2 className="size-10 animate-spin opacity-50" /> : <Logo className="size-14 opacity-30 grayscale" />}
+          <p className="text-sm">{busy ? busyLabel : 'Hình vẽ sẽ hiện ở đây'}</p>
+          {!busy && !failure && (
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => void onRefine('')}>
+              Vẽ hình
+            </Button>
+          )}
+        </div>
+        {!busy && status}
       </div>
     )
   }
@@ -36,7 +70,6 @@ export function DrawingPanel({ drawings, shown, onShow, busy }: Props) {
           <h2 className="font-semibold">Hình vẽ</h2>
           <p className="text-xs text-muted-foreground">
             {isLatest ? 'Phiên bản mới nhất' : `Phiên bản ${index + 1}/${drawings.length}`}
-            {busy && ' · đang vẽ phiên bản mới…'}
           </p>
         </div>
         {drawings.length > 1 && (
@@ -56,7 +89,9 @@ export function DrawingPanel({ drawings, shown, onShow, busy }: Props) {
         )}
       </div>
 
+      {status}
       <ZoomImage src={shown.image_url!} alt="Hình vẽ" />
+      {refineBox}
       {shown.video_url && (
         <video src={shown.video_url} controls className="w-full rounded-xl border bg-black" />
       )}
@@ -90,5 +125,43 @@ function TextFile({ queryKey, load }: { queryKey: readonly unknown[]; load: () =
     <pre className="max-h-96 overflow-auto rounded-xl border bg-muted/50 p-4 font-mono text-xs leading-relaxed">
       {file.data ?? file.error?.message}
     </pre>
+  )
+}
+
+function RefineBox({ busy, hasDrawing, requests, onRefine }: {
+  busy: boolean; hasDrawing: boolean; requests: string[]; onRefine: (text: string) => Promise<boolean>
+}) {
+  const [text, setText] = useState('')
+  if (!hasDrawing) return null
+  const submit = async () => {
+    if (!text.trim() || busy) return
+    if (await onRefine(text.trim())) setText('')
+  }
+  return (
+    <div className="grid gap-2">
+      <form
+        className="flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void submit()
+        }}
+      >
+        <Input
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          placeholder="Yêu cầu chỉnh hình, vd: vẽ thêm đường cao AH"
+          maxLength={2000}
+          className="h-9 bg-background"
+        />
+        <Button type="submit" size="icon" className="size-9" aria-label="Gửi yêu cầu chỉnh hình" disabled={busy || !text.trim()}>
+          {busy ? <Loader2 className="animate-spin" /> : <Send />}
+        </Button>
+      </form>
+      {requests.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Đã yêu cầu: {requests.map((request, i) => <span key={i}>{i > 0 && ' · '}“{request}”</span>)}
+        </p>
+      )}
+    </div>
   )
 }

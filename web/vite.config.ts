@@ -10,7 +10,7 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(import.meta.dirname, './src') },
   },
-  // One single-page app bundle (~240 kB gzipped), loaded once: no need to split it.
+  // The chat page chunk (KaTeX, Markdown, drawing tools) is ~250 kB gzipped and loaded once.
   build: { chunkSizeWarningLimit: 1000 },
   server: {
     // start.sh passes GEO_DRAW_API_PORT when the API runs on another port.

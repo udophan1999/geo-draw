@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from geo_draw.ai_codegen import load_dotenv, settings_from_env
-from geo_draw.examples import EXAMPLES
+from geo_draw.examples import MATH_EXAMPLES
 from geo_draw.geometry_knowledge import GEOMETRY_HELP_VI
 
 from .deps import GUEST_COOKIE, new_guest_id, valid_guest_id
@@ -62,7 +62,8 @@ def create_app(data_dir: Path | None = None, web_dist: Path | None = ROOT / "web
 
     @api.get("/examples", tags=["meta"])
     def examples() -> list[dict]:
-        return [{"name": name, "problem": problem} for name, problem in EXAMPLES.items()]
+        """Sample problems for the empty chat: ``topic``, ``name``, ``problem``."""
+        return MATH_EXAMPLES
 
     @api.get("/help", tags=["meta"])
     def geometry_help() -> dict:

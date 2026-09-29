@@ -131,7 +131,10 @@
     @apply font-sans;
     }
 }
-/* Markdown inside assistant messages. */
+/* Markdown inside messages (tutor replies, solutions). */
+.prose-chat h1, .prose-chat h2, .prose-chat h3 { font-weight: 600; margin: 0.75rem 0 0.25rem; }
+.prose-chat .katex-display { margin: 0.5rem 0; overflow-x: auto; overflow-y: hidden; }
+.prose-chat code { font-size: 0.85em; background: var(--muted); padding: 0.1rem 0.3rem; border-radius: 0.3rem; }
 .prose-chat p + p { margin-top: 0.5rem; }
 .prose-chat strong { font-weight: 600; }
 .prose-chat ul { margin: 0.25rem 0 0.25rem 1.25rem; list-style: disc; }
