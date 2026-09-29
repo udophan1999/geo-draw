@@ -5,21 +5,23 @@ A conversation holds its ``problem`` plus two message channels:
 - ``figure``: drawing requests and the drawings made for them (``geo_draw.chat``).
 Conversations from before the tutor existed only have ``figure`` messages.
 
-Stored in SQLite under ``root`` (``conversations.sqlite3``). Every message may own a
-folder ``<root>/<owner>/conversations/<conversation_id>/<message_id>/`` holding its
-files: the pasted problem image for user messages, the scene and renders for drawings.
+Rows live in the shared PostgreSQL database when one is given, else in SQLite under
+``root`` (``conversations.sqlite3``). Every message may own a folder
+``<root>/<owner>/conversations/<conversation_id>/<message_id>/`` holding its files: the
+pasted problem image for user messages, the scene and renders for drawings. File paths are
+stored relative to ``root``, so the data folder can move (e.g. into a Docker volume).
 """
 
 from __future__ import annotations
 
 import json
 import shutil
-import sqlite3
 import time
 import uuid
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from .db import Database, SqliteDatabase
 
 USER = "user"
 ASSISTANT = "assistant"
@@ -87,45 +89,45 @@ def make_title(text: str) -> str:
     return title if len(title) <= TITLE_LENGTH else title[:TITLE_LENGTH].rstrip() + "…"
 
 
-class ConversationStore:
-    def __init__(self, root: Path):
-        self.root = root
-        self.db_path = root / "conversations.sqlite3"
+_SCHEMA = [
+    """CREATE TABLE IF NOT EXISTS conversations (
+           {SEQ_COLUMN}
+           id TEXT PRIMARY KEY,
+           owner TEXT NOT NULL,
+           title TEXT NOT NULL,
+           created_at {FLOAT} NOT NULL,
+           updated_at {FLOAT} NOT NULL
+       )""",
+    "CREATE INDEX IF NOT EXISTS conversations_owner ON conversations (owner, updated_at)",
+    """CREATE TABLE IF NOT EXISTS messages (
+           {SEQ_COLUMN}
+           id TEXT PRIMARY KEY,
+           conversation_id TEXT NOT NULL,
+           role TEXT NOT NULL,
+           text TEXT NOT NULL,
+           image_path TEXT,
+           scene_path TEXT,
+           video_path TEXT,
+           log TEXT NOT NULL DEFAULT '',
+           created_at {FLOAT} NOT NULL
+       )""",
+    "CREATE INDEX IF NOT EXISTS messages_conversation ON messages (conversation_id, created_at)",
+]
 
-    @contextmanager
+
+class ConversationStore:
+    """``db`` is the shared PostgreSQL database; without it, SQLite under ``root``."""
+
+    def __init__(self, root: Path, db: Database | None = None):
+        self.root = root
+        self.db = db or SqliteDatabase(root / "conversations.sqlite3")
+
+    def create_tables(self) -> None:
+        self.db.ensure_schema("conversations", _SCHEMA, _ADDED_COLUMNS)
+
     def _connect(self):
-        self.root.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(self.db_path)
-        connection.executescript(
-            """CREATE TABLE IF NOT EXISTS conversations (
-                   id TEXT PRIMARY KEY,
-                   owner TEXT NOT NULL,
-                   title TEXT NOT NULL,
-                   created_at REAL NOT NULL,
-                   updated_at REAL NOT NULL
-               );
-               CREATE INDEX IF NOT EXISTS conversations_owner
-                   ON conversations (owner, updated_at);
-               CREATE TABLE IF NOT EXISTS messages (
-                   id TEXT PRIMARY KEY,
-                   conversation_id TEXT NOT NULL,
-                   role TEXT NOT NULL,
-                   text TEXT NOT NULL,
-                   image_path TEXT,
-                   scene_path TEXT,
-                   video_path TEXT,
-                   log TEXT NOT NULL DEFAULT '',
-                   created_at REAL NOT NULL
-               );
-               CREATE INDEX IF NOT EXISTS messages_conversation
-                   ON messages (conversation_id, created_at);"""
-        )
-        _add_missing_columns(connection)
-        try:
-            with connection:
-                yield connection
-        finally:
-            connection.close()
+        self.create_tables()
+        return self.db.connect()
 
     # Conversations -----------------------------------------------------------------
 
@@ -145,7 +147,7 @@ class ConversationStore:
         with self._connect() as connection:
             rows = connection.execute(
                 f"SELECT {_CONVERSATION_COLUMNS} FROM conversations "
-                "WHERE owner = ? ORDER BY updated_at DESC, rowid DESC LIMIT ?",
+                + self.db.sql("WHERE owner = ? ORDER BY updated_at DESC, {ROW_ORDER} DESC LIMIT ?"),
                 (owner, limit),
             ).fetchall()
         return [Conversation(*row) for row in rows]
@@ -192,16 +194,17 @@ class ConversationStore:
         """
         with self._connect() as connection:
             connection.execute(
-                "INSERT OR IGNORE INTO conversations (id, owner, title, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO conversations (id, owner, title, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
                 (conversation_id, owner, make_title(title) or "Đề mới", created_at, created_at),
             )
             for offset, (role, text, image_path, scene_path) in enumerate(messages):
                 connection.execute(
-                    "INSERT OR IGNORE INTO messages (id, conversation_id, role, text, image_path, "
-                    "scene_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO messages (id, conversation_id, role, text, image_path, "
+                    "scene_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
                     (f"{conversation_id}-{offset}", conversation_id, role, text,
-                     _path_text(image_path), _path_text(scene_path), created_at + offset * 1e-3),
+                     self._path_text(image_path), self._path_text(scene_path),
+                     created_at + offset * 1e-3),
                 )
 
     def rename(self, owner: str, conversation_id: str, title: str) -> None:
@@ -242,7 +245,8 @@ class ConversationStore:
             connection.execute(
                 f"INSERT INTO messages ({_MESSAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (message.id, conversation_id, role, text,
-                 _path_text(image_path), _path_text(scene_path), _path_text(video_path),
+                 self._path_text(image_path), self._path_text(scene_path),
+                 self._path_text(video_path),
                  log, now, channel, json.dumps(message.meta, ensure_ascii=False)),
             )
             connection.execute(
@@ -255,7 +259,7 @@ class ConversationStore:
         with self._connect() as connection:
             connection.execute(
                 "UPDATE messages SET image_path = ?, video_path = ? WHERE id = ?",
-                (str(image_path), _path_text(video_path), message_id),
+                (self._path_text(image_path), self._path_text(video_path), message_id),
             )
 
     def get_message(self, message_id: str) -> Message | None:
@@ -263,7 +267,7 @@ class ConversationStore:
             row = connection.execute(
                 f"SELECT {_MESSAGE_COLUMNS} FROM messages WHERE id = ?", (message_id,),
             ).fetchone()
-        return _message(row) if row else None
+        return self._message(row) if row else None
 
     def messages(self, conversation_id: str, channel: str | None = None) -> list[Message]:
         """Messages in order; ``channel`` keeps only ``chat`` or ``figure`` ones."""
@@ -273,23 +277,36 @@ class ConversationStore:
             query += " AND channel = ?"
             params += (channel,)
         with self._connect() as connection:
-            rows = connection.execute(query + " ORDER BY created_at, rowid", params).fetchall()
-        return [_message(row) for row in rows]
+            rows = connection.execute(query + self.db.sql(" ORDER BY created_at, {ROW_ORDER}"),
+                                      params).fetchall()
+        return [self._message(row) for row in rows]
 
+    # Files are stored relative to root (older rows hold absolute paths, still accepted).
 
-def _path_text(path: Path | None) -> str | None:
-    return str(path) if path else None
+    def _path_text(self, path: Path | None) -> str | None:
+        if not path:
+            return None
+        try:
+            return Path(path).relative_to(self.root).as_posix()
+        except ValueError:
+            return str(path)
 
+    def _path(self, text: str | None) -> Path | None:
+        if not text:
+            return None
+        path = Path(text)
+        return path if path.is_absolute() else self.root / path
 
-def _message(row) -> Message:
-    message_id, conversation_id, role, text, image, scene, video, log, created_at, channel, meta = row
-    try:
-        meta = json.loads(meta) if meta else {}
-    except ValueError:
-        meta = {}
-    return Message(message_id, conversation_id, role, text,
-                   Path(image) if image else None, Path(scene) if scene else None,
-                   Path(video) if video else None, log, created_at, channel or FIGURE, meta)
+    def _message(self, row) -> Message:
+        (message_id, conversation_id, role, text, image, scene, video, log, created_at, channel,
+         meta) = row
+        try:
+            meta = json.loads(meta) if meta else {}
+        except ValueError:
+            meta = {}
+        return Message(message_id, conversation_id, role, text, self._path(image),
+                       self._path(scene), self._path(video), log, created_at, channel or FIGURE,
+                       meta)
 
 
 # Columns added after the first release; older databases get them on open.
@@ -302,10 +319,3 @@ _ADDED_COLUMNS = {
                  ("meta", "TEXT NOT NULL DEFAULT '{}'")],
 }
 
-
-def _add_missing_columns(connection: sqlite3.Connection) -> None:
-    for table, columns in _ADDED_COLUMNS.items():
-        existing = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
-        for name, definition in columns:
-            if name not in existing:
-                connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")

@@ -1,4 +1,4 @@
-"""Username + password accounts and browser sessions, stored in SQLite."""
+"""Username + password accounts and browser sessions (PostgreSQL, or SQLite locally)."""
 
 from __future__ import annotations
 
@@ -6,11 +6,10 @@ import hashlib
 import hmac
 import math
 import secrets
-import sqlite3
 import time
-from contextlib import contextmanager
 from pathlib import Path
 
+from .db import Database, SqliteDatabase
 from .history import user_id_for
 
 MAX_FAILED_ATTEMPTS = 5
@@ -31,36 +30,37 @@ def _hash_password(password: str, salt: bytes) -> bytes:
     return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 200_000)
 
 
-class AccountStore:
-    def __init__(self, root: Path):
-        self.root = root
-        self.db_path = root / "accounts.sqlite3"
+_SCHEMA = [
+    """CREATE TABLE IF NOT EXISTS users (
+           user_id TEXT PRIMARY KEY,
+           name TEXT NOT NULL,
+           code_hash {BLOB} NOT NULL,  -- password hash; name kept for existing DBs
+           salt {BLOB} NOT NULL,
+           failed_attempts INTEGER NOT NULL DEFAULT 0,
+           locked_until {FLOAT} NOT NULL DEFAULT 0,
+           created_at {FLOAT} NOT NULL
+       )""",
+    """CREATE TABLE IF NOT EXISTS sessions (
+           token TEXT PRIMARY KEY,
+           user_id TEXT NOT NULL,
+           created_at {FLOAT} NOT NULL
+       )""",
+]
 
-    @contextmanager
+
+class AccountStore:
+    """``db`` is the shared PostgreSQL database; without it, SQLite under ``root``."""
+
+    def __init__(self, root: Path, db: Database | None = None):
+        self.root = root
+        self.db = db or SqliteDatabase(root / "accounts.sqlite3")
+
+    def create_tables(self) -> None:
+        self.db.ensure_schema("accounts", _SCHEMA)
+
     def _connect(self):
-        self.root.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(self.db_path)
-        connection.executescript(
-            """CREATE TABLE IF NOT EXISTS users (
-                   user_id TEXT PRIMARY KEY,
-                   name TEXT NOT NULL,
-                   code_hash BLOB NOT NULL,  -- password hash; name kept for existing DBs
-                   salt BLOB NOT NULL,
-                   failed_attempts INTEGER NOT NULL DEFAULT 0,
-                   locked_until REAL NOT NULL DEFAULT 0,
-                   created_at REAL NOT NULL
-               );
-               CREATE TABLE IF NOT EXISTS sessions (
-                   token TEXT PRIMARY KEY,
-                   user_id TEXT NOT NULL,
-                   created_at REAL NOT NULL
-               );"""
-        )
-        try:
-            with connection:
-                yield connection
-        finally:
-            connection.close()
+        self.create_tables()
+        return self.db.connect()
 
     @staticmethod
     def _user_id(name: str) -> str:
@@ -102,7 +102,7 @@ class AccountStore:
                     "VALUES (?, ?, ?, ?, ?)",
                     (user_id, name, _hash_password(password, salt), salt, time.time()),
                 )
-        except sqlite3.IntegrityError as exc:
+        except self.db.IntegrityError as exc:
             raise ValueError(f"Tên đăng nhập «{name}» đã có người dùng.") from exc
         return user_id
 
@@ -157,7 +157,7 @@ class AccountStore:
         token = secrets.token_urlsafe(24)
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO sessions VALUES (?, ?, ?)", (token, user_id, time.time())
+                "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)", (token, user_id, time.time())
             )
         return token
 

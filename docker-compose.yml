@@ -7,7 +7,9 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
 #
-# Data (accounts, conversations, drawings, daily usage) lives in the "mathmate-data" volume.
+# Accounts, conversations and daily usage go to PostgreSQL (DATABASE_URL in .env); photos and
+# drawings are files in the "mathmate-data" volume. Without DATABASE_URL, SQLite files in the
+# volume are used instead.
 
 services:
   app:
@@ -21,6 +23,9 @@ services:
       GEO_DRAW_DATA_DIR: /data
     volumes:
       - mathmate-data:/data
+    extra_hosts:
+      # Lets DATABASE_URL reach a PostgreSQL running on the server itself (not in Docker).
+      - "host.docker.internal:host-gateway"
     ports:
       - "${PORT:-8000}:8000"
 

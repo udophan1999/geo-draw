@@ -37,7 +37,7 @@ def create_app(data_dir: Path | None = None, web_dist: Path | None = ROOT / "web
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         yield
-        state.jobs.shutdown()
+        state.close()
 
     app = FastAPI(title="geo-draw API", version="1.0", lifespan=lifespan)
     app.state.geo = state

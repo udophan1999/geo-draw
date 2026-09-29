@@ -66,8 +66,8 @@ class ConversationStoreTests(unittest.TestCase):
         conversation = self.store.create("alice", "Đề từ ảnh")
         message = self.store.add_message(conversation.id, ASSISTANT, "Đã vẽ",
                                          image_path=Path("a.png"), scene_path=Path("s.py"))
-        self.store.update_drawing(message.id, Path("b.png"), None)
-        self.assertEqual(self.store.messages(conversation.id)[0].image_path, Path("b.png"))
+        self.store.update_drawing(message.id, self.store.root / "b.png", None)
+        self.assertEqual(self.store.messages(conversation.id)[0].image_path, self.store.root / "b.png")
         self.store.rename("alice", conversation.id, "Cho hình vuông ABCD")
         self.assertEqual(self.store.get("alice", conversation.id).title, "Cho hình vuông ABCD")
         _, folder = self.store.new_message_dir("alice", conversation.id)
@@ -77,6 +77,20 @@ class ConversationStoreTests(unittest.TestCase):
         self.assertIsNone(self.store.get("alice", conversation.id))
         self.assertEqual(self.store.messages(conversation.id), [])
         self.assertFalse(folder.exists())
+
+    def test_files_are_stored_relative_to_the_root(self):
+        conversation = self.store.create("alice", "Đề")
+        image = self.store.root / "alice" / "conversations" / conversation.id / "m1" / "a.png"
+        self.store.add_message(conversation.id, ASSISTANT, "Đã vẽ", image_path=image,
+                               scene_path=Path("/elsewhere/s.py"))
+        with self.store.db.connect() as connection:
+            stored = connection.execute("SELECT image_path, scene_path FROM messages").fetchone()
+        self.assertEqual(stored, (f"alice/conversations/{conversation.id}/m1/a.png", "/elsewhere/s.py"))
+        # Moving the data folder keeps the files reachable.
+        moved = ConversationStore(self.store.root, self.store.db)
+        moved.root = Path("/data/users")
+        self.assertEqual(moved.messages(conversation.id)[0].image_path,
+                         Path(f"/data/users/alice/conversations/{conversation.id}/m1/a.png"))
 
     def test_import_is_idempotent(self):
         messages = [(USER, "Cho tam giác ABC.", None, None),

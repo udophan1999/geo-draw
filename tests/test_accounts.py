@@ -41,7 +41,7 @@ class AccountStoreTests(unittest.TestCase):
         self.assertEqual(self.store.verify("an", "pass2468"), user_id)
         self.assertIsNone(self.store.verify("An", "pass1357"))
         self.assertIsNone(self.store.verify("Bình", "pass2468"))
-        self.assertNotIn(b"pass2468", self.store.db_path.read_bytes())
+        self.assertNotIn(b"pass2468", self.store.db.path.read_bytes())
 
     def test_repeated_failures_lock_the_name(self):
         self.store.create("An", "pass2468")

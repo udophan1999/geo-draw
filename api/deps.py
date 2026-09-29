@@ -15,7 +15,6 @@ from .state import AppState
 
 SESSION_COOKIE = "geo_session"
 GUEST_COOKIE = "geo_guest"
-GUEST_OWNER = "guest"
 _GUEST_ID = re.compile(r"^[0-9a-f]{24}$")
 
 
@@ -35,15 +34,11 @@ class Owner:
     name: str | None
     store: ConversationStore
     workspace: Path
+    store_owner: str  # the owner column used inside ``store``
 
     @property
     def is_guest(self) -> bool:
         return self.user_id is None
-
-    @property
-    def store_owner(self) -> str:
-        """The owner column used inside ``store``."""
-        return self.user_id or GUEST_OWNER
 
     @property
     def identity(self) -> str:
@@ -57,7 +52,7 @@ def app_state(request: Request) -> AppState:
 
 def user_owner(state: AppState, user_id: str) -> Owner:
     return Owner(user_id, "", state.accounts.display_name(user_id), state.conversations,
-                 state.users_dir / user_id)
+                 state.users_dir / user_id, user_id)
 
 
 def get_owner(request: Request) -> Owner:
@@ -69,7 +64,7 @@ def get_owner(request: Request) -> Owner:
         return user_owner(state, user_id)
     guest_id = request.state.guest_id  # set by the guest-cookie middleware
     return Owner(None, guest_id, None, state.guest_store(guest_id),
-                 state.sessions_dir / guest_id)
+                 state.sessions_dir / guest_id, state.guest_owner(guest_id))
 
 
 def owned_conversation(owner: Owner, conversation_id: str) -> Conversation:

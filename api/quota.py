@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
-import sqlite3
 import time
-from contextlib import contextmanager
 from pathlib import Path
+
+from geo_draw.db import Database, SqliteDatabase
+
+_SCHEMA = ["""CREATE TABLE IF NOT EXISTS usage (
+                  owner TEXT NOT NULL,
+                  day TEXT NOT NULL,
+                  count INTEGER NOT NULL DEFAULT 0,
+                  PRIMARY KEY (owner, day)
+              )"""]
 
 
 def _today() -> str:
@@ -13,26 +20,17 @@ def _today() -> str:
 
 
 class QuotaStore:
-    def __init__(self, db_path: Path):
-        self.db_path = db_path
+    """``db`` is the shared PostgreSQL database; without it, SQLite at ``db_path``."""
 
-    @contextmanager
+    def __init__(self, db_path: Path, db: Database | None = None):
+        self.db = db or SqliteDatabase(db_path)
+
+    def create_tables(self) -> None:
+        self.db.ensure_schema("usage", _SCHEMA)
+
     def _connect(self):
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(self.db_path)
-        connection.execute(
-            """CREATE TABLE IF NOT EXISTS usage (
-                   owner TEXT NOT NULL,
-                   day TEXT NOT NULL,
-                   count INTEGER NOT NULL DEFAULT 0,
-                   PRIMARY KEY (owner, day)
-               )"""
-        )
-        try:
-            with connection:
-                yield connection
-        finally:
-            connection.close()
+        self.create_tables()
+        return self.db.connect()
 
     def used(self, owner: str) -> int:
         with self._connect() as connection:
@@ -45,7 +43,7 @@ class QuotaStore:
         """Count one AI turn; return False (and count nothing) when the limit is reached."""
         with self._connect() as connection:
             connection.execute(
-                "INSERT OR IGNORE INTO usage (owner, day, count) VALUES (?, ?, 0)",
+                "INSERT INTO usage (owner, day, count) VALUES (?, ?, 0) ON CONFLICT DO NOTHING",
                 (owner, _today()),
             )
             cursor = connection.execute(

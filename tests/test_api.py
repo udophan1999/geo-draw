@@ -46,7 +46,9 @@ class ApiTestCase(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.data = Path(self._tmp.name)
-        self.app = create_app(self.data, ai=self.ai, daily_limit_guest=self.limit_guest,
+        # database_url=None: always SQLite in the temp dir, whatever DATABASE_URL says.
+        self.app = create_app(self.data, ai=self.ai, database_url=None,
+                              daily_limit_guest=self.limit_guest,
                               daily_limit_user=self.limit_user)
         self.state = self.app.state.geo
         tutor = patch("geo_draw.tutor.stream_chat", side_effect=fake_stream)
