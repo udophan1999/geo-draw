@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { LogIn, LogOut, MoreHorizontal, Pencil, Settings2, SquarePen, Trash2 } from 'lucide-react'
+import { ChevronUp, LogIn, LogOut, MoreHorizontal, Pencil, Settings2, SquarePen, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -203,13 +203,15 @@ function AccountBox() {
       {user ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-11 w-full justify-start gap-3 px-2">
+            <Button variant="ghost" className="group h-11 w-full justify-start gap-3 px-2">
               <Avatar className="size-7">
                 <AvatarFallback className="bg-primary text-xs text-primary-foreground">
                   {user.name.slice(0, 1).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <span className="truncate font-medium">{user.name}</span>
+              {/* Hints that the row opens a menu; points down while it is open. */}
+              <ChevronUp className="ml-auto text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-56">
