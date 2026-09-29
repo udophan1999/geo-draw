@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 
+import { Logo } from '@/components/Logo'
 import { ManualEditor } from '@/components/drawing/ManualEditor'
 import { ZoomImage } from '@/components/drawing/ZoomImage'
 import { Button } from '@/components/ui/button'
@@ -20,7 +21,7 @@ export function DrawingPanel({ drawings, shown, onShow, busy }: Props) {
   if (!shown) {
     return (
       <div className="flex h-full min-h-80 flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
-        {busy ? <Loader2 className="size-10 animate-spin opacity-50" /> : <div className="text-5xl opacity-40">📐</div>}
+        {busy ? <Loader2 className="size-10 animate-spin opacity-50" /> : <Logo className="size-14 opacity-30 grayscale" />}
         <p className="text-sm">{busy ? 'Đang vẽ hình…' : 'Hình vẽ sẽ hiện ở đây'}</p>
       </div>
     )

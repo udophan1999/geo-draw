@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="geo-draw">
+  <!-- Thales: BC is a diameter of the circle, so triangle ABC has a right angle at A. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <circle cx="32" cy="34" r="19" fill="#fff" fill-opacity="0.1" stroke="#fff" stroke-opacity="0.45" stroke-width="2.2"/>
+  <path d="M13.00 34.00 L23.08 17.22 L51.00 34.00 Z" fill="#fff" fill-opacity="0.16" stroke="#fff" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M19.47 23.22 L25.47 26.83 L29.08 20.83" fill="none" stroke="#FBBF24" stroke-width="2.38" stroke-linejoin="round" stroke-linecap="round"/>
+  <g fill="#fff">
+    <circle cx="23.08" cy="17.22" r="2.7"/>
+    <circle cx="13" cy="34" r="2.7"/>
+    <circle cx="51" cy="34" r="2.7"/>
+  </g>
+</svg>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { NavLink, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
+import { Logo } from '@/components/Logo'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -29,7 +30,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <aside className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex items-center gap-2 px-4 pt-4 pb-2">
-        <span className="text-xl">📐</span>
+        <Logo />
         <span className="text-base font-semibold tracking-tight">geo-draw</span>
       </div>
       <div className="px-3 pb-2">

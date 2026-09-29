@@ -2,6 +2,7 @@ import { Loader2, Menu } from 'lucide-react'
 import { useState } from 'react'
 import { Navigate, Outlet } from 'react-router'
 
+import { Logo } from '@/components/Logo'
 import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { ChatProvider } from '@/lib/chat'
@@ -47,7 +48,8 @@ export function AppLayout() {
             <Button variant="ghost" size="icon" aria-label="Mở menu" onClick={() => setSidebarOpen(true)}>
               <Menu />
             </Button>
-            <span className="font-semibold">📐 geo-draw</span>
+            <Logo className="size-6" />
+            <span className="font-semibold">geo-draw</span>
           </div>
           <Outlet />
         </main>

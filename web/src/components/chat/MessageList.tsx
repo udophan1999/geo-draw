@@ -2,6 +2,7 @@ import { Eye, Lightbulb, Loader2 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import Markdown from 'react-markdown'
 
+import { Logo } from '@/components/Logo'
 import { Badge } from '@/components/ui/badge'
 import type { Example, Message } from '@/lib/api'
 import type { PendingTurn } from '@/lib/chat'
@@ -88,9 +89,7 @@ function UserBubble({ text, image }: { text: string; image: string | null }) {
 function AssistantRow({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex gap-3">
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-full border bg-background text-base">
-        📐
-      </div>
+      <Logo className="size-8 rounded-lg" />
       <div className="min-w-0 flex-1 pt-1">{children}</div>
     </div>
   )
