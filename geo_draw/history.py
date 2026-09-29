@@ -97,3 +97,18 @@ class HistoryStore:
 def _entry(row) -> HistoryEntry:
     entry_id, problem, summary, scene_path, image_path, created_at = row
     return HistoryEntry(entry_id, problem, summary, Path(scene_path), Path(image_path), created_at)
+
+
+def import_into_conversations(history: HistoryStore, conversations, user_id: str) -> None:
+    """Turn drawings saved before chat existed into one-turn conversations (idempotent)."""
+    from .conversations import ASSISTANT, USER
+
+    for entry in reversed(history.list(user_id, limit=1000)):
+        conversation_id = f"h{entry.id}"
+        if conversations.get(user_id, conversation_id):
+            continue
+        conversations.import_conversation(
+            user_id, conversation_id, entry.problem, entry.created_at,
+            [(USER, entry.problem, None, None),
+             (ASSISTANT, entry.summary, entry.image_path, entry.scene_path)],
+        )

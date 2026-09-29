@@ -11,7 +11,8 @@ A Streamlit app that takes a Vietnamese middle-school (THCS) plane-geometry prob
 No virtualenv is committed. The README uses Windows paths (`.venv-codex`/`.venv`); on macOS/Linux create one with `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
 
 ```bash
-streamlit run app.py                                   # run the app (http://localhost:8501)
+uvicorn api.main:app --reload                          # API server (http://localhost:8000, docs at /docs)
+streamlit run app.py                                   # legacy Streamlit UI (http://localhost:8501)
 python -m unittest discover -s tests -v                # all tests
 python -m unittest tests.test_geometry_primitives -v   # one file
 python -m unittest tests.test_ai_codegen.AiCodegenTests.test_missing_referenced_figure_stops_before_ai_generation  # one test
@@ -19,18 +20,24 @@ python -m unittest tests.test_ai_codegen.AiCodegenTests.test_missing_referenced_
 
 There is no linter or build step. The theme (blue primary color, minimal toolbar) is set in `.streamlit/config.toml`, which is committed; only `.streamlit/secrets.toml` is gitignored. Static renders need only Manim (labels use `Text`, so no LaTeX is required). Video output needs FFmpeg.
 
-DeepSeek configuration is read from `.env` (see `.env.example`: `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, `DEEPSEEK_VISION_MODEL`, `DEEPSEEK_BASE_URL`) by a small custom `load_dotenv` in `ai_codegen.py`. The key can also be entered in the sidebar. Never write the key into scenes, logs or code.
+DeepSeek configuration is read from `.env` (see `.env.example`: `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, `DEEPSEEK_VISION_MODEL`, `DEEPSEEK_BASE_URL`) by a small custom `load_dotenv` in `ai_codegen.py`. The API only ever uses this server key; the legacy Streamlit UI still lets users type a key in its settings. Never write the key into scenes, logs or code. The API also reads `GEO_DRAW_DAILY_LIMIT_USER` (default 50), `GEO_DRAW_DAILY_LIMIT_GUEST` (default 5), `GEO_DRAW_COOKIE_SECURE=1` (for HTTPS) and `GEO_DRAW_DATA_DIR`.
 
 ## Architecture
 
 ### Layout
 
 - `geo_draw/`: the shared core, with no Streamlit imports: geometry, AI code generation, rendering, accounts and chat conversations (`conversations.py`). Two modules serve the UIs directly:
+  - `chat.py`: `run_turn`, one chat message end to end: optional OCR, saving the messages, `compose_problem` of all user turns, and `previous_code` from the last drawing. It reports through `on_event`.
   - `pipeline.py`: one drawing turn (DeepSeek or parser → render → up to 3 AI repairs), reporting progress through `on_progress(stage, label)`; it also holds `parser_scene` and `render_error_summary`.
   - `scene_info.py`: what the manual editor needs: label and segment names, `empty_manual_edits()`, and `load_edits`/`save_edits` for `edits.json`. A future `mobile/` app should reuse it.
 
 **Migration in progress:** the Streamlit UI (`streamlit_app/`) is being replaced by a FastAPI server (`api/`) and a React + Vite + TypeScript + Tailwind + shadcn/ui app (`web/`). The plan and its phases live in `/Users/tonyphanx/.claude/plans/iridescent-nibbling-sutherland.md`. Keep new logic in `geo_draw/` so that the API, Streamlit and a future `mobile/` app can all share it. Frontend tooling needs Node 22 (`.nvmrc`); the `/usr/local/bin/node` on this machine is an old v18, so run `nvm use` first.
 
+- `api/`: FastAPI server. `create_app(data_dir, **AppState options)` builds one `AppState` (`api/state.py`), stored at `app.state.geo`, which holds the stores, the quota and the job manager; tests build their own app on a temp dir.
+  - **Identity** (`api/deps.py`): an HttpOnly `geo_session` cookie (a token in `AccountStore`'s sessions table) means a signed-in user. Otherwise the caller is a guest, identified by a `geo_guest` cookie that middleware issues to everyone. `Owner` bundles the conversation store, the store's owner column, the workspace and `identity` (the key used for quota and jobs). Always load data through `owned_conversation` / `owned_message`, which return 404 for other people's data.
+  - **Chat turn**: `POST /api/messages` (multipart: `text`, optional `conversation_id`, optional `image`) checks ownership, then quota, then starts `geo_draw.chat.run_turn` in `JobManager` (a pool of 2 threads) and returns `{conversation, job_id}` at once. `GET /api/jobs/{id}/events` is SSE with `message` (saved message JSON), `progress`, then `done` or `error`. The job saves its results itself, so a closed tab loses nothing.
+  - **Quota** (`api/quota.py`): each AI turn (drawing or OCR) costs one unit of a daily limit per identity, stored in `usage.sqlite3`; it returns 429 when the limit is used up. Parser turns are free. When there is no server key, AI mode returns 503.
+  - JSON shapes live in `api/schemas.py` (`message_json` adds `image_url`/`video_url` with a `?v=` cache-busting version, since a re-render writes a new file). Settings are stored per workspace in `settings.json`, with `mode` `"ai"`/`"parser"`; `load_settings` also accepts the Streamlit app's Vietnamese mode labels.
 - `streamlit_app/`: the legacy Streamlit UI. It stays runnable until the React app reaches parity.
   - `streamlit_app/app.py`: routes and the access guard, built with `st.navigation(position="hidden")`. `/login` is the login/register page, `/dashboard` is the main page, and `/` redirects. Anyone who is not signed in and not in anonymous mode is sent to `/login`; anyone else who opens `/login` or `/` is sent to `/dashboard`. The redirects use `st.switch_page` and always carry `?session=<token>`. All access checks live here; views never redirect themselves. Pages are created inside `main()` on every run, because `st.Page` needs a script-run context.
   - `streamlit_app/config.py`: data paths, the shared `ACCOUNTS`, `CONVERSATIONS` and legacy `HISTORY` stores, and the example problems.

@@ -205,6 +205,15 @@ class ConversationStore:
                 (str(image_path), _path_text(video_path), message_id),
             )
 
+    def get_message(self, message_id: str) -> Message | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT id, conversation_id, role, text, image_path, scene_path, video_path, "
+                "log, created_at FROM messages WHERE id = ?",
+                (message_id,),
+            ).fetchone()
+        return _message(row) if row else None
+
     def messages(self, conversation_id: str) -> list[Message]:
         with self._connect() as connection:
             rows = connection.execute(

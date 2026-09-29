@@ -13,7 +13,8 @@ import streamlit as st
 
 from geo_draw.ai_codegen import extract_problem_from_image
 from geo_draw.conversations import ASSISTANT, USER, Conversation, Message, compose_problem
-from streamlit_app import config, session, settings, styles
+from geo_draw.examples import EXAMPLES
+from streamlit_app import session, settings, styles
 from streamlit_app.components.manual_editor import manual_editor
 from streamlit_app.components.sidebar import sidebar
 from streamlit_app.components.zoomable_image import zoomable_image
@@ -81,7 +82,7 @@ def _welcome() -> None:
         "để chỉnh tiếp."
     )
     st.caption("Thử một đề mẫu:")
-    for name, problem in config.EXAMPLES.items():
+    for name, problem in EXAMPLES.items():
         st.button(f"💡 {name}", key=f"example_{name}", width="stretch",
                   on_click=_queue_prompt, args=(problem,))
 

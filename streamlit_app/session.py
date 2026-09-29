@@ -7,7 +7,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from geo_draw.conversations import ASSISTANT, USER, ConversationStore
+from geo_draw.conversations import ConversationStore
+from geo_draw.history import import_into_conversations
 
 from streamlit_app import config
 
@@ -46,23 +47,9 @@ def conversations() -> ConversationStore:
     if not user_id:
         return ConversationStore(workspace())
     if st.session_state.get("history_imported_for") != user_id:
-        _import_old_history(user_id)
+        import_into_conversations(config.HISTORY, config.CONVERSATIONS, user_id)
         st.session_state["history_imported_for"] = user_id
     return config.CONVERSATIONS
-
-
-def _import_old_history(user_id: str) -> None:
-    """Turn drawings saved before chat existed (HistoryStore) into one-turn conversations."""
-    store = config.CONVERSATIONS
-    for entry in reversed(config.HISTORY.list(user_id, limit=1000)):
-        conversation_id = f"h{entry.id}"
-        if store.get(user_id, conversation_id):
-            continue
-        store.import_conversation(
-            user_id, conversation_id, entry.problem, entry.created_at,
-            [(USER, entry.problem, None, None), (ASSISTANT, entry.summary, entry.image_path,
-                                                  entry.scene_path)],
-        )
 
 
 # Open conversation and the drawing shown on the right --------------------------------

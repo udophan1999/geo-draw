@@ -1,3 +1,10 @@
 manim>=0.19.0
-streamlit>=1.64.0
 numpy>=1.26.0
+# API server (api/)
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+# Legacy Streamlit UI (streamlit_app/), removed once the React app reaches parity
+streamlit>=1.64.0
+# Tests
+httpx2>=2.13
