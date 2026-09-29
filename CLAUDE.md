@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Streamlit app that takes a Vietnamese middle-school (THCS) plane-geometry problem, as text or as an image, and draws the figure with Manim. The main path sends the problem to DeepSeek, which writes a `GeoScene` Manim module. A local regex parser handles simple figures without any API call. UI strings, error messages and the README are in Vietnamese; keep new user-facing text in Vietnamese.
+A Vietnamese math tutor (THCS–THPT) that also draws geometry figures. A student sends a problem (text or photo). The tutor, ported from the MathLovers project, gives Socratic hints level by level, or a worked solution when asked. For plane-geometry problems the figure is drawn automatically with Manim: DeepSeek writes a `GeoScene` module, or a local regex parser handles simple figures without any API call. UI strings, error messages and the README are in Vietnamese; keep new user-facing text in Vietnamese.
 
 ## Commands
 
@@ -26,14 +26,15 @@ python -m unittest tests.test_ai_codegen.AiCodegenTests.test_missing_referenced_
 
 There is no linter or build step. The theme (blue primary color, minimal toolbar) is set in `.streamlit/config.toml`, which is committed; only `.streamlit/secrets.toml` is gitignored. Static renders need only Manim (labels use `Text`, so no LaTeX is required). Video output needs FFmpeg.
 
-DeepSeek configuration is read from `.env` (see `.env.example`: `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, `DEEPSEEK_VISION_MODEL`, `DEEPSEEK_BASE_URL`) by a small custom `load_dotenv` in `ai_codegen.py`. The API only ever uses this server key; the legacy Streamlit UI still lets users type a key in its settings. Never write the key into scenes, logs or code. The API also reads `GEO_DRAW_DAILY_LIMIT_USER` (default 50), `GEO_DRAW_DAILY_LIMIT_GUEST` (default 5), `GEO_DRAW_COOKIE_SECURE=1` (for HTTPS) and `GEO_DRAW_DATA_DIR`.
+DeepSeek configuration is read from `.env` (see `.env.example`: `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, `DEEPSEEK_VISION_MODEL`, `DEEPSEEK_BASE_URL`) by a small custom `load_dotenv` in `ai_codegen.py`. The API only ever uses this server key; the legacy Streamlit UI still lets users type a key in its settings. Never write the key into scenes, logs or code. The API also reads `GEO_DRAW_DAILY_LIMIT_USER` (default 100), `GEO_DRAW_DAILY_LIMIT_GUEST` (default 10), `GEO_DRAW_COOKIE_SECURE=1` (for HTTPS) and `GEO_DRAW_DATA_DIR`.
 
 ## Architecture
 
 ### Layout
 
 - `geo_draw/`: the shared core, with no Streamlit imports: geometry, AI code generation, rendering, accounts and chat conversations (`conversations.py`). Two modules serve the UIs directly:
-  - `chat.py`: `run_turn`, one chat message end to end: optional OCR, saving the messages, `compose_problem` of all user turns, and `previous_code` from the last drawing. It reports through `on_event`.
+  - `tutor.py` + `tutor_prompts.py`: the math tutor (see **Math tutor** below). `is_geometry_problem` decides whether a figure is drawn automatically.
+  - `chat.py`: `run_figure_turn`, one drawing turn in the `figure` channel. It draws `compose_problem([problem, *figure requests])` with `previous_code` from the last drawing and reports through `on_event`.
   - `pipeline.py`: one drawing turn (DeepSeek or parser → render → up to 3 AI repairs), reporting progress through `on_progress(stage, label)`; it also holds `parser_scene` and `render_error_summary`.
   - `scene_info.py`: what the manual editor needs: label and segment names, `empty_manual_edits()`, and `load_edits`/`save_edits` for `edits.json`. A future `mobile/` app should reuse it.
 
@@ -41,14 +42,17 @@ DeepSeek configuration is read from `.env` (see `.env.example`: `DEEPSEEK_API_KE
 
 - `api/`: FastAPI server. `create_app(data_dir, **AppState options)` builds one `AppState` (`api/state.py`), stored at `app.state.geo`, which holds the stores, the quota and the job manager; tests build their own app on a temp dir.
   - **Identity** (`api/deps.py`): an HttpOnly `geo_session` cookie (a token in `AccountStore`'s sessions table) means a signed-in user. Otherwise the caller is a guest, identified by a `geo_guest` cookie that middleware issues to everyone. `Owner` bundles the conversation store, the store's owner column, the workspace and `identity` (the key used for quota and jobs). Always load data through `owned_conversation` / `owned_message`, which return 404 for other people's data.
-  - **Chat turn**: `POST /api/messages` (multipart: `text`, optional `conversation_id`, optional `image`) checks ownership, then quota, then starts `geo_draw.chat.run_turn` in `JobManager` (a pool of 2 threads) and returns `{conversation, job_id}` at once. `GET /api/jobs/{id}/events` is SSE with `message` (saved message JSON), `progress`, then `done` or `failed` (not `error`, which `EventSource` reserves for connection problems). The job saves its results itself, so a closed tab loses nothing.
-  - **Quota** (`api/quota.py`): each AI turn (drawing or OCR) costs one unit of a daily limit per identity, stored in `usage.sqlite3`; it returns 429 when the limit is used up. Parser turns are free. When there is no server key, AI mode returns 503.
+  - **Turns run as jobs** (`api/routers/messages.py`) in `JobManager`, a pool of 2 threads, and return `{…, job_id}` at once. The job saves its results itself, so a closed tab loses nothing.
+    - `POST /api/messages` (multipart: `text`, `conversation_id?`, `image?`, `action` = `ask`/`deeper`/`solution`/`hint`) starts a tutor turn after checking ownership, then the server key (503), then quota. On the first message of a plane-geometry problem it also starts a figure job and announces it as `figure_job` (or `figure_skipped` if quota or settings prevent it).
+    - `POST /api/conversations/{id}/figure` (`{text}`) draws the figure or refines it.
+    - `GET /api/jobs/{id}/events` is SSE with `progress`, `delta` (tutor text), `message` (saved message JSON), `conversation`, `figure_job`, then `done` or `failed` (not `error`, which `EventSource` reserves for connection problems).
+  - **Quota** (`api/quota.py`): every tutor turn and every AI drawing costs one unit of a daily limit per identity, stored in `usage.sqlite3`; it returns 429 when the limit is used up. Parser drawings are free. The tutor always needs the server key (503 without it); the `mode` setting only chooses how figures are drawn.
   - JSON shapes live in `api/schemas.py` (`message_json` adds `image_url`/`video_url` with a `?v=` cache-busting version, since a re-render writes a new file). Settings are stored per workspace in `settings.json`, with `mode` `"ai"`/`"parser"`; `load_settings` also accepts the Streamlit app's Vietnamese mode labels.
 - `web/`: React 19 + Vite + TypeScript, with Tailwind v4 and shadcn/ui (radix-nova preset; generated components live in `src/components/ui/`, add more with `npx shadcn@latest add <name>`). Routes (React Router 8, `src/main.tsx`): `/login` and `/register` (`routes/auth.tsx`), then `AppLayout`, which guards `/` and `/c/:conversationId` (`routes/ChatPage.tsx`). A visitor without an account is sent to `/login` unless they chose "Dùng thử", stored in localStorage (`lib/guest.ts`).
   - `lib/api.ts`: the typed API client and `followJob` (an `EventSource` on the job events). Reuse it for mobile.
   - `lib/queries.ts`: TanStack Query hooks and keys. `upsertMessage` patches a cached conversation from SSE events or re-renders.
-  - `lib/chat.tsx`: `ChatProvider` sits above the routes and tracks running turns (`pending[conversationId]`: optimistic user bubble and progress label). It navigates from `/` to `/c/:id` when a turn creates a conversation, and re-fetches the conversation when the job ends.
-  - `components/`: `Sidebar` (conversation list with rename/delete, account menu at the bottom), `SettingsDialog`, `chat/` (`MessageList`, `Composer` with paste/drag-drop/📎 images), and `drawing/` (`DrawingPanel` with versions and tabs, `ZoomImage`, `ManualEditor`, a port of the Streamlit editor that commits edits only after a successful re-render).
+  - `lib/chat.tsx`: `ChatProvider` sits above the routes and tracks running jobs. `pending[conversationId]` is a tutor turn (optimistic user bubble, progress label, `reply` streamed from `delta` events). `figures[conversationId]` is a drawing job, and figure jobs announced by `figure_job` are followed too. It navigates from `/` to `/c/:id` when a turn creates a conversation, and re-fetches the conversation when a job ends.
+  - `components/`: `Sidebar` (conversation list with rename/delete, account menu at the bottom), `SettingsDialog`, `MathMarkdown` (react-markdown + remark-math + rehype-katex, for every message), `chat/` (`MessageList` with the `chat` channel only, `TutorBar` with the Gợi ý/Lời giải switch, hint level, "Gợi ý sâu hơn" and "Vẽ hình", and `Composer` with paste/drag-drop/📎 images), and `drawing/` (`DrawingPanel` with versions, tabs and the "Yêu cầu chỉnh hình" box, shown only for geometry problems or once a figure exists; `ZoomImage`, `ManualEditor`, a port of the Streamlit editor that commits edits only after a successful re-render).
   - In production `api/main.py` serves `web/dist` when it exists, and unknown non-`/api` paths return `index.html`.
 - `streamlit_app/`: the legacy Streamlit UI. It stays runnable until the React app reaches parity.
   - `streamlit_app/app.py`: routes and the access guard, built with `st.navigation(position="hidden")`. `/login` is the login/register page, `/dashboard` is the main page, and `/` redirects. Anyone who is not signed in and not in anonymous mode is sent to `/login`; anyone else who opens `/login` or `/` is sent to `/dashboard`. The redirects use `st.switch_page` and always carry `?session=<token>`. All access checks live here; views never redirect themselves. Pages are created inside `main()` on every run, because `st.Page` needs a script-run context.
@@ -108,7 +112,18 @@ The app opens on a separate login screen (`streamlit_app/views/login.py`); `stre
 
 Passwords are stored as salted PBKDF2 hashes; the column is still called `code_hash` so that existing databases keep working. After sign-in the URL carries a random session token (`?session=...`, looked up in the `sessions` table) so that a reload keeps the user signed in. Never put the name itself in the URL, because that would bypass the password. `auth.logout` deletes the token and clears the displayed drawing. `user_id` is `history.user_id_for(name.casefold())`.
 
-### Dashboard = chat
+### Math tutor (from MathLovers)
+
+- **Conversations** (`geo_draw/conversations.py`) hold `problem`, `mode` (`hint` | `solution`) and `hint_level` (1–5). Messages have a `channel`: `chat` holds the tutor conversation, and `figure` holds drawing requests and drawings. They also carry a JSON `meta` (mode, level, `error`). Missing columns are added to old databases on open. Conversations from before the tutor have only `figure` messages; `problem_of()` returns their first request as the problem.
+- **`run_tutor_turn`** (`geo_draw/tutor.py`):
+  - A photo is read with `extract_problem_from_image`. The first message becomes the `problem` and the title.
+  - The model gets `build_system_prompt(problem, mode, level)` plus the last 16 chat messages. The reply streams through `ai_codegen.stream_chat` (DeepSeek `stream: true`) as `delta` events.
+  - AI errors are saved as an assistant message with `meta.error`.
+- **Prompts** (`geo_draw/tutor_prompts.py`): the 5 hint levels are Hiểu đề → Nhớ kiến thức → Chiến lược → Bước đầu tiên → Sâu hơn nữa. In hint mode the MathLovers `GUARDRAIL` (no full solution, no final answer, end with exactly one question) is always appended. The solution prompt asks for numbered steps, a **Kết luận:** and a **Lưu ý**. Keep the UI level names (`web/src/components/chat/TutorBar.tsx`) in sync with `HINT_LEVELS`.
+- **`is_geometry_problem`** needs named points (ABC, tâm O…) plus plane-figure words, or relation words when there are no algebra words. Solids are never drawn automatically. It works on accent-stripped text, so avoid ambiguous words such as "kẻ"/"kể".
+- **Testing without DeepSeek**: patch `geo_draw.tutor.stream_chat` (the API tests do this in `setUp`). For browser runs, point `DEEPSEEK_BASE_URL` at a small OpenAI-compatible fake server.
+
+### Dashboard = chat (legacy Streamlit UI; it only reads the `figure` channel)
 
 `/dashboard` (`streamlit_app/views/dashboard.py`) has two columns: the chat on the left and the drawing on the right. The sidebar holds "Cuộc trò chuyện mới", the list of conversations, and an account box at the bottom. For signed-in users the account box is a popover with "Cài đặt" (a `st.dialog`) and "Đăng xuất". For guests it shows "Đăng nhập để lưu lại lịch sử hỏi đáp", a login button and ⚙️.
 

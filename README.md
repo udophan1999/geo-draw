@@ -1,6 +1,6 @@
 # geo-draw
 
-Ứng dụng web nhận đề hình học phẳng bằng tiếng Việt từ văn bản hoặc ảnh, dùng DeepSeek tạo scene Manim rồi render thành ảnh hoặc video. Parser cục bộ vẫn có sẵn để vẽ nhanh các hình cơ bản mà không gọi API.
+Trợ giảng Toán tiếng Việt (THCS–THPT). Ứng dụng nhận đề bằng văn bản hoặc ảnh chụp, **gợi ý từng bước để học sinh tự giải** (hoặc trình bày lời giải chi tiết khi học sinh yêu cầu), và **tự vẽ hình** cho bài hình học phẳng. Phần gợi ý theo bậc lấy từ dự án MathLovers. Hình được vẽ bằng DeepSeek (tạo scene Manim rồi render thành ảnh hoặc video) hoặc bằng parser cục bộ cho các hình cơ bản.
 
 Ứng dụng gồm ba phần:
 
@@ -67,9 +67,9 @@ DEEPSEEK_API_KEY=sk-...
 DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_VISION_MODEL=deepseek-v4-flash-vision-exp
 DEEPSEEK_BASE_URL=https://api.deepseek.com
-# Số lượt dùng AI mỗi ngày (vẽ hoặc đọc ảnh); chế độ Parser không bị giới hạn
-GEO_DRAW_DAILY_LIMIT_USER=50
-GEO_DRAW_DAILY_LIMIT_GUEST=5
+# Số lượt dùng AI mỗi ngày: mỗi lượt trợ giảng trả lời và mỗi lần vẽ bằng AI tính 1 lượt; vẽ bằng Parser không tính
+GEO_DRAW_DAILY_LIMIT_USER=100
+GEO_DRAW_DAILY_LIMIT_GUEST=10
 ```
 
 Máy chủ dùng chung một key cho mọi người dùng; người dùng không cần nhập key. Không commit tệp `.env`. Ứng dụng không ghi API key vào scene, log hoặc mã nguồn.
@@ -82,9 +82,13 @@ Hai lựa chọn model (chọn trong **Cài đặt**):
 ## Cách dùng
 
 - **Tài khoản**: đăng ký hoặc đăng nhập bằng tên và mật khẩu; hoặc bấm **Dùng thử không cần tài khoản**. Lịch sử của người dùng thử chỉ lưu trên trình duyệt đó.
-- **Chat**: tin nhắn đầu tiên là đề bài. Các tin sau là yêu cầu bổ sung, ví dụ *"vẽ thêm đường cao AH"*; ứng dụng vẽ lại và giữ bố cục của hình trước. Muốn làm đề khác thì bấm **Cuộc trò chuyện mới**.
-- **Ảnh đề bài**: dán ảnh bằng **Ctrl+V**, kéo thả vào khung chat, hoặc bấm nút đính kèm. DeepSeek đọc đề trong ảnh rồi vẽ luôn; nội dung đọc được hiện trong câu trả lời để bạn kiểm tra và nhắn sửa nếu cần.
-- **Khung hình** (bên phải): zoom và kéo ảnh, chọn lại các phiên bản trước, xem mã Manim và log.
+- **Giải toán**: tin nhắn đầu tiên là đề bài (mọi dạng: phương trình, hàm số, bất đẳng thức, hình học…). Trợ giảng gợi ý theo 5 bậc: *Hiểu đề → Nhớ kiến thức → Chiến lược → Bước đầu tiên → Sâu hơn nữa*. Mỗi lượt kết thúc bằng một câu hỏi dẫn dắt. Học sinh trả lời trong khung chat. Bấm **Gợi ý sâu hơn** khi bí.
+  - Ở chế độ **Gợi ý**, trợ giảng không bao giờ đưa lời giải hay đáp số, kể cả khi bị yêu cầu.
+  - Chuyển sang **Lời giải chi tiết** (có hỏi xác nhận) để xem lời giải đầy đủ từng bước. Bấm **Gợi ý** để quay lại.
+  - Công thức toán hiển thị bằng KaTeX.
+- **Vẽ hình**: bài hình học phẳng (có điểm được đặt tên như ABC, tâm O) được **tự vẽ** ở khung bên phải. Bài khác thì bấm **Vẽ hình** nếu cần. Muốn chỉnh hình, nhập vào ô **Yêu cầu chỉnh hình** trong khung hình, ví dụ *"vẽ thêm đường cao AH"*; ứng dụng vẽ lại và giữ bố cục của hình trước.
+- **Ảnh đề bài**: dán ảnh bằng **Ctrl+V**, kéo thả vào khung chat, hoặc bấm nút đính kèm. DeepSeek đọc đề trong ảnh; đề đọc được hiện trong khung chat để bạn kiểm tra.
+- **Khung hình**: zoom và kéo ảnh, chọn lại các phiên bản trước, xem mã Manim và log.
 - **Chỉnh hình thủ công**: dịch hoặc ẩn tên điểm, ẩn chấm điểm, thêm, ẩn hoặc làm đậm đoạn thẳng. Tab **Dựng hình** hạ đường vuông góc, dựng tia phân giác, đường trung trực hoặc trung tuyến. Mọi thao tác chỉ render lại trên máy chủ, không gọi DeepSeek. Chỉ áp dụng cho hình do DeepSeek tạo.
 
 ## Cách hoạt động
