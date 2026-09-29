@@ -1,8 +1,9 @@
-"""Streamlit entry point. Run from the repository root: `streamlit run app.py`.
+"""Legacy Streamlit entry point. Run from the repository root: `streamlit run app.py`.
 
-The web UI lives in `web/`; the shared geometry/AI/account core lives in `geo_draw/`.
+The Streamlit UI lives in `streamlit_app/` and is being replaced by the React app in `web/`
+backed by the FastAPI server in `api/`; the shared core lives in `geo_draw/`.
 """
 
-from web.app import main
+from streamlit_app.app import main
 
 main()

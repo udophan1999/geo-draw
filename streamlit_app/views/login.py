@@ -6,7 +6,7 @@ import streamlit as st
 
 from geo_draw.accounts import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 
-from web import auth
+from streamlit_app import auth
 
 
 def login_page() -> None:

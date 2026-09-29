@@ -9,16 +9,9 @@ import streamlit as st
 
 from geo_draw.conversations import ASSISTANT, USER, ConversationStore
 
-from web import config
+from streamlit_app import config
 
 GUEST_OWNER = "guest"
-
-
-def empty_manual_edits() -> dict:
-    return {
-        "hidden_labels": [], "hidden_points": [], "hidden_segments": [],
-        "added_segments": [], "segment_widths": {}, "constructions": [],
-    }
 
 
 def current_user_id() -> str | None:

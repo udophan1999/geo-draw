@@ -2,68 +2,29 @@
 
 from __future__ import annotations
 
-import json
-import re
-from pathlib import Path
-
 import streamlit as st
 
 from geo_draw.conversations import Message
+from geo_draw.pipeline import render_error_summary
 from geo_draw.renderer import render_scene
+from geo_draw.scene_info import (
+    empty_manual_edits, label_names, load_edits, save_edits, segment_names, suggest_point_name,
+)
 
-from web import rendering, session
-
-
-def _scene_label_names(scene_path: Path) -> list[str]:
-    if not scene_path.exists():
-        return []
-    code = scene_path.read_text(encoding="utf-8")
-    return sorted(set(re.findall(r'safe_point_label\([^,]+,\s*["\']([A-Z])["\']', code)))
-
-
-def _scene_segment_names(scene_path: Path, edits: dict | None = None) -> list[str]:
-    if not scene_path.exists():
-        return []
-    code = scene_path.read_text(encoding="utf-8")
-    found = {
-        "".join(sorted(match))
-        for match in re.findall(r"\bLine\(\s*([A-Z])\s*,\s*([A-Z])", code)
-    }
-    found.update(
-        "".join(sorted(value))
-        for value in (edits or {}).get("added_segments", ())
-        if isinstance(value, str) and len(value) == 2
-    )
-    return sorted(found)
-
-
-def _suggest_point_name(names: list[str], edits: dict, preferred: str) -> str:
-    occupied = set(names)
-    occupied.update(
-        str(item.get("name", ""))
-        for item in edits.get("constructions", ())
-        if isinstance(item, dict)
-    )
-    choices = preferred + "MNPKQRESTUVXYZ"
-    return next((name for name in choices if name not in occupied), "")
+from streamlit_app import session
 
 
 def manual_editor(message: Message, quality: str, animate: bool) -> None:
     """Edit the drawing of ``message``; a successful re-render replaces its image."""
     scene_path = message.scene_path
-    names = _scene_label_names(scene_path)
+    names = label_names(scene_path)
     if not names:
         return
     # Edits are saved next to the scene so they survive reloads and keep accumulating.
-    edits_file = scene_path.parent / "edits.json"
     if st.session_state.get("edits_for") != message.id:
-        try:
-            saved = json.loads(edits_file.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            saved = {}
-        st.session_state["label_offsets"] = saved.get("label_offsets", {})
-        st.session_state["manual_edits"] = {**session.empty_manual_edits(),
-                                            **saved.get("manual_edits", {})}
+        offsets, edits = load_edits(scene_path)
+        st.session_state["label_offsets"] = offsets
+        st.session_state["manual_edits"] = edits
         st.session_state["edits_for"] = message.id
     offsets = st.session_state["label_offsets"]
     edits = st.session_state["manual_edits"]
@@ -75,12 +36,11 @@ def manual_editor(message: Message, quality: str, animate: bool) -> None:
                 label_offsets=offsets, manual_edits=edits,
             )
         if result.ok and result.image_path:
-            edits_file.write_text(json.dumps({"label_offsets": offsets, "manual_edits": edits},
-                                             ensure_ascii=False), encoding="utf-8")
+            save_edits(scene_path, offsets, edits)
             session.conversations().update_drawing(message.id, result.image_path,
                                                    result.video_path)
             st.rerun()
-        st.error("Không thể cập nhật hình: " + rendering.render_error_summary(result.log))
+        st.error("Không thể cập nhật hình: " + render_error_summary(result.log))
 
     with st.expander("🛠️ Chỉnh hình thủ công", expanded=False):
         st.caption(
@@ -176,7 +136,7 @@ def manual_editor(message: Message, quality: str, animate: bool) -> None:
                 rerender()
 
         with construct_tab:
-            segments = _scene_segment_names(scene_path, edits)
+            segments = segment_names(scene_path, edits)
             constructions = edits.setdefault("constructions", [])
             if not segments:
                 st.info("Hình hiện tại chưa có đoạn thẳng để dùng làm cạnh tham chiếu.")
@@ -191,7 +151,7 @@ def manual_editor(message: Message, quality: str, animate: bool) -> None:
                     col1, col2 = st.columns(2)
                     point = col1.selectbox("Điểm đi qua", names, key="perp_point")
                     reference = col2.selectbox("Đường thẳng/cạnh", segments, key="perp_line")
-                    default_name = _suggest_point_name(names, edits, "H")
+                    default_name = suggest_point_name(names, edits, "H")
                     name = st.text_input("Tên chân đường vuông góc", value=default_name, max_chars=1)
                     spec = {"type": "perpendicular", "point": point, "segment": reference,
                             "name": name.upper()}
@@ -206,7 +166,7 @@ def manual_editor(message: Message, quality: str, animate: bool) -> None:
                         spec = None
                 elif tool == "Đường trung trực":
                     segment = st.selectbox("Đoạn thẳng", segments, key="bisector_segment")
-                    default_name = _suggest_point_name(names, edits, "M")
+                    default_name = suggest_point_name(names, edits, "M")
                     name = st.text_input("Tên trung điểm", value=default_name, max_chars=1)
                     spec = {"type": "perpendicular_bisector", "segment": segment,
                             "name": name.upper()}
@@ -214,7 +174,7 @@ def manual_editor(message: Message, quality: str, animate: bool) -> None:
                     col1, col2 = st.columns(2)
                     apex = col1.selectbox("Đỉnh", names, key="median_apex")
                     opposite = col2.selectbox("Cạnh đối diện", segments, key="median_side")
-                    default_name = _suggest_point_name(names, edits, "M")
+                    default_name = suggest_point_name(names, edits, "M")
                     name = st.text_input("Tên trung điểm cạnh", value=default_name, max_chars=1)
                     spec = {"type": "median", "point": apex, "segment": opposite,
                             "name": name.upper()}
@@ -247,5 +207,5 @@ def manual_editor(message: Message, quality: str, animate: bool) -> None:
         if st.button("Khôi phục toàn bộ chỉnh sửa", key="manual_reset_all"):
             offsets.clear()
             edits.clear()
-            edits.update(session.empty_manual_edits())
+            edits.update(empty_manual_edits())
             rerender()

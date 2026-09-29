@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from geo_draw.geometry_knowledge import GEOMETRY_HELP_VI
-from web import settings
+from streamlit_app import settings
 
 
 @st.dialog("⚙️ Cài đặt", width="medium")

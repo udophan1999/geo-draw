@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import streamlit as st
 
-from web import auth, config, session
-from web.components.settings_dialog import settings_dialog
+from streamlit_app import auth, config, session
+from streamlit_app.components.settings_dialog import settings_dialog
 
 
 def sidebar(user_id: str | None) -> None:

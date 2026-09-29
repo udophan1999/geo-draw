@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass, replace
 import streamlit as st
 
 from geo_draw.ai_codegen import AiSettings, settings_from_env
-from web import session
+from streamlit_app import session
 
 AI_MODE = "DeepSeek AI"
 PARSER_MODE = "Parser nhanh (không dùng API)"

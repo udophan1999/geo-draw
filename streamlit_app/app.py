@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from web import session
-from web.views.dashboard import dashboard_page
-from web.views.login import login_page
+from streamlit_app import session
+from streamlit_app.views.dashboard import dashboard_page
+from streamlit_app.views.login import login_page
 
 
 def _dashboard() -> None:

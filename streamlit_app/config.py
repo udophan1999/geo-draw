@@ -1,4 +1,4 @@
-"""Paths, shared stores and constants for the web app."""
+"""Paths, shared stores and constants for the Streamlit app."""
 
 from __future__ import annotations
 

@@ -13,11 +13,11 @@ import streamlit as st
 
 from geo_draw.ai_codegen import extract_problem_from_image
 from geo_draw.conversations import ASSISTANT, USER, Conversation, Message, compose_problem
-from web import config, session, settings, styles
-from web.components.manual_editor import manual_editor
-from web.components.sidebar import sidebar
-from web.components.zoomable_image import zoomable_image
-from web.drawing import draw
+from streamlit_app import config, session, settings, styles
+from streamlit_app.components.manual_editor import manual_editor
+from streamlit_app.components.sidebar import sidebar
+from streamlit_app.components.zoomable_image import zoomable_image
+from streamlit_app.drawing import draw
 
 IMAGE_TYPES = ["png", "jpg", "jpeg", "webp", "gif"]
 ASSISTANT_AVATAR = "📐"

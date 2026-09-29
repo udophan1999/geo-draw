@@ -6,7 +6,7 @@ import streamlit as st
 
 from geo_draw.accounts import MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH, normalize_name, valid_password
 
-from web import config
+from streamlit_app import config
 
 
 def _sign_in(user_id: str) -> None:
