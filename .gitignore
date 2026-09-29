@@ -13,3 +13,5 @@ generated/
 .DS_Store
 Thumbs.db
 .streamlit/secrets.toml
+
+.claude/settings.json
