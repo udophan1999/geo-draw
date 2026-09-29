@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
-import { Loader2, RotateCcw, Send, TriangleAlert } from 'lucide-react'
+import { ChevronDown, Loader2, RotateCcw, Send, TriangleAlert } from 'lucide-react'
 import { useState } from 'react'
 
 import { Logo } from '@/components/Logo'
 import { ManualEditor } from '@/components/drawing/ManualEditor'
 import { ZoomImage } from '@/components/drawing/ZoomImage'
 import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api, type Message } from '@/lib/api'
@@ -96,24 +97,7 @@ export function DrawingPanel({ figureMessages, drawings, shown, onShow, busyLabe
         <video src={shown.video_url} controls className="w-full rounded-xl border bg-black" />
       )}
 
-      <Tabs defaultValue="edit" className="w-full">
-        <TabsList>
-          <TabsTrigger value="edit">Chỉnh hình</TabsTrigger>
-          <TabsTrigger value="code">Mã Manim</TabsTrigger>
-          {shown.has_log && <TabsTrigger value="log">Log render</TabsTrigger>}
-        </TabsList>
-        <TabsContent value="edit" className="pt-2">
-          <ManualEditor key={shown.id} message={shown} />
-        </TabsContent>
-        <TabsContent value="code" className="pt-2">
-          <TextFile queryKey={keys.scene(shown.id)} load={() => api.scene(shown.id)} />
-        </TabsContent>
-        {shown.has_log && (
-          <TabsContent value="log" className="pt-2">
-            <TextFile queryKey={keys.log(shown.id)} load={() => api.log(shown.id)} />
-          </TabsContent>
-        )}
-      </Tabs>
+      <AdvancedOptions key={shown.id} drawing={shown} />
     </div>
   )
 }
@@ -163,5 +147,52 @@ function RefineBox({ busy, hasDrawing, requests, onRefine }: {
         </p>
       )}
     </div>
+  )
+}
+
+/** Manual editor, scene code and render log: tools most students never need, so folded away.
+ *  The editor tab only appears for drawings it can edit (AI geometry with named points). */
+function AdvancedOptions({ drawing }: { drawing: Message }) {
+  const [open, setOpen] = useState(false)
+  const editor = useQuery({
+    queryKey: keys.editor(drawing.id), queryFn: () => api.editor(drawing.id), enabled: open,
+  })
+  const editable = (editor.data?.labels.length ?? 0) > 0
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+          Tùy chọn nâng cao
+          <ChevronDown className={cn('transition-transform', open && 'rotate-180')} />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-2">
+        {editor.isPending ? (
+          <Loader2 className="mx-auto my-6 animate-spin text-muted-foreground" />
+        ) : (
+          <Tabs key={String(editable)} defaultValue={editable ? 'edit' : 'code'} className="w-full">
+            <TabsList>
+              {editable && <TabsTrigger value="edit">Chỉnh hình</TabsTrigger>}
+              <TabsTrigger value="code">Mã Manim</TabsTrigger>
+              {drawing.has_log && <TabsTrigger value="log">Log render</TabsTrigger>}
+            </TabsList>
+            {editable && (
+              <TabsContent value="edit" className="pt-2">
+                <ManualEditor message={drawing} />
+              </TabsContent>
+            )}
+            <TabsContent value="code" className="pt-2">
+              <TextFile queryKey={keys.scene(drawing.id)} load={() => api.scene(drawing.id)} />
+            </TabsContent>
+            {drawing.has_log && (
+              <TabsContent value="log" className="pt-2">
+                <TextFile queryKey={keys.log(drawing.id)} load={() => api.log(drawing.id)} />
+              </TabsContent>
+            )}
+          </Tabs>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   )
 }

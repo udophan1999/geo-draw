@@ -1,5 +1,5 @@
 // "Chỉnh hình thủ công": re-render the same scene locally with label offsets and edits
-// (no DeepSeek). Edits are only committed once the server re-render succeeds.
+// (no AI call). Edits are only committed once the server re-render succeeds.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Eye, EyeOff, Loader2, RotateCcw, Undo2,
@@ -63,13 +63,6 @@ export function ManualEditor({ message }: { message: Message }) {
   const state = useQuery({ queryKey: keys.editor(message.id), queryFn: () => api.editor(message.id) })
   if (state.isPending) return <Loader2 className="mx-auto my-6 animate-spin text-muted-foreground" />
   if (state.isError) return <p className="text-sm text-destructive">{state.error.message}</p>
-  if (state.data.labels.length === 0) {
-    return (
-      <p className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
-        Hình vẽ bằng Parser chưa hỗ trợ chỉnh thủ công — chỉ hình do DeepSeek AI tạo mới chỉnh được.
-      </p>
-    )
-  }
   return <Editor message={message} state={state.data} />
 }
 
@@ -109,7 +102,7 @@ function Editor({ message, state }: { message: Message; state: EditorState }) {
   return (
     <div className="grid gap-3 rounded-xl border p-4">
       <p className="text-xs text-muted-foreground">
-        Chỉ render lại trên máy chủ, không gọi DeepSeek. Tọa độ hình học gốc được giữ nguyên.
+        Chỉ vẽ lại trên máy chủ, không tốn lượt AI. Tọa độ hình học gốc được giữ nguyên.
       </p>
       <Tabs defaultValue="labels">
         <TabsList className="w-full">
