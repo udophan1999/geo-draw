@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { ApiError, api, type Me } from '@/lib/api'
 import { setGuestMode } from '@/lib/guest'
 import { keys, useMe } from '@/lib/queries'
+import { APP_NAME } from '@/lib/brand'
 
 const MIN_PASSWORD = 6
 
@@ -20,7 +21,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-svh flex-col items-center justify-center bg-muted/30 px-4 py-10">
       <div className="mb-8 text-center">
         <Logo className="mx-auto size-16 drop-shadow-sm" />
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">geo-draw</h1>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">{APP_NAME}</h1>
         <p className="mt-1 text-sm text-muted-foreground">Vẽ hình học THCS từ đề bài hoặc ảnh chụp</p>
       </div>
       <div className="w-full max-w-[380px] rounded-2xl border bg-card p-6 shadow-sm">{children}</div>

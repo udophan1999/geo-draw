@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Vietnamese math tutor (THCS–THPT) that also draws geometry figures. A student sends a problem (text or photo). The tutor, ported from the MathLovers project, gives Socratic hints level by level, or a worked solution when asked. For plane-geometry problems the figure is drawn automatically with Manim: DeepSeek writes a `GeoScene` module, or a local regex parser handles simple figures without any API call. UI strings, error messages and the README are in Vietnamese; keep new user-facing text in Vietnamese.
 
+The app is shown to users as **MathMate** (`geo_draw/branding.py` `APP_NAME`, `web/src/lib/brand.ts`, `web/index.html`). User-facing text says "MathMate" or "AI" and never names the AI provider; "DeepSeek" appears only in code, config and the legacy Streamlit UI. The repo and package keep the name geo-draw.
+
 ## Commands
 
 No virtualenv is committed. The README uses Windows paths (`.venv-codex`/`.venv`); on macOS/Linux create one with `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.

@@ -108,7 +108,7 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
             reply_text += piece
             emit("delta", {"text": piece})
         if not reply_text.strip():
-            raise ValueError("DeepSeek không trả về nội dung. Hãy thử lại.")
+            raise ValueError("AI không trả về nội dung. Hãy thử lại.")
     except ValueError as exc:
         reply_text, reply_meta = str(exc), {**meta, "error": True}
     reply = store.add_message(conversation_id, ASSISTANT, reply_text, channel=CHAT,

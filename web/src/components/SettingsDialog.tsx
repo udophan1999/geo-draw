@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { api, type Settings } from '@/lib/api'
 import { keys, useHelp, useMe, useSettings } from '@/lib/queries'
+import { APP_NAME } from '@/lib/brand'
 
 const QUALITY_LABELS: Record<Settings['quality'], string> = {
   l: 'Thấp — nhanh nhất',
@@ -56,7 +57,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Cài đặt</DialogTitle>
-          <DialogDescription>Trợ giảng giải toán luôn dùng DeepSeek AI; các lựa chọn dưới đây áp dụng cho việc vẽ hình.</DialogDescription>
+          <DialogDescription>Trợ giảng giải toán luôn dùng {APP_NAME} AI; các lựa chọn dưới đây áp dụng cho việc vẽ hình.</DialogDescription>
         </DialogHeader>
         {!draft ? (
           <div className="flex justify-center py-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
@@ -68,11 +69,11 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                 <label className="flex items-start gap-3 rounded-lg border p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
                   <RadioGroupItem value="ai" disabled={!aiAvailable} className="mt-0.5" />
                   <span className="grid gap-0.5">
-                    <span className="text-sm font-medium">DeepSeek AI</span>
+                    <span className="text-sm font-medium">{APP_NAME} AI</span>
                     <span className="text-xs text-muted-foreground">
                       {aiAvailable
                         ? `Vẽ được đề phức tạp. Mỗi lần vẽ tốn 1 lượt AI.${quota ? ` Hôm nay đã dùng ${quota.used}/${quota.limit} lượt.` : ''}`
-                        : 'Máy chủ chưa cấu hình DeepSeek API key.'}
+                        : 'Máy chủ chưa cấu hình khóa AI.'}
                     </span>
                   </span>
                 </label>
@@ -90,12 +91,12 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
             {draft.mode === 'ai' && (
               <div className="grid gap-2">
-                <Label>Mô hình DeepSeek</Label>
+                <Label>Mô hình AI</Label>
                 <Select value={draft.model} onValueChange={(model) => set({ model: model as Settings['model'] })}>
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="deepseek-v4-flash">deepseek-v4-flash — nhanh, hợp đa số đề</SelectItem>
-                    <SelectItem value="deepseek-v4-pro">deepseek-v4-pro — ưu tiên chất lượng</SelectItem>
+                    <SelectItem value="deepseek-v4-flash">Nhanh — hợp đa số đề</SelectItem>
+                    <SelectItem value="deepseek-v4-pro">Chuyên sâu — ưu tiên chất lượng</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

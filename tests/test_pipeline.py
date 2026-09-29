@@ -49,7 +49,7 @@ class PipelineTests(unittest.TestCase):
     def test_ai_needs_a_key(self):
         outcome = draw("Cho tam giác ABC.", self.folder, ai=AiSettings(api_key=""))
         self.assertFalse(outcome.ok)
-        self.assertIn("API key", outcome.message)
+        self.assertIn("khóa AI", outcome.message)
 
     def test_ai_follow_up_passes_previous_code_then_repairs(self):
         ok = AiResult(code="class GeoScene: pass\n", raw="", ok=True)
@@ -66,7 +66,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(stages, [GENERATING, RENDERING, REPAIRING])
         self.assertEqual(generate.call_args_list[0].kwargs["previous_code"], "OLD")
         self.assertIn("GEOMETRY_LAYOUT_CROWDED", generate.call_args_list[1].kwargs["repair_log"])
-        self.assertEqual(outcome.message, "Đã vẽ xong · DeepSeek AI · deepseek-v4-flash")
+        self.assertEqual(outcome.message, "Đã vẽ xong · MathMate AI")
 
     def test_failed_render_is_summarised(self):
         self.assertEqual(render_error_summary("x\nValueError: GEOMETRY_LAYOUT_CROWDED"),

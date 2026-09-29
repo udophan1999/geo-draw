@@ -16,6 +16,7 @@ from .ai_codegen import (
     ALLOWED_IMPORTS, BLOCKED_NAMES, BLOCKED_NODES, AiResult, AiSettings, _ensure_light_theme,
     _request_chat, extract_python,
 )
+from .branding import APP_NAME
 from .tutor import _FIGURES, _RELATIONS, _SOLIDS, _mentions, _plain, is_geometry_problem
 
 GEOMETRY = "geometry"
@@ -23,7 +24,7 @@ GRAPH = "graph"
 
 NOT_DRAWABLE = ("Bài này không có hình hay đồ thị để vẽ. Khung hình dùng cho bài hình học và "
                 "bài hàm số, đồ thị, tích phân.")
-GRAPH_NEEDS_AI = "Vẽ đồ thị cần chế độ DeepSeek AI (Cài đặt → Cách vẽ hình)."
+GRAPH_NEEDS_AI = f"Vẽ đồ thị cần chế độ {APP_NAME} AI (Cài đặt → Cách vẽ hình)."
 
 _GRAPH_WORDS = [
     "ham so", "do thi", "tich phan", "nguyen ham", "parabol", "dao ham", "cuc tri", "tiem can",

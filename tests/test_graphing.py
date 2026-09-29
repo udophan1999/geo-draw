@@ -119,7 +119,7 @@ class GraphPipelineTests(unittest.TestCase):
     def test_graph_needs_the_ai(self):
         outcome = draw("Cho hàm số y = 2x + 1. Vẽ đồ thị.", self.folder, ai=None)
         self.assertFalse(outcome.ok)
-        self.assertIn("DeepSeek", outcome.message)
+        self.assertIn("MathMate AI", outcome.message)
 
 
 if __name__ == "__main__":

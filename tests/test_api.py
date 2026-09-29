@@ -198,7 +198,7 @@ class ChatTests(ApiTestCase):
         self.assertNotIn("figure_job", [kind for kind, _ in events])
         response = self.figure(client, started["conversation"]["id"])
         self.assertEqual(response.status_code, 422)
-        self.assertIn("DeepSeek", response.json()["detail"])
+        self.assertIn("MathMate AI", response.json()["detail"])
 
     def test_asking_for_a_drawing_in_the_chat_draws_it(self):
         client = self.client()
@@ -287,7 +287,7 @@ class NoServerKeyTests(ApiTestCase):
         client = self.client()
         response = self.send(client, TRIANGLE)
         self.assertEqual(response.status_code, 503)
-        self.assertIn("DeepSeek API key", response.json()["detail"])
+        self.assertIn("khóa AI", response.json()["detail"])
         self.assertEqual(client.get("/api/conversations").json(), [])
 
 

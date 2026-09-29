@@ -9,6 +9,7 @@ import { ChatProvider } from '@/lib/chat'
 import { isGuestMode } from '@/lib/guest'
 import { useMe } from '@/lib/queries'
 import { cn } from '@/lib/utils'
+import { APP_NAME } from '@/lib/brand'
 
 /** Signed-in users and guests who chose "Dùng thử" get the app; everyone else /login. */
 export function AppLayout() {
@@ -49,7 +50,7 @@ export function AppLayout() {
               <Menu />
             </Button>
             <Logo className="size-6" />
-            <span className="font-semibold">geo-draw</span>
+            <span className="font-semibold">{APP_NAME}</span>
           </div>
           <Outlet />
         </main>

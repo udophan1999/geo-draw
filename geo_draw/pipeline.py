@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .ai_codegen import AiSettings, generate_manim_code, missing_reference_figure_points
+from .branding import APP_NAME
 from .engine import build_figure
 from .graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind, generate_graph_code
 from .parser import parse_problem
@@ -79,7 +80,7 @@ def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l
     generate = generate_graph_code if kind == GRAPH else generate_manim_code
     if ai is not None:
         if not ai.api_key:
-            return DrawingOutcome(False, "Chưa có DeepSeek API key.")
+            return DrawingOutcome(False, "Máy chủ chưa cấu hình khóa AI.")
         missing_points = [] if kind == GRAPH else missing_reference_figure_points(problem)
         if missing_points:
             return DrawingOutcome(
@@ -98,13 +99,13 @@ def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l
         return render_scene(scene_path, media_dir, quality=quality, animate=animate)
 
     if ai is not None:
-        report(GENERATING, "DeepSeek đang vẽ đồ thị..." if kind == GRAPH else
-               "DeepSeek đang phân tích đề và viết mã Manim...")
+        report(GENERATING, f"{APP_NAME} đang vẽ đồ thị..." if kind == GRAPH else
+               f"{APP_NAME} đang phân tích đề và vẽ hình...")
         generated = generate(problem, ai, animate, previous_code=previous_code)
         if not generated.ok:
             return DrawingOutcome(False, generated.error)
         scene_path.write_text(generated.code, encoding="utf-8")
-        summary = f"DeepSeek AI · {ai.model}"
+        summary = f"{APP_NAME} AI"
     else:
         scene_path, summary = parser_scene(problem, animate, scene_path)
 
@@ -113,7 +114,7 @@ def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l
     if not result.ok and ai is not None:
         for attempt in range(1, REPAIR_ATTEMPTS + 1):
             report(REPAIRING,
-                   f"Bản vẽ chưa đạt — DeepSeek đang tự cân chỉnh lần {attempt}/{REPAIR_ATTEMPTS}...")
+                   f"Bản vẽ chưa đạt — {APP_NAME} đang tự cân chỉnh lần {attempt}/{REPAIR_ATTEMPTS}...")
             repair_context = (
                 result.log[-4500:]
                 + "\n\nPrevious module to improve:\n"

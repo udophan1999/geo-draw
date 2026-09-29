@@ -24,6 +24,7 @@ import { api, type Conversation } from '@/lib/api'
 import { setGuestMode } from '@/lib/guest'
 import { keys, useConversations, useMe } from '@/lib/queries'
 import { cn } from '@/lib/utils'
+import { APP_NAME } from '@/lib/brand'
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate()
@@ -31,7 +32,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <aside className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex items-center gap-2 px-4 pt-4 pb-2">
         <Logo />
-        <span className="text-base font-semibold tracking-tight">geo-draw</span>
+        <span className="text-base font-semibold tracking-tight">{APP_NAME}</span>
       </div>
       <div className="px-3 pb-2">
         <Button

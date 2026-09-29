@@ -271,7 +271,7 @@ def extract_python(text: str) -> str:
         if start < 0:
             start = text.find("class GeoScene")
         return text[start:].strip()
-    raise ValueError("DeepSeek không trả về class GeoScene.")
+    raise ValueError("AI không trả về class GeoScene.")
 
 
 def _drawing_facts_text(problem: str) -> str:
@@ -1668,7 +1668,7 @@ def _ensure_light_theme(code: str) -> str:
 def _open_chat(settings: AiSettings, payload: dict, timeout: int):
     """POST a chat completion request; HTTP and network errors become Vietnamese ValueErrors."""
     if not settings.api_key:
-        raise ValueError("Chưa có API key DeepSeek. Dán key ở sidebar hoặc đặt DEEPSEEK_API_KEY.")
+        raise ValueError("Máy chủ chưa cấu hình khóa AI (DEEPSEEK_API_KEY).")
     request = urllib.request.Request(
         settings.base_url + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
@@ -1683,11 +1683,11 @@ def _open_chat(settings: AiSettings, payload: dict, timeout: int):
             detail = json.loads(detail).get("error", {}).get("message", detail)
         except json.JSONDecodeError:
             pass
-        raise ValueError(f"DeepSeek trả về lỗi HTTP {exc.code}: {str(detail)[:500]}") from exc
+        raise ValueError(f"Máy chủ AI trả về lỗi HTTP {exc.code}: {str(detail)[:500]}") from exc
     except urllib.error.URLError as exc:
-        raise ValueError(f"Không kết nối được DeepSeek: {exc.reason}") from exc
+        raise ValueError(f"Không kết nối được máy chủ AI: {exc.reason}") from exc
     except TimeoutError as exc:
-        raise ValueError("DeepSeek phản hồi quá thời gian chờ.") from exc
+        raise ValueError("Máy chủ AI phản hồi quá thời gian chờ.") from exc
 
 
 def _request_chat(
@@ -1703,14 +1703,14 @@ def _request_chat(
         with _open_chat(settings, payload, timeout) as response:
             body = json.loads(response.read().decode("utf-8"))
     except TimeoutError as exc:
-        raise ValueError("DeepSeek phản hồi quá thời gian chờ.") from exc
+        raise ValueError("Máy chủ AI phản hồi quá thời gian chờ.") from exc
     try:
         content = body["choices"][0]["message"]["content"]
         if not isinstance(content, str) or not content.strip():
             raise TypeError
         return content
     except (KeyError, IndexError, TypeError) as exc:
-        raise ValueError("Phản hồi DeepSeek không có nội dung mã hợp lệ.") from exc
+        raise ValueError("Phản hồi của AI không có nội dung mã hợp lệ.") from exc
 
 
 def stream_chat(
@@ -1740,7 +1740,7 @@ def stream_chat(
                 if piece:
                     yield piece
     except (TimeoutError, urllib.error.URLError) as exc:
-        raise ValueError("Mất kết nối với DeepSeek khi đang trả lời. Hãy thử lại.") from exc
+        raise ValueError("Mất kết nối với máy chủ AI khi đang trả lời. Hãy thử lại.") from exc
 
 
 def extract_problem_from_image(

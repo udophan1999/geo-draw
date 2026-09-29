@@ -81,7 +81,7 @@ def start_figure_job(state: AppState, owner: Owner, conversation: Conversation,
     ai = None
     if settings.mode == "ai":
         if not state.ai_available:
-            raise HTTPException(503, "Máy chủ chưa cấu hình DeepSeek API key. "
+            raise HTTPException(503, "Máy chủ chưa cấu hình khóa AI. "
                                      "Hãy dùng chế độ Parser trong Cài đặt.")
         _consume_ai_turn(state, owner)
         ai = _ai(state, settings.model)
@@ -141,7 +141,7 @@ async def send_message(
     if wants_drawing == GENERIC:
         return _answer_drawing_request(state, owner, conversation, text)
     if not state.ai_available:
-        raise HTTPException(503, "Máy chủ chưa cấu hình DeepSeek API key nên chưa giải toán được.")
+        raise HTTPException(503, "Máy chủ chưa cấu hình khóa AI nên chưa giải toán được.")
     _consume_ai_turn(state, owner)
     if conversation is None:
         conversation = owner.store.create(owner.store_owner, text or "Đề từ ảnh")

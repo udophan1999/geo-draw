@@ -3,6 +3,8 @@
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 
+import { APP_NAME } from '@/lib/brand'
+
 declare const __BUILD_ID__: string
 
 const CHECK_EVERY_MS = 5 * 60 * 1000
@@ -26,7 +28,7 @@ export function useNewVersionNotice() {
       const latest = await latestBuild()
       if (latest && latest !== __BUILD_ID__) {
         notified = true
-        toast('Đã có phiên bản mới của geo-draw', {
+        toast(`Đã có phiên bản mới của ${APP_NAME}`, {
           description: 'Tải lại trang để dùng giao diện mới nhất.',
           duration: Infinity,
           action: { label: 'Tải lại', onClick: () => window.location.reload() },
