@@ -15,6 +15,20 @@ _SCHEMA = ["""CREATE TABLE IF NOT EXISTS usage (
               )"""]
 
 
+# Counters that are not a user or a guest start with "~" (the admin charts skip them).
+TOTAL = "~total"
+
+
+def client_counter(kind: str, ip: str) -> str:
+    """A per-IP counter, e.g. ``~ai:203.0.113.5`` or ``~register:203.0.113.5``."""
+    return f"~{kind}:{ip}"
+
+
+class _Full(Exception):
+    def __init__(self, owner: str):
+        self.owner = owner
+
+
 def _today() -> str:
     return time.strftime("%Y-%m-%d")
 
@@ -63,13 +77,28 @@ class QuotaStore:
 
     def consume(self, owner: str, limit: int) -> bool:
         """Count one AI turn; return False (and count nothing) when the limit is reached."""
-        with self._connect() as connection:
-            connection.execute(
-                "INSERT INTO usage (owner, day, count) VALUES (?, ?, 0) ON CONFLICT DO NOTHING",
-                (owner, _today()),
-            )
-            cursor = connection.execute(
-                "UPDATE usage SET count = count + 1 WHERE owner = ? AND day = ? AND count < ?",
-                (owner, _today(), limit),
-            )
-            return cursor.rowcount == 1
+        return self.consume_all([(owner, limit)]) is None
+
+    def consume_all(self, counters: list[tuple[str, int]]) -> str | None:
+        """Count one use on every ``(owner, limit)`` counter, all or nothing.
+
+        Returns None when all were counted, else the first full counter's owner; then the
+        transaction rolls back, so a full counter never uses up the others.
+        """
+        day = _today()
+        try:
+            with self._connect() as connection:
+                for owner, limit in counters:
+                    connection.execute(
+                        "INSERT INTO usage (owner, day, count) VALUES (?, ?, 0) ON CONFLICT DO NOTHING",
+                        (owner, day),
+                    )
+                    cursor = connection.execute(
+                        "UPDATE usage SET count = count + 1 WHERE owner = ? AND day = ? AND count < ?",
+                        (owner, day, limit),
+                    )
+                    if cursor.rowcount != 1:
+                        raise _Full(owner)
+        except _Full as full:
+            return full.owner
+        return None

@@ -101,7 +101,7 @@ def stats(request: Request, days: int = 30) -> dict:
     ai_users, ai_guests = [0] * days, [0] * days
     ai_by_user: dict[str, int] = {}
     for owner, day, count in state.quota.daily_since(labels[0]):
-        if (i := index.get(day)) is None:
+        if (i := index.get(day)) is None or owner.startswith("~"):  # ~total, ~ai:<ip>…
             continue
         if owner.startswith("guest:"):
             ai_guests[i] += count

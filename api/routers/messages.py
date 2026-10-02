@@ -32,6 +32,7 @@ from geo_draw.tutor_prompts import FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN
 
 from ..deps import Owner, app_state, get_owner, owned_conversation
 from ..jobs import Job
+from ..quota import TOTAL, client_counter
 from ..schemas import FigureRequest, conversation_json, message_json
 from ..state import AppState
 from .settings import load_settings
@@ -49,10 +50,25 @@ def _ai(state: AppState, model: str) -> AiSettings:
 
 
 def _consume_ai_turn(state: AppState, owner: Owner) -> None:
+    """Count one AI turn on the caller's own limit, the guests' per-IP limit and the server's
+    daily total, all or nothing; 429 with the reason when one is full."""
     limit = state.daily_limit(owner.is_guest, owner.own_daily_limit)
-    if not state.quota.consume(owner.identity, limit):
+    counters = [(owner.identity, limit)]
+    if owner.is_guest:
+        counters.append((client_counter("ai", owner.ip), state.daily_limit_guest_ip))
+    if state.daily_limit_total > 0:
+        counters.append((TOTAL, state.daily_limit_total))
+    full = state.quota.consume_all(counters)
+    if full is None:
+        return
+    if full == TOTAL:
+        raise HTTPException(429, "Hôm nay MathMate đã dùng hết lượt AI chung của máy chủ. "
+                                 "Hãy quay lại vào ngày mai.")
+    if full == owner.identity:
         hint = " Đăng nhập để có thêm lượt." if owner.is_guest else ""
         raise HTTPException(429, f"Bạn đã dùng hết {limit} lượt dùng AI hôm nay.{hint}")
+    raise HTTPException(429, "Mạng của bạn đã dùng hết lượt dùng thử hôm nay. "
+                             "Đăng nhập để tiếp tục dùng MathMate.")
 
 
 def _event_payload(owner: Owner):

@@ -10,6 +10,11 @@
 services:
   app:
     ports: !reset []  # reachable only through Traefik
+    environment:
+      # Believe X-Forwarded-For only from Traefik (private Docker addresses), so the per-IP
+      # limits see the real client: uvicorn then reads the header from the right and stops
+      # at the first address that is not a trusted proxy.
+      FORWARDED_ALLOW_IPS: ${TRAEFIK_PROXY_IPS:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16}
     networks:
       - traefik
     labels:

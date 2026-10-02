@@ -94,6 +94,8 @@ docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
 
 Cập nhật phiên bản mới: `git pull` rồi chạy lại lệnh trên. Sao lưu: dùng `pg_dump` cho database, và với tệp hình vẽ: `docker run --rm -v geo-draw_mathmate-data:/data -v "$PWD":/backup alpine tar czf /backup/mathmate-data.tgz -C /data .` (tên volume có tiền tố là tên thư mục dự án; xem bằng `docker volume ls`).
 
+**Giới hạn chi phí AI.** Mỗi tài khoản và mỗi khách có hạn mức lượt AI mỗi ngày. Vì khách chỉ được nhận diện bằng cookie, khách còn bị giới hạn chung theo IP (`GEO_DRAW_DAILY_LIMIT_GUEST_IP`), số tài khoản tạo mới mỗi ngày từ một IP cũng bị giới hạn (`GEO_DRAW_REGISTER_LIMIT_IP`), và cả máy chủ có tổng lượt AI tối đa mỗi ngày (`GEO_DRAW_DAILY_LIMIT_TOTAL`). Sau Traefik, ứng dụng chỉ tin địa chỉ IP do Traefik chuyển tới (`TRAEFIK_PROXY_IPS`).
+
 Máy chủ chỉ chạy **một** tiến trình uvicorn: các lượt đang chạy và luồng cập nhật trực tiếp nằm trong bộ nhớ của tiến trình đó, nên đừng tăng `--workers` hay chạy nhiều bản sao.
 
 ## Quản trị

@@ -9,7 +9,8 @@ from geo_draw.accounts import (
     MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, normalize_name, valid_password,
 )
 
-from ..deps import SESSION_COOKIE, Owner, app_state, get_owner, user_owner
+from ..deps import SESSION_COOKIE, Owner, app_state, client_ip, get_owner, user_owner
+from ..quota import client_counter
 from ..schemas import Credentials
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -42,7 +43,14 @@ def me(request: Request, owner: Owner = Depends(get_owner)) -> dict:
 
 @router.post("/register", status_code=201)
 def register(body: Credentials, request: Request, response: Response):
-    accounts = app_state(request).accounts
+    state = app_state(request)
+    accounts = state.accounts
+    # Each account gets its own AI quota, so sign-ups are limited per IP (only successful
+    # ones count, so typos and taken names do not use the allowance up).
+    signups = client_counter("register", client_ip(request))
+    if state.quota.used(signups) >= state.registrations_per_ip:
+        raise HTTPException(429, "Đã có quá nhiều tài khoản được tạo từ mạng này hôm nay. "
+                                 "Hãy thử lại vào ngày mai hoặc liên hệ quản trị viên.")
     name = normalize_name(body.username)
     if not name:
         raise HTTPException(422, "Hãy nhập tên đăng nhập.")
@@ -59,6 +67,7 @@ def register(body: Credentials, request: Request, response: Response):
         user_id = accounts.create(name, body.password)
     except ValueError as exc:  # someone registered the same name a moment earlier
         raise HTTPException(409, str(exc)) from exc
+    state.quota.consume(signups, 1_000_000)  # counted, never refused here
     return _signed_in(request, response, user_id)
 
 

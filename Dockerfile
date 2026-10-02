@@ -50,6 +50,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4)"
 # One worker only: running jobs, their SSE streams and the "being drawn" markers live in
-# this process's memory.
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--proxy-headers", "--forwarded-allow-ips", "*"]
+# this process's memory. X-Forwarded-For is only believed from the proxies listed in
+# FORWARDED_ALLOW_IPS (uvicorn's default: localhost only; docker-compose.traefik.yml sets the
+# Docker networks). Never "*": uvicorn would then take the leftmost, client-forgeable address,
+# and the per-IP limits would be easy to dodge.
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]

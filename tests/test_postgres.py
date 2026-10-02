@@ -130,6 +130,9 @@ class PostgresStoreTests(PostgresTestCase):
         self.assertEqual(quota.used_today(), {user_id: 1})
         self.assertEqual([row[0] for row in quota.daily_since("2000-01-01")], [user_id])
         self.assertEqual([count for _, count in quota.owner_days(user_id)], [1])
+        self.assertIsNone(quota.consume_all([("x", 5), ("~ai:1.2.3.4", 1)]))
+        self.assertEqual(quota.consume_all([("x", 5), ("~ai:1.2.3.4", 1)]), "~ai:1.2.3.4")
+        self.assertEqual(quota.used("x"), 1)  # rolled back on PostgreSQL too
         config = ConfigStore(self.root, db)
         config.set("k", "một", "Admin")
         config.set("k", "hai", "Admin")  # ON CONFLICT … DO UPDATE

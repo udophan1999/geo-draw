@@ -36,6 +36,14 @@ class AppState:
     ai: AiSettings = field(default_factory=settings_from_env)
     daily_limit_user: int = field(default_factory=lambda: _int_env("GEO_DRAW_DAILY_LIMIT_USER", 100))
     daily_limit_guest: int = field(default_factory=lambda: _int_env("GEO_DRAW_DAILY_LIMIT_GUEST", 10))
+    # Guests are only a cookie, and a script can drop it to get a fresh quota every time, so
+    # guests also share a daily limit per IP address (a school network shares one IP: keep it
+    # well above one guest's limit). Accounts are capped by the sign-ups per IP instead.
+    daily_limit_guest_ip: int = field(default_factory=lambda: _int_env("GEO_DRAW_DAILY_LIMIT_GUEST_IP", 60))
+    registrations_per_ip: int = field(default_factory=lambda: _int_env("GEO_DRAW_REGISTER_LIMIT_IP", 20))
+    # Every AI turn on the server together, per day: the last guard on the API bill.
+    # 0 turns the cap off.
+    daily_limit_total: int = field(default_factory=lambda: _int_env("GEO_DRAW_DAILY_LIMIT_TOTAL", 2000))
     cookie_secure: bool = field(default_factory=lambda: os.environ.get("GEO_DRAW_COOKIE_SECURE") == "1")
     # PostgreSQL for accounts, conversations and usage; None keeps SQLite files in data_dir.
     # Files (photos, drawings) always stay in data_dir.

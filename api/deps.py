@@ -38,6 +38,7 @@ class Owner:
     store_owner: str  # the owner column used inside ``store``
     role: str = USER
     own_daily_limit: int | None = None  # set by an admin; None: the server default
+    ip: str = ""  # the caller's address, for the guests' per-IP limit
 
     @property
     def is_guest(self) -> bool:
@@ -51,6 +52,12 @@ class Owner:
     def identity(self) -> str:
         """A key that is unique across users and guests (quota, jobs)."""
         return self.user_id or f"guest:{self.guest_id}"
+
+
+def client_ip(request: Request) -> str:
+    """The caller's IP. Behind a proxy, uvicorn fills it from X-Forwarded-For, but only for
+    proxies listed in FORWARDED_ALLOW_IPS (see docker-compose.traefik.yml)."""
+    return request.client.host if request.client else "unknown"
 
 
 def app_state(request: Request) -> AppState:
@@ -70,10 +77,12 @@ def get_owner(request: Request) -> Owner:
     user_id = state.accounts.session_user(token) if token else None
     if user_id:
         state.import_history(user_id)
-        return user_owner(state, user_id)
+        owner = user_owner(state, user_id)
+        owner.ip = client_ip(request)
+        return owner
     guest_id = request.state.guest_id  # set by the guest-cookie middleware
     return Owner(None, guest_id, None, state.guest_store(guest_id),
-                 state.sessions_dir / guest_id, state.guest_owner(guest_id))
+                 state.sessions_dir / guest_id, state.guest_owner(guest_id), ip=client_ip(request))
 
 
 def require_admin(request: Request) -> Owner:
