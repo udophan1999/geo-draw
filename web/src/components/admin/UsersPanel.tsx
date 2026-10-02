@@ -45,7 +45,7 @@ export function UsersPanel({ meId }: { meId: string }) {
         <p className="py-10 text-center text-sm text-muted-foreground">Không có tài khoản nào khớp.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-180 text-sm">
             <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Người dùng</th>
