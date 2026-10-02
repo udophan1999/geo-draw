@@ -198,6 +198,30 @@ class AdminApiTests(ApiTestCase):
         self.assertEqual({u["name"] for u in stats["top_users"]}, {"Bình", "Cường"})
         self.assertEqual(self.client().get("/api/admin/stats").status_code, 401)
 
+    def test_user_detail(self):
+        user = self.client()
+        self.register(user, "Bình")
+        conversation_id = self.send(user, EQUATION).json()["conversation"]["id"]
+        read_events(user, self.send(user, "x = 2 hoặc x = 3", conversation_id).json()["job_id"])
+        admin = self.admin()
+        user_id = self.user_id(admin, "Bình")
+        detail = admin.get(f"/api/admin/users/{user_id}?days=7").json()
+        self.assertEqual(detail["name"], "Bình")
+        self.assertEqual(len(detail["series"]["ai"]), 7)
+        self.assertEqual(detail["series"]["questions"][-1], 2)
+        totals = detail["totals"]
+        self.assertEqual((totals["ai_turns"], totals["questions"], totals["conversations"]), (2, 2, 1))
+        self.assertEqual((totals["conversations_range"], totals["active_days"], totals["drawings"]), (1, 1, 0))
+        self.assertEqual(detail["outcomes"]["in_progress"], 1)
+        self.assertEqual(sum(detail["hint_levels"]), 1)
+        self.assertEqual(detail["conversations"], 1)  # the count, as in the users list
+        [row] = detail["recent_conversations"]
+        self.assertEqual((row["id"], row["questions"]), (conversation_id, 2))
+        self.assertNotIn("messages", detail)  # activity only, never what was said
+        self.assertEqual(admin.get("/api/admin/users/nobody").status_code, 404)
+        self.assertEqual(admin.get(f"/api/admin/users/{user_id}?days=5").status_code, 422)
+        self.assertEqual(user.get(f"/api/admin/users/{user_id}").status_code, 403)
+
     def test_edited_prompt_reaches_the_tutor(self):
         admin = self.admin()
         prompts = admin.get("/api/admin/prompts").json()

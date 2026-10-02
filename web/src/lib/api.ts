@@ -101,6 +101,22 @@ export type AdminStats = {
   outcomes: { solved: number; solution: number; in_progress: number }
   top_users: { id: string; name: string; ai_turns: number; conversations: number }[]
 }
+export type AdminUserDetail = AdminUser & {
+  default_limit: number
+  days: string[]
+  series: { ai: number[]; questions: number[] }
+  totals: {
+    ai_turns: number; ai_turns_range: number; questions: number; questions_range: number
+    conversations: number; conversations_range: number; drawings: number; active_days: number
+  }
+  outcomes: { solved: number; solution: number; in_progress: number }
+  /** Conversations by the hint level they reached (index 0 = level 1). */
+  hint_levels: number[]
+  recent_conversations: {
+    id: string; title: string; created_at: number; updated_at: number; mode: TutorMode
+    hint_level: number; solved: boolean; questions: number; drawings: number
+  }[]
+}
 export type PromptList = { prompts: PromptInfo[]; fixed: { label: string; text: string }[] }
 export type TutorAction = 'ask' | 'deeper' | 'solution' | 'hint'
 
@@ -181,6 +197,7 @@ export const api = {
 
   admin: {
     stats: (days: number) => request<AdminStats>(`/admin/stats?days=${days}`),
+    user: (id: string, days: number) => request<AdminUserDetail>(`/admin/users/${id}?days=${days}`),
     users: (q = '') => request<AdminUserList>(`/admin/users?q=${encodeURIComponent(q)}`),
     updateUser: (id: string, update: AdminUserUpdate) =>
       request<AdminUser>(`/admin/users/${id}`, { method: 'PATCH', body: json(update) }),

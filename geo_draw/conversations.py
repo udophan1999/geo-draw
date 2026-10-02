@@ -239,6 +239,18 @@ class ConversationStore:
             ).fetchall()
         return [(owner, created, mode, bool(solved)) for owner, created, mode, solved in rows]
 
+    def owner_messages(self, owner: str) -> list[tuple[str, str, str, float, bool]]:
+        """(conversation_id, role, channel, created_at, is_drawing) of every message of ``owner``."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT m.conversation_id, m.role, m.channel, m.created_at, "
+                "m.image_path IS NOT NULL AND m.scene_path IS NOT NULL "
+                "FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.owner = ?",
+                (owner,),
+            ).fetchall()
+        return [(cid, role, channel, created, bool(drawing))
+                for cid, role, channel, created, drawing in rows]
+
     def delete_owner(self, owner: str) -> None:
         """Delete every conversation of ``owner`` with its messages and files."""
         with self._connect() as connection:

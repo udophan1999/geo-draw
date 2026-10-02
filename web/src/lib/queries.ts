@@ -15,6 +15,7 @@ export const keys = {
   adminUsers: (q: string) => ['admin', 'users', q] as const,
   adminPrompts: ['admin', 'prompts'] as const,
   adminStats: (days: number) => ['admin', 'stats', days] as const,
+  adminUser: (id: string, days: number) => ['admin', 'user', id, days] as const,
 }
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: api.me })

@@ -5,32 +5,22 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 
 import { AreaChart, BarList, ChartCard, ColumnChart, shortDay, StatTile } from '@/components/admin/charts'
+import { RangeSwitch, type Range } from '@/components/admin/RangeSwitch'
 import { api } from '@/lib/api'
 import { keys } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/routes/admin/AdminLayout'
 
-const RANGES = [7, 30, 90] as const
 const ACCOUNTS = { label: 'Tài khoản', color: 'var(--viz-1)' }
 const GUESTS = { label: 'Khách', color: 'var(--viz-2)' }
 
 export function AdminOverview() {
-  const [days, setDays] = useState<(typeof RANGES)[number]>(30)
+  const [days, setDays] = useState<Range>(30)
   const stats = useQuery({
     queryKey: keys.adminStats(days), queryFn: () => api.admin.stats(days), placeholderData: keepPreviousData,
   })
 
-  const range = (
-    <div className="flex rounded-lg border bg-card p-0.5" role="group" aria-label="Khoảng thời gian">
-      {RANGES.map((n) => (
-        <button key={n} type="button" onClick={() => setDays(n)} aria-pressed={days === n}
-                className={cn('rounded-md px-3 py-1 text-sm transition',
-                              days === n ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
-          {n} ngày
-        </button>
-      ))}
-    </div>
-  )
+  const range = <RangeSwitch value={days} onChange={setDays} />
 
   if (stats.isPending) {
     return (

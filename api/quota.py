@@ -54,6 +54,13 @@ class QuotaStore:
                 "SELECT owner, day, count FROM usage WHERE day >= ?", (first_day,)
             ).fetchall()
 
+    def owner_days(self, owner: str) -> list[tuple[str, int]]:
+        """(day, count) of every day ``owner`` used the AI."""
+        with self._connect() as connection:
+            return connection.execute(
+                "SELECT day, count FROM usage WHERE owner = ? ORDER BY day", (owner,)
+            ).fetchall()
+
     def consume(self, owner: str, limit: int) -> bool:
         """Count one AI turn; return False (and count nothing) when the limit is reached."""
         with self._connect() as connection:

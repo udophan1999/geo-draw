@@ -71,6 +71,16 @@ def _day(timestamp: float) -> str:
     return time.strftime("%Y-%m-%d", time.localtime(timestamp))  # the quota's day, too
 
 
+def _range(days: int) -> tuple[list[str], dict[str, int], float]:
+    """The last ``days`` local dates (oldest first), their positions, and the first one's start."""
+    if days not in (7, 30, 90):
+        raise HTTPException(422, "Chỉ hỗ trợ 7, 30 hoặc 90 ngày.")
+    today = date.fromisoformat(_day(time.time()))
+    labels = [(today - timedelta(days=offset)).isoformat() for offset in range(days - 1, -1, -1)]
+    return labels, {day: i for i, day in enumerate(labels)}, time.mktime(
+        date.fromisoformat(labels[0]).timetuple())
+
+
 @router.get("/stats")
 def stats(request: Request, days: int = 30) -> dict:
     """The overview page: totals and daily series over the last ``days`` days.
@@ -78,13 +88,8 @@ def stats(request: Request, days: int = 30) -> dict:
     Conversation figures cover accounts only (guests' conversations are not kept in one
     place with SQLite); AI turns cover accounts and guests.
     """
-    if days not in (7, 30, 90):
-        raise HTTPException(422, "Chỉ hỗ trợ 7, 30 hoặc 90 ngày.")
     state = app_state(request)
-    today = date.fromisoformat(_day(time.time()))
-    labels = [(today - timedelta(days=offset)).isoformat() for offset in range(days - 1, -1, -1)]
-    index = {day: i for i, day in enumerate(labels)}
-    since = time.mktime(date.fromisoformat(labels[0]).timetuple())
+    labels, index, since = _range(days)
 
     users = state.accounts.list_users()
     names = {u.user_id: u.name for u in users}
@@ -152,6 +157,75 @@ def list_users(request: Request, q: str = "") -> dict:
     return {
         "users": [_user_json(state, u, stats, used) for u in users],
         "default_limit": state.daily_limit_user,
+    }
+
+
+@router.get("/users/{user_id}")
+def user_detail(user_id: str, request: Request, days: int = 30) -> dict:
+    """One account: its row, usage over the last ``days`` days, and its conversations.
+
+    Conversation contents are not included: the page shows activity, not what was said.
+    """
+    state = app_state(request)
+    user = _target(state, user_id)
+    labels, index, since = _range(days)
+
+    ai_series = [0] * days
+    ai_all = 0
+    for day, count in state.quota.owner_days(user_id):
+        ai_all += count
+        if (i := index.get(day)) is not None:
+            ai_series[i] += count
+
+    # A "question" is a message the student sent to the tutor (the problem, an answer, a
+    # follow-up, or a hint/solution button).
+    questions, drawings = {}, {}
+    questions_series = [0] * days
+    questions_all = drawings_all = 0
+    for cid, role, channel, created, drawing in state.conversations.owner_messages(user_id):
+        if role == "user" and channel == "chat":
+            questions[cid] = questions.get(cid, 0) + 1
+            questions_all += 1
+            if (i := index.get(_day(created))) is not None:
+                questions_series[i] += 1
+        elif drawing:
+            drawings[cid] = drawings.get(cid, 0) + 1
+            drawings_all += 1
+
+    conversations = state.conversations.list(user_id, limit=10_000)
+    levels = [0] * 5
+    outcomes = {"solved": 0, "solution": 0, "in_progress": 0}
+    for c in conversations:
+        if c.solved:
+            outcomes["solved"] += 1
+        elif c.mode == "solution":
+            outcomes["solution"] += 1
+        else:
+            outcomes["in_progress"] += 1
+        levels[min(max(c.hint_level, 1), 5) - 1] += 1
+
+    stats, used = state.conversations.owner_stats(), state.quota.used_today()
+    return {
+        **_user_json(state, user, stats, used),
+        "default_limit": state.daily_limit_user,
+        "days": labels,
+        "series": {"ai": ai_series, "questions": questions_series},
+        "totals": {
+            "ai_turns": ai_all, "ai_turns_range": sum(ai_series),
+            "questions": questions_all, "questions_range": sum(questions_series),
+            "conversations": len(conversations),
+            "conversations_range": sum(c.created_at >= since for c in conversations),
+            "drawings": drawings_all, "active_days": sum(v > 0 for v in ai_series),
+        },
+        "outcomes": outcomes,
+        "hint_levels": levels,
+        # Not "conversations": that is the count, from _user_json above.
+        "recent_conversations": [
+            {"id": c.id, "title": c.title, "created_at": c.created_at, "updated_at": c.updated_at,
+             "mode": c.mode, "hint_level": c.hint_level, "solved": c.solved,
+             "questions": questions.get(c.id, 0), "drawings": drawings.get(c.id, 0)}
+            for c in conversations[:50]
+        ],
     }
 
 

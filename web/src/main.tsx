@@ -18,6 +18,7 @@ const ChatPage = lazy(() => import('@/routes/ChatPage').then((m) => ({ default: 
 const AdminLayout = lazy(() => import('@/routes/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })))
 const AdminOverview = lazy(() => import('@/routes/admin/AdminOverview').then((m) => ({ default: m.AdminOverview })))
 const AdminUsers = lazy(() => import('@/routes/admin/AdminUsers').then((m) => ({ default: m.AdminUsers })))
+const AdminUserDetail = lazy(() => import('@/routes/admin/AdminUserDetail').then((m) => ({ default: m.AdminUserDetail })))
 const AdminPrompts = lazy(() => import('@/routes/admin/AdminPrompts').then((m) => ({ default: m.AdminPrompts })))
 const adminRoutes = {
   path: '/admin',
@@ -25,6 +26,7 @@ const adminRoutes = {
   children: [
     { index: true, element: <Suspense fallback={null}><AdminOverview /></Suspense> },
     { path: 'users', element: <Suspense fallback={null}><AdminUsers /></Suspense> },
+    { path: 'users/:userId', element: <Suspense fallback={null}><AdminUserDetail /></Suspense> },
     { path: 'prompts', element: <Suspense fallback={null}><AdminPrompts /></Suspense> },
   ],
 }

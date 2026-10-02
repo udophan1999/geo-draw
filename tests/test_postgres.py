@@ -117,12 +117,19 @@ class PostgresStoreTests(PostgresTestCase):
         conversations.create(user_id, "Hai")
         self.assertEqual(conversations.owner_stats()[user_id][0], 2)
         self.assertEqual(len(conversations.created_since(0)), 2)
+        first = conversations.list(user_id)[0]
+        conversations.add_message(first.id, "user", "Đề", channel="chat")
+        conversations.add_message(first.id, "assistant", "Hình", image_path=self.root / "a.png",
+                                  scene_path=self.root / "s.py")
+        self.assertEqual(sorted((r[1], r[4]) for r in conversations.owner_messages(user_id)),
+                         [("assistant", True), ("user", False)])
         conversations.delete_owner(user_id)
         self.assertNotIn(user_id, conversations.owner_stats())
         quota = QuotaStore(self.root / "usage.sqlite3", db)
         quota.consume(user_id, 5)
         self.assertEqual(quota.used_today(), {user_id: 1})
         self.assertEqual([row[0] for row in quota.daily_since("2000-01-01")], [user_id])
+        self.assertEqual([count for _, count in quota.owner_days(user_id)], [1])
         config = ConfigStore(self.root, db)
         config.set("k", "một", "Admin")
         config.set("k", "hai", "Admin")  # ON CONFLICT … DO UPDATE

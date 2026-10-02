@@ -7,10 +7,9 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import type { Conversation, TutorAction } from '@/lib/api'
+import { HINT_LEVELS } from '@/lib/hintLevels'
 import { cn } from '@/lib/utils'
 
-// Same order as geo_draw/tutor_prompts.py HINT_LEVELS.
-const HINT_LEVELS = ['Hiểu đề', 'Nhớ kiến thức', 'Chiến lược', 'Bước đầu tiên', 'Sâu hơn nữa']
 
 type Props = {
   conversation: Conversation
