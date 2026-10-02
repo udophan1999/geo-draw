@@ -176,6 +176,28 @@ class AdminApiTests(ApiTestCase):
         self.assertIsNone(user.get("/api/auth/me").json()["user"])
         self.assertEqual(self.register(user, "Dũng").status_code, 201)  # the name is free again
 
+    def test_overview_stats(self):
+        for name in ("Bình", "Cường"):
+            user = self.client()
+            self.register(user, name)
+            read_events(user, self.send(user, EQUATION).json()["job_id"])
+        guest = self.client()
+        read_events(guest, self.send(guest, EQUATION).json()["job_id"])
+        admin = self.admin()
+        self.assertEqual(admin.get("/api/admin/stats?days=12").status_code, 422)
+        stats = admin.get("/api/admin/stats?days=7").json()
+        self.assertEqual(len(stats["days"]), 7)
+        self.assertEqual(len(stats["series"]["ai_users"]), 7)
+        self.assertEqual((stats["series"]["ai_users"][-1], stats["series"]["ai_guests"][-1]), (2, 1))
+        self.assertEqual(stats["series"]["new_users"][-1], 3)  # the admin, Bình, Cường
+        self.assertEqual(stats["series"]["new_conversations"][-1], 2)  # the guest's is not counted
+        totals = stats["totals"]
+        self.assertEqual((totals["users"], totals["admins"], totals["conversations"]), (3, 1, 2))
+        self.assertEqual((totals["ai_turns"], totals["ai_guest_turns"], totals["active_users"]), (3, 1, 3))
+        self.assertEqual(stats["outcomes"], {"solved": 0, "solution": 0, "in_progress": 2})
+        self.assertEqual({u["name"] for u in stats["top_users"]}, {"Bình", "Cường"})
+        self.assertEqual(self.client().get("/api/admin/stats").status_code, 401)
+
     def test_edited_prompt_reaches_the_tutor(self):
         admin = self.admin()
         prompts = admin.get("/api/admin/prompts").json()

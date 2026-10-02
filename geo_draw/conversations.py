@@ -230,6 +230,15 @@ class ConversationStore:
             ).fetchall()
         return {owner: (count, last) for owner, count, last in rows}
 
+    def created_since(self, since: float) -> list[tuple[str, float, str, bool]]:
+        """(owner, created_at, mode, solved) of conversations started at ``since`` or later."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT owner, created_at, mode, solved FROM conversations WHERE created_at >= ?",
+                (since,),
+            ).fetchall()
+        return [(owner, created, mode, bool(solved)) for owner, created, mode, solved in rows]
+
     def delete_owner(self, owner: str) -> None:
         """Delete every conversation of ``owner`` with its messages and files."""
         with self._connect() as connection:

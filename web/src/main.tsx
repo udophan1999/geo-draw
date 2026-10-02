@@ -14,7 +14,20 @@ import { LoginPage, RegisterPage } from '@/routes/auth'
 // The chat page carries KaTeX, Markdown and the drawing tools: load it only inside the app,
 // so /login stays light.
 const ChatPage = lazy(() => import('@/routes/ChatPage').then((m) => ({ default: m.ChatPage })))
-const AdminPage = lazy(() => import('@/routes/AdminPage').then((m) => ({ default: m.AdminPage })))
+// The admin pages (and their charts) load only when an admin opens them.
+const AdminLayout = lazy(() => import('@/routes/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })))
+const AdminOverview = lazy(() => import('@/routes/admin/AdminOverview').then((m) => ({ default: m.AdminOverview })))
+const AdminUsers = lazy(() => import('@/routes/admin/AdminUsers').then((m) => ({ default: m.AdminUsers })))
+const AdminPrompts = lazy(() => import('@/routes/admin/AdminPrompts').then((m) => ({ default: m.AdminPrompts })))
+const adminRoutes = {
+  path: '/admin',
+  element: <Suspense fallback={null}><AdminLayout /></Suspense>,
+  children: [
+    { index: true, element: <Suspense fallback={null}><AdminOverview /></Suspense> },
+    { path: 'users', element: <Suspense fallback={null}><AdminUsers /></Suspense> },
+    { path: 'prompts', element: <Suspense fallback={null}><AdminPrompts /></Suspense> },
+  ],
+}
 const chatPage = (
   <Suspense fallback={null}>
     <ChatPage />
@@ -35,7 +48,7 @@ const queryClient = new QueryClient({
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
-  { path: '/admin', element: <Suspense fallback={null}><AdminPage /></Suspense> },
+  adminRoutes,
   {
     element: <AppLayout />,
     children: [

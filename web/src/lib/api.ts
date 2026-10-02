@@ -91,6 +91,16 @@ export type PromptInfo = {
   updated_at: number | null
   updated_by: string | null
 }
+export type AdminStats = {
+  days: string[]
+  series: { new_users: number[]; new_conversations: number[]; ai_users: number[]; ai_guests: number[] }
+  totals: {
+    users: number; admins: number; locked: number; new_users: number; active_users: number
+    conversations: number; new_conversations: number; ai_turns: number; ai_guest_turns: number
+  }
+  outcomes: { solved: number; solution: number; in_progress: number }
+  top_users: { id: string; name: string; ai_turns: number; conversations: number }[]
+}
 export type PromptList = { prompts: PromptInfo[]; fixed: { label: string; text: string }[] }
 export type TutorAction = 'ask' | 'deeper' | 'solution' | 'hint'
 
@@ -170,6 +180,7 @@ export const api = {
     }),
 
   admin: {
+    stats: (days: number) => request<AdminStats>(`/admin/stats?days=${days}`),
     users: (q = '') => request<AdminUserList>(`/admin/users?q=${encodeURIComponent(q)}`),
     updateUser: (id: string, update: AdminUserUpdate) =>
       request<AdminUser>(`/admin/users/${id}`, { method: 'PATCH', body: json(update) }),

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import shutil
+import time
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -63,6 +65,82 @@ def _not_self(admin: Owner, user_id: str, action: str) -> None:
     # Acting on others only keeps at least one admin (the one acting) at all times.
     if admin.user_id == user_id:
         raise HTTPException(409, f"Bạn không thể {action} chính tài khoản của mình.")
+
+
+def _day(timestamp: float) -> str:
+    return time.strftime("%Y-%m-%d", time.localtime(timestamp))  # the quota's day, too
+
+
+@router.get("/stats")
+def stats(request: Request, days: int = 30) -> dict:
+    """The overview page: totals and daily series over the last ``days`` days.
+
+    Conversation figures cover accounts only (guests' conversations are not kept in one
+    place with SQLite); AI turns cover accounts and guests.
+    """
+    if days not in (7, 30, 90):
+        raise HTTPException(422, "Chỉ hỗ trợ 7, 30 hoặc 90 ngày.")
+    state = app_state(request)
+    today = date.fromisoformat(_day(time.time()))
+    labels = [(today - timedelta(days=offset)).isoformat() for offset in range(days - 1, -1, -1)]
+    index = {day: i for i, day in enumerate(labels)}
+    since = time.mktime(date.fromisoformat(labels[0]).timetuple())
+
+    users = state.accounts.list_users()
+    names = {u.user_id: u.name for u in users}
+    new_users = [0] * days
+    for user in users:
+        if (i := index.get(_day(user.created_at))) is not None:
+            new_users[i] += 1
+
+    ai_users, ai_guests = [0] * days, [0] * days
+    ai_by_user: dict[str, int] = {}
+    for owner, day, count in state.quota.daily_since(labels[0]):
+        if (i := index.get(day)) is None:
+            continue
+        if owner.startswith("guest:"):
+            ai_guests[i] += count
+        else:
+            ai_users[i] += count
+            ai_by_user[owner] = ai_by_user.get(owner, 0) + count
+
+    new_conversations = [0] * days
+    outcomes = {"solved": 0, "solution": 0, "in_progress": 0}
+    conversations_by_user: dict[str, int] = {}
+    for owner, created, mode, solved in state.conversations.created_since(since):
+        if owner not in names:  # guests, or accounts deleted since
+            continue
+        if (i := index.get(_day(created))) is not None:
+            new_conversations[i] += 1
+        conversations_by_user[owner] = conversations_by_user.get(owner, 0) + 1
+        outcome = "solved" if solved else "solution" if mode == "solution" else "in_progress"
+        outcomes[outcome] += 1
+
+    active = {owner for owner in conversations_by_user} | set(ai_by_user)
+    active |= {u.user_id for u in users if u.last_login and u.last_login >= since}
+    top = sorted(set(ai_by_user) | set(conversations_by_user),
+                 key=lambda uid: (-ai_by_user.get(uid, 0), -conversations_by_user.get(uid, 0)))
+    return {
+        "days": labels,
+        "series": {"new_users": new_users, "new_conversations": new_conversations,
+                   "ai_users": ai_users, "ai_guests": ai_guests},
+        "totals": {
+            "users": len(users),
+            "admins": sum(u.is_admin for u in users),
+            "locked": sum(u.disabled for u in users),
+            "new_users": sum(new_users),
+            "active_users": len(active & set(names)),
+            "conversations": sum(count for owner, (count, _) in state.conversations.owner_stats().items()
+                                 if owner in names),
+            "new_conversations": sum(new_conversations),
+            "ai_turns": sum(ai_users) + sum(ai_guests),
+            "ai_guest_turns": sum(ai_guests),
+        },
+        "outcomes": outcomes,
+        "top_users": [{"id": uid, "name": names[uid], "ai_turns": ai_by_user.get(uid, 0),
+                       "conversations": conversations_by_user.get(uid, 0)}
+                      for uid in top if uid in names][:5],
+    }
 
 
 @router.get("/users")
