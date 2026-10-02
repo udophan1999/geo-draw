@@ -62,39 +62,51 @@ Mở `http://localhost:8000`. Nếu chạy sau HTTPS, đặt `GEO_DRAW_COOKIE_SE
 
 Image gồm máy chủ API và giao diện đã build sẵn, kèm Cairo, Pango, FFmpeg để Manim vẽ hình và làm video. Tài khoản, cuộc trò chuyện và lượt dùng nằm trong **PostgreSQL**; ảnh đề bài và hình vẽ là tệp trong volume `mathmate-data`.
 
-1. Tạo database riêng trên PostgreSQL có sẵn:
-   ```sql
-   CREATE USER mathmate WITH PASSWORD 'mật-khẩu-mạnh';
-   CREATE DATABASE mathmate OWNER mathmate;
-   ```
-   Bảng được tạo tự động khi ứng dụng khởi động.
-2. Trong `.env`, điền `DEEPSEEK_API_KEY` và `DATABASE_URL`:
-   - PostgreSQL chạy thẳng trên máy chủ: `postgresql://mathmate:mật-khẩu@host.docker.internal:5432/mathmate`. PostgreSQL phải nghe trên địa chỉ mà container thấy được (`listen_addresses`), và `pg_hba.conf` phải cho phép dải mạng Docker (thường là `172.16.0.0/12`).
-   - PostgreSQL chạy trong Docker: dùng tên container của nó làm tên máy, và cho container `app` vào cùng mạng Docker đó.
-   - Mật khẩu có ký tự đặc biệt (`@`, `:`, `/`…) thì phải mã hóa URL, ví dụ `@` thành `%40`.
-3. Chạy:
-   ```bash
-   cp .env.example .env                 # rồi điền như bước 2
-   docker compose up -d --build         # mở http://<máy chủ>:8000 (đổi cổng bằng PORT trong .env)
-   ```
+### Trên VPS dùng chung (Traefik + Postgres chung + Jenkins)
 
-**Chuyển dữ liệu cũ (SQLite) sang PostgreSQL** (không bắt buộc; chạy lại nhiều lần cũng không nhân đôi dữ liệu). Chép thư mục `generated/` cũ vào volume, rồi chạy lệnh chuyển bên trong container:
+Giống cách deploy Wordime: ứng dụng không mở cổng nào, Traefik (chạy ở chế độ host network) phục vụ HTTPS qua mạng `mathmate-web`, và ứng dụng nối vào Postgres chung qua mạng Docker của container Postgres. Các tệp: `docker-compose.prod.yml`, `deploy.sh`, `Jenkinsfile`, `scripts/backup.sh`.
+
+Làm theo thứ tự (bước sau phụ thuộc bước trước):
+
+1. **Database và role** trên Postgres chung (một lần):
+   ```bash
+   docker exec -it <pg-container> psql -U postgres -d postgres -c "CREATE DATABASE mathmate;"
+   docker exec -it <pg-container> psql -U postgres -d postgres -c "CREATE USER mathmate WITH PASSWORD '<mật-khẩu-mạnh>';"
+   docker exec -it <pg-container> psql -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE mathmate TO mathmate;"
+   # Postgres 15+: thiếu dòng này thì ứng dụng kết nối được nhưng không tạo được bảng.
+   docker exec -it <pg-container> psql -U postgres -d mathmate -c "GRANT ALL ON SCHEMA public TO mathmate;"
+   ```
+   Thử quyền ghi từ mạng của Postgres: `docker run --rm --network <DB_NETWORK> postgres:17-alpine psql "postgresql://mathmate:<mật-khẩu>@<pg-container>:5432/mathmate" -c "CREATE TABLE _probe(x int); DROP TABLE _probe;"`. Bảng của ứng dụng được tạo tự động khi khởi động.
+2. **DNS**: bản ghi A cho tên miền (ví dụ `mathmate.tonyvibecode.com`) trỏ về VPS, trước lần deploy đầu.
+3. **Cấu hình**: managed config `mathmate.tonyvibecode.com` trong Jenkins (và một `.env` trong thư mục checkout nếu deploy tay) gồm `DEEPSEEK_API_KEY`, `DATABASE_URL` (tên container Postgres làm tên máy), `DB_NETWORK`, `APP_DOMAIN`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, và các hạn mức nếu muốn đổi. Xem phần "Docker" trong `.env.example`.
+4. **Deploy**: chạy job Jenkins, hoặc `./deploy.sh` trên VPS. Pipeline chạy toàn bộ test trong image (`docker build --target test`), build, khởi động lại, rồi kiểm tra health, database và địa chỉ công khai.
+5. **Sao lưu** ngay trong ngày: tạo `/opt/mathmate/backup.env` (xem `.env.example`), chạy thử một lần, rồi đặt cron mỗi giờ:
+   ```cron
+   0 * * * * BACKUP_ENV_FILE=/opt/mathmate/backup.env /đường/dẫn/geo-draw/scripts/backup.sh >> /var/log/mathmate-backup.log 2>&1
+   ```
+   Mỗi lần sao lưu tạo `mathmate-db-….sql.gz` (pg_dump) và `mathmate-files-….tar.gz` (ảnh và hình vẽ); cách khôi phục ghi ở cuối script. Đừng khôi phục bằng `pg_dumpall --clean`: nó xóa database của mọi ứng dụng trên Postgres chung.
+
+Quay lại bản trước: `IMAGE=mathmate:previous docker compose -f docker-compose.prod.yml --env-file .env up -d`.
+
+### Ở máy khác (mở cổng, không Traefik)
 
 ```bash
-docker compose run --rm -v "$PWD/generated":/import:ro app sh -c "cp -a /import/. /data/ && python -m api.migrate_sqlite /data"
+cp .env.example .env                 # điền DEEPSEEK_API_KEY; DATABASE_URL tùy chọn
+docker compose up -d --build         # mở http://<máy>:8000 (đổi cổng bằng PORT trong .env)
+```
+
+### Chuyển dữ liệu cũ (SQLite) sang PostgreSQL
+
+Không bắt buộc; chạy lại nhiều lần cũng không nhân đôi dữ liệu. Chép thư mục `generated/` cũ vào volume, rồi chạy lệnh chuyển bên trong container:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env run --rm -v "$PWD/generated":/import:ro app \
+  sh -c "cp -a /import/. /data/ && python -m api.migrate_sqlite /data"
 ```
 
 Lệnh này chép tài khoản (giữ nguyên mật khẩu và phiên đăng nhập), mọi cuộc trò chuyện của người dùng và khách, cùng lượt dùng trong ngày.
 
-**Chạy sau Traefik** (HTTPS theo tên miền, không mở cổng 8000 ra ngoài). Trong `.env`, điền `DOMAIN`, đặt `GEO_DRAW_COOKIE_SECURE=1`, và nếu Traefik trên máy chủ dùng tên khác mặc định thì sửa `TRAEFIK_NETWORK` (mạng Docker của Traefik), `TRAEFIK_ENTRYPOINT` (`websecure`) và `TRAEFIK_CERTRESOLVER` (`letsencrypt`). Sau đó:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
-```
-
-Cập nhật phiên bản mới: `git pull` rồi chạy lại lệnh trên. Sao lưu: dùng `pg_dump` cho database, và với tệp hình vẽ: `docker run --rm -v geo-draw_mathmate-data:/data -v "$PWD":/backup alpine tar czf /backup/mathmate-data.tgz -C /data .` (tên volume có tiền tố là tên thư mục dự án; xem bằng `docker volume ls`).
-
-**Giới hạn chi phí AI.** Mỗi tài khoản và mỗi khách có hạn mức lượt AI mỗi ngày. Vì khách chỉ được nhận diện bằng cookie, khách còn bị giới hạn chung theo IP (`GEO_DRAW_DAILY_LIMIT_GUEST_IP`), số tài khoản tạo mới mỗi ngày từ một IP cũng bị giới hạn (`GEO_DRAW_REGISTER_LIMIT_IP`), và cả máy chủ có tổng lượt AI tối đa mỗi ngày (`GEO_DRAW_DAILY_LIMIT_TOTAL`). Sau Traefik, ứng dụng chỉ tin địa chỉ IP do Traefik chuyển tới (`TRAEFIK_PROXY_IPS`).
+**Giới hạn chi phí AI.** Mỗi tài khoản và mỗi khách có hạn mức lượt AI mỗi ngày. Vì khách chỉ được nhận diện bằng cookie, khách còn bị giới hạn chung theo IP (`GEO_DRAW_DAILY_LIMIT_GUEST_IP`), số tài khoản tạo mới mỗi ngày từ một IP cũng bị giới hạn (`GEO_DRAW_REGISTER_LIMIT_IP`), và cả máy chủ có tổng lượt AI tối đa mỗi ngày (`GEO_DRAW_DAILY_LIMIT_TOTAL`). Trên VPS, ứng dụng chỉ tin địa chỉ IP do Traefik chuyển tới (`TRAEFIK_PROXY_IPS`), nên không ai giả được IP để lách giới hạn.
 
 Máy chủ chỉ chạy **một** tiến trình uvicorn: các lượt đang chạy và luồng cập nhật trực tiếp nằm trong bộ nhớ của tiến trình đó, nên đừng tăng `--workers` hay chạy nhiều bản sao.
 

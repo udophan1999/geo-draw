@@ -1,19 +1,19 @@
-# MathMate in production.
+# MathMate anywhere with Docker, on a port (a test machine, or a server without Traefik).
 #
-#   cp .env.example .env              # fill in DEEPSEEK_API_KEY
-#   docker compose up -d --build      # http://<server>:8000
+#   cp .env.example .env              # fill in DEEPSEEK_API_KEY (DATABASE_URL optional)
+#   docker compose up -d --build      # http://<machine>:8000
 #
-# Behind the Traefik already running on the server (HTTPS on your domain, no open port):
+# On the shared VPS use docker-compose.prod.yml instead (Traefik, shared Postgres, no port):
+# ./deploy.sh or the Jenkins pipeline.
 #
-#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
-#
-# Accounts, conversations and daily usage go to PostgreSQL (DATABASE_URL in .env); photos and
-# drawings are files in the "mathmate-data" volume. Without DATABASE_URL, SQLite files in the
-# volume are used instead.
+# Accounts, conversations and daily usage go to PostgreSQL when DATABASE_URL is set, else to
+# SQLite files in the volume; photos and drawings are always files in the volume.
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      target: runtime
     image: mathmate:latest
     restart: unless-stopped
     env_file:

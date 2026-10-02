@@ -1,4 +1,4 @@
-# Only geo_draw/, api/, web/ and requirements.txt go into the image.
+# Only geo_draw/, api/, web/, requirements.txt (and tests/, for the CI test stage) are used.
 .git
 .venv*
 venv
@@ -12,10 +12,14 @@ media_cache
 .manim_cache
 web/node_modules
 web/dist
-tests
 streamlit_app
 .streamlit
 .claude
 .cursor
 *.log
 .DS_Store
+backups
+scripts
+deploy.sh
+Jenkinsfile
+docker-compose*.yml
