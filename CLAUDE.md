@@ -125,6 +125,14 @@ The app opens on a separate login screen (`streamlit_app/views/login.py`); `stre
 
 Passwords are stored as salted PBKDF2 hashes; the column is still called `code_hash` so that existing databases keep working. After sign-in the URL carries a random session token (`?session=...`, looked up in the `sessions` table) so that a reload keeps the user signed in. Never put the name itself in the URL, because that would bypass the password. `auth.logout` deletes the token and clears the displayed drawing. `user_id` is `history.user_id_for(name.casefold())`.
 
+### Admin
+
+- Roles live in `users.role` (`user` | `admin`), with `disabled`, `daily_limit` (NULL = server default) and `last_login` as added columns. A locked account has no sessions (`set_disabled` deletes them, and `session_user` joins on `disabled = 0`); its login gets 403 only after the right password. `set_password` also signs the user out.
+- The first admin comes from `ADMIN_USERNAME`/`ADMIN_PASSWORD`: `AppState.startup()` (in the lifespan, never when the app object is built, so importing `api.main` does not touch the database) calls `AccountStore.ensure_admin`, which does nothing once any active admin exists and only promotes an existing account (keeping its password).
+- `api/routers/admin.py` (`/api/admin/*`, `require_admin`: 401 guests, 403 users): users list with `owner_stats()` and `quota.used_today()`, PATCH role/disabled/limit, password reset, delete (conversations via `delete_owner`, the account, and the `users/<id>` folder). An admin can never lock, demote or delete themselves, which keeps at least one admin. `/api/auth/me` returns `user.role`, and limits go through `AppState.daily_limit(is_guest, own_limit)`.
+- **System prompts**: `tutor_prompts.EDITABLE_PROMPTS` (`prompt.tutor_hint`, `prompt.tutor_solution`) can be overridden from the admin page; overrides are rows in `ConfigStore` (`geo_draw/app_config.py`, table `app_config`), read per tutor turn and passed as `run_tutor_turn(prompts=…)` → `build_system_prompt(prompts=…)`. Saving the default text deletes the override. The guardrail, `PROGRESS_RULE`, the figure notes and the level block are never editable.
+- Web: `/admin` (`routes/AdminPage.tsx`, lazy, tabs in `?tab=`), `components/admin/UsersPanel.tsx` and `PromptsPanel.tsx`; the account menu shows "Trang quản trị" to admins.
+
 ### Math tutor (from MathLovers)
 
 - **Conversations** (`geo_draw/conversations.py`) hold `problem`, `mode` (`hint` | `solution`) and `hint_level` (1–5). Messages have a `channel`: `chat` holds the tutor conversation, and `figure` holds drawing requests and drawings. They also carry a JSON `meta` (mode, level, `error`). Missing columns are added to old databases on open. Conversations from before the tutor have only `figure` messages; `problem_of()` returns their first request as the problem.

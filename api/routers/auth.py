@@ -18,9 +18,10 @@ SESSION_MAX_AGE = 60 * 60 * 24 * 30
 
 def me_json(request: Request, owner: Owner) -> dict:
     state = app_state(request)
-    limit = state.daily_limit_guest if owner.is_guest else state.daily_limit_user
+    limit = state.daily_limit(owner.is_guest, owner.own_daily_limit)
     return {
-        "user": None if owner.is_guest else {"id": owner.user_id, "name": owner.name},
+        "user": None if owner.is_guest else {"id": owner.user_id, "name": owner.name,
+                                             "role": owner.role},
         "quota": {"used": state.quota.used(owner.identity), "limit": limit},
         "ai_available": state.ai_available,
     }
@@ -76,6 +77,9 @@ def login(body: Credentials, request: Request, response: Response) -> dict:
                 429, f"Nhập sai quá nhiều lần. Hãy thử lại sau {-(-locked // 60)} phút."
             )
         raise HTTPException(401, "Sai tên đăng nhập hoặc mật khẩu.")
+    user = accounts.get_user(user_id)
+    if user and user.disabled:  # told only after the right password, so names do not leak
+        raise HTTPException(403, "Tài khoản này đã bị khóa. Hãy liên hệ quản trị viên.")
     return _signed_in(request, response, user_id)
 
 

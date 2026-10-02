@@ -39,6 +39,14 @@ class QuotaStore:
             ).fetchone()
         return row[0] if row else 0
 
+    def used_today(self) -> dict[str, int]:
+        """Today's count for every owner that used the AI."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT owner, count FROM usage WHERE day = ?", (_today(),)
+            ).fetchall()
+        return dict(rows)
+
     def consume(self, owner: str, limit: int) -> bool:
         """Count one AI turn; return False (and count nothing) when the limit is reached."""
         with self._connect() as connection:

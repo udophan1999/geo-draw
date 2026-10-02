@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronUp, LogIn, LogOut, MoreHorizontal, Pencil, Settings2, SquarePen, Trash2 } from 'lucide-react'
+import { ChevronUp, LogIn, LogOut, MoreHorizontal, Pencil, Settings2, ShieldCheck, SquarePen, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -219,6 +219,11 @@ function AccountBox() {
             <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
               <Settings2 /> Cài đặt
             </DropdownMenuItem>
+            {user.role === 'admin' && (
+              <DropdownMenuItem onSelect={() => navigate('/admin')}>
+                <ShieldCheck /> Trang quản trị
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => logout.mutate()}>
               <LogOut /> Đăng xuất

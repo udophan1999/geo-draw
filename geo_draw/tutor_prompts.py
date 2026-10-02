@@ -85,6 +85,20 @@ Dòng cuối cùng của câu trả lời phải là đúng một thẻ, không 
 """.strip()
 
 
+# The prompts an admin may rewrite (admin page → System prompt); stored in app_config under
+# these keys. The guardrail, the progress tags and the figure notes stay fixed: the app reads
+# the tags, and the guardrail is what keeps hint mode from giving the answer away.
+TUTOR_HINT = "prompt.tutor_hint"
+TUTOR_SOLUTION = "prompt.tutor_solution"
+EDITABLE_PROMPTS = {
+    TUTOR_HINT: ("Trợ giảng gợi ý",
+                 "Vai trò, các bậc gợi ý và cách trả lời ở chế độ Gợi ý.", BASE_TUTOR_PROMPT),
+    TUTOR_SOLUTION: ("Lời giải chi tiết",
+                     "Cách trình bày khi học sinh chọn Lời giải chi tiết.", SOLUTION_PROMPT),
+}
+MAX_PROMPT_LENGTH = 20_000
+
+
 def clamp_level(level: int) -> int:
     return min(max(int(level or 1), 1), MAX_HINT_LEVEL)
 
@@ -107,16 +121,21 @@ FIGURE_NOTES = {
 
 
 def build_system_prompt(problem: str, mode: str = HINT, level: int = 1,
-                        figure: str = FIGURE_NONE) -> str:
-    """The system prompt for one tutor reply about ``problem``."""
+                        figure: str = FIGURE_NONE, prompts: dict[str, str] | None = None) -> str:
+    """The system prompt for one tutor reply about ``problem``.
+
+    ``prompts`` holds an admin's versions of ``EDITABLE_PROMPTS`` (missing keys: defaults).
+    """
+    prompts = prompts or {}
     problem_block = "=== ĐỀ BÀI ===\n" + (problem.strip() or "(Học sinh chưa đưa đề bài.)")
     figure_block = FIGURE_NOTES.get(figure, FIGURE_NOTES[FIGURE_NONE])
     if mode == SOLUTION:
-        return "\n\n".join([SOLUTION_PROMPT, problem_block, figure_block])
+        return "\n\n".join([prompts.get(TUTOR_SOLUTION) or SOLUTION_PROMPT, problem_block,
+                            figure_block])
     level = clamp_level(level)
     level_block = (
         f"=== BẬC GỢI Ý HIỆN TẠI: {level}/{MAX_HINT_LEVEL} ({HINT_LEVELS[level - 1]}) ===\n"
         f"Đưa gợi ý ở bậc {level}. Không gộp nhiều bậc trong một lượt."
     )
-    return "\n\n".join([BASE_TUTOR_PROMPT, problem_block, figure_block, level_block, GUARDRAIL,
-                         PROGRESS_RULE])
+    return "\n\n".join([prompts.get(TUTOR_HINT) or BASE_TUTOR_PROMPT, problem_block, figure_block,
+                         level_block, GUARDRAIL, PROGRESS_RULE])

@@ -49,7 +49,7 @@ def _ai(state: AppState, model: str) -> AiSettings:
 
 
 def _consume_ai_turn(state: AppState, owner: Owner) -> None:
-    limit = state.daily_limit_guest if owner.is_guest else state.daily_limit_user
+    limit = state.daily_limit(owner.is_guest, owner.own_daily_limit)
     if not state.quota.consume(owner.identity, limit):
         hint = " Đăng nhập để có thêm lượt." if owner.is_guest else ""
         raise HTTPException(429, f"Bạn đã dùng hết {limit} lượt dùng AI hôm nay.{hint}")
@@ -174,7 +174,7 @@ async def send_message(
 
         run_tutor_turn(owner.store, owner.store_owner, conversation.id, text=text,
                        image=image_bytes, image_type=image_type, action=action, ai=ai,
-                       figure=figure_state, on_event=on_event)
+                       figure=figure_state, prompts=state.config.values(), on_event=on_event)
 
     job = state.jobs.submit(owner.identity, work)
     return {"conversation": conversation_json(conversation), "job_id": job.id}

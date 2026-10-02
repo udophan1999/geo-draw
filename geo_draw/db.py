@@ -118,11 +118,19 @@ class PostgresDatabase(Database):
         from psycopg_pool import ConnectionPool
 
         self.IntegrityError = psycopg.IntegrityError
-        self.pool = ConnectionPool(url, min_size=1, max_size=max_size, open=True,
+        # Opened on first use, so building an app (e.g. importing api.main) never connects.
+        self.pool = ConnectionPool(url, min_size=1, max_size=max_size, open=False,
                                    name="mathmate")
+        self._opened = False
+        self._open_lock = threading.Lock()  # not self._lock: ensure_schema holds that one
 
     @contextmanager
     def connect(self) -> Iterator[Connection]:
+        if not self._opened:
+            with self._open_lock:
+                if not self._opened:
+                    self.pool.open(wait=False)
+                    self._opened = True
         with self.pool.connection() as raw:  # commits on success, rolls back on error
             yield Connection(raw, "%s")
 
@@ -135,7 +143,8 @@ class PostgresDatabase(Database):
             connection.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {name} {definition}")
 
     def close(self) -> None:
-        self.pool.close()
+        if self._opened:
+            self.pool.close()
 
 
 def database_from_url(url: str | None) -> Database | None:

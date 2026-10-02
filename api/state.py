@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from geo_draw.accounts import AccountStore
+from geo_draw.app_config import ConfigStore
 from geo_draw.ai_codegen import AiSettings, settings_from_env
 from geo_draw.conversations import ConversationStore
 from geo_draw.db import database_from_url
@@ -16,6 +18,7 @@ from .jobs import JobManager
 from .quota import QuotaStore
 
 ROOT = Path(__file__).resolve().parent.parent
+log = logging.getLogger("mathmate")
 
 
 def _int_env(name: str, default: int) -> int:
@@ -37,6 +40,9 @@ class AppState:
     # PostgreSQL for accounts, conversations and usage; None keeps SQLite files in data_dir.
     # Files (photos, drawings) always stay in data_dir.
     database_url: str | None = field(default_factory=lambda: os.environ.get("DATABASE_URL") or None)
+    # The first admin, created at startup when no admin exists yet (see ensure_admin).
+    admin_username: str | None = field(default_factory=lambda: os.environ.get("ADMIN_USERNAME") or None)
+    admin_password: str | None = field(default_factory=lambda: os.environ.get("ADMIN_PASSWORD") or None)
     workers: int = 2
 
     def __post_init__(self) -> None:
@@ -47,11 +53,36 @@ class AppState:
         # Signed-in users share one store; each guest keeps files in their own folder.
         self.conversations = ConversationStore(self.users_dir, self.db)
         self.quota = QuotaStore(self.data_dir / "usage.sqlite3", self.db)
+        self.config = ConfigStore(self.data_dir, self.db)
         self.jobs = JobManager(self.workers)
         # conversation id -> marker of the figure job drawing it right now
         self.figure_jobs: dict[str, str] = {}
         self._history = HistoryStore(self.users_dir)
         self._history_imported: set[str] = set()
+
+    def startup(self) -> None:
+        """Run when the server starts (not when the app object is built)."""
+        self.create_first_admin()
+
+    def create_first_admin(self) -> None:
+        if not (self.admin_username and self.admin_password):
+            if not self.accounts.admin_count():
+                log.warning("Chưa có tài khoản quản trị: đặt ADMIN_USERNAME và ADMIN_PASSWORD "
+                            "trong .env rồi khởi động lại.")
+            return
+        try:
+            done = self.accounts.ensure_admin(self.admin_username, self.admin_password)
+        except ValueError as exc:  # e.g. a password that is too short
+            log.error("Không tạo được tài khoản quản trị: %s", exc)
+            return
+        if done:
+            log.warning(done)
+
+    def daily_limit(self, is_guest: bool, own_limit: int | None = None) -> int:
+        """A user's own limit (set by an admin) wins over the server default."""
+        if is_guest:
+            return self.daily_limit_guest
+        return self.daily_limit_user if own_limit is None else own_limit
 
     def import_history(self, user_id: str) -> None:
         """Bring a user's pre-chat drawings into their conversations, once per process."""

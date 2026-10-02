@@ -99,6 +99,33 @@ class PostgresStoreTests(PostgresTestCase):
         self.assertIsNone(store.get("alice", first.id))
         self.assertEqual(store.messages(first.id), [])
 
+    def test_admin_queries(self):
+        from api.quota import QuotaStore
+        from geo_draw.app_config import ConfigStore
+
+        db = self.database()
+        accounts = AccountStore(self.root, db)
+        self.assertIn("Đã tạo", accounts.ensure_admin("Admin", "quantri123"))
+        user_id = accounts.create("An", "pass2468")
+        accounts.set_daily_limit(user_id, 7)
+        accounts.set_disabled(user_id, True)
+        self.assertEqual([(u.name, u.role, u.disabled, u.daily_limit) for u in accounts.list_users()],
+                         [("Admin", "admin", False, None), ("An", "user", True, 7)])
+        self.assertEqual(accounts.admin_count(), 1)
+        conversations = ConversationStore(self.root, db)
+        conversations.create(user_id, "Một")
+        conversations.create(user_id, "Hai")
+        self.assertEqual(conversations.owner_stats()[user_id][0], 2)
+        conversations.delete_owner(user_id)
+        self.assertNotIn(user_id, conversations.owner_stats())
+        quota = QuotaStore(self.root / "usage.sqlite3", db)
+        quota.consume(user_id, 5)
+        self.assertEqual(quota.used_today(), {user_id: 1})
+        config = ConfigStore(self.root, db)
+        config.set("k", "một", "Admin")
+        config.set("k", "hai", "Admin")  # ON CONFLICT … DO UPDATE
+        self.assertEqual(config.values(), {"k": "hai"})
+
     def test_newer_columns_are_added_to_an_older_table(self):
         import psycopg
 

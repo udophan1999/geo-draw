@@ -12,6 +12,8 @@ export const keys = {
   editor: (messageId: string) => ['editor', messageId] as const,
   scene: (messageId: string) => ['scene', messageId] as const,
   log: (messageId: string) => ['log', messageId] as const,
+  adminUsers: (q: string) => ['admin', 'users', q] as const,
+  adminPrompts: ['admin', 'prompts'] as const,
 }
 
 export const useMe = () => useQuery({ queryKey: keys.me, queryFn: api.me })

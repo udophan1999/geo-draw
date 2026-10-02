@@ -41,11 +41,13 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
                    text: str = "", image: bytes | None = None, image_type: str | None = None,
                    action: str = ASK, ai: AiSettings,
                    figure: Callable[[], str] = lambda: FIGURE_NONE,
+                   prompts: dict[str, str] | None = None,
                    on_event: EventCallback | None = None) -> list[Message]:
     """Handle one chat message; return the saved user message and tutor reply.
 
     ``figure()`` tells the prompt whether a figure is shown, being drawn, or missing. It is
     called after the user message is saved, since that may start the automatic drawing.
+    ``prompts`` are the admin's edited system prompts (see ``tutor_prompts.EDITABLE_PROMPTS``).
     """
     emit = on_event or (lambda kind, payload: None)
     if action not in ACTIONS:
@@ -95,7 +97,8 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
     emit("message", user_message)
 
     model_messages = [{"role": "system",
-                       "content": build_system_prompt(problem, mode, level, figure())}]
+                       "content": build_system_prompt(problem, mode, level, figure(),
+                                                      prompts)}]
     for message in history[-HISTORY_LIMIT:]:
         if message.text:
             model_messages.append({"role": message.role, "content": message.text})

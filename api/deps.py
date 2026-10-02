@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import HTTPException, Request
 
+from geo_draw.accounts import ADMIN, USER
 from geo_draw.conversations import Conversation, ConversationStore, Message
 
 from .state import AppState
@@ -35,10 +36,16 @@ class Owner:
     store: ConversationStore
     workspace: Path
     store_owner: str  # the owner column used inside ``store``
+    role: str = USER
+    own_daily_limit: int | None = None  # set by an admin; None: the server default
 
     @property
     def is_guest(self) -> bool:
         return self.user_id is None
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == ADMIN
 
     @property
     def identity(self) -> str:
@@ -51,8 +58,10 @@ def app_state(request: Request) -> AppState:
 
 
 def user_owner(state: AppState, user_id: str) -> Owner:
-    return Owner(user_id, "", state.accounts.display_name(user_id), state.conversations,
-                 state.users_dir / user_id, user_id)
+    user = state.accounts.get_user(user_id)
+    return Owner(user_id, "", user.name if user else None, state.conversations,
+                 state.users_dir / user_id, user_id, user.role if user else USER,
+                 user.daily_limit if user else None)
 
 
 def get_owner(request: Request) -> Owner:
@@ -65,6 +74,16 @@ def get_owner(request: Request) -> Owner:
     guest_id = request.state.guest_id  # set by the guest-cookie middleware
     return Owner(None, guest_id, None, state.guest_store(guest_id),
                  state.sessions_dir / guest_id, state.guest_owner(guest_id))
+
+
+def require_admin(request: Request) -> Owner:
+    """For the admin endpoints: 401 when signed out, 403 for everyone but admins."""
+    owner = get_owner(request)
+    if owner.is_guest:
+        raise HTTPException(401, "Hãy đăng nhập.")
+    if not owner.is_admin:
+        raise HTTPException(403, "Chỉ quản trị viên mới dùng được chức năng này.")
+    return owner
 
 
 def owned_conversation(owner: Owner, conversation_id: str) -> Conversation:

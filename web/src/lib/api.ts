@@ -1,7 +1,7 @@
 // Typed client for the FastAPI server in api/. Cookies carry the session, so every call
 // is same-origin (Vite proxies /api in dev; FastAPI serves the built app in production).
 
-export type User = { id: string; name: string }
+export type User = { id: string; name: string; role: 'user' | 'admin' }
 export type Me = {
   user: User | null
   quota: { used: number; limit: number }
@@ -60,6 +60,38 @@ export type EditorState = {
   manual_edits: ManualEdits
 }
 export type Progress = { stage: string; label: string }
+
+export type AdminUser = {
+  id: string
+  name: string
+  role: 'user' | 'admin'
+  disabled: boolean
+  created_at: number
+  last_login: number | null
+  /** The latest change to one of the user's conversations. */
+  last_active: number | null
+  conversations: number
+  /** ``custom``: the admin set this user's own limit instead of the server default. */
+  quota: { used: number; limit: number; custom: boolean }
+}
+export type AdminUserList = { users: AdminUser[]; default_limit: number }
+export type AdminUserUpdate = {
+  role?: 'user' | 'admin'
+  disabled?: boolean
+  daily_limit?: number
+  reset_limit?: boolean
+}
+export type PromptInfo = {
+  key: string
+  label: string
+  description: string
+  default: string
+  value: string
+  custom: boolean
+  updated_at: number | null
+  updated_by: string | null
+}
+export type PromptList = { prompts: PromptInfo[]; fixed: { label: string; text: string }[] }
 export type TutorAction = 'ask' | 'deeper' | 'solution' | 'hint'
 
 export class ApiError extends Error {
@@ -136,6 +168,20 @@ export const api = {
       method: 'POST',
       body: json({ text }),
     }),
+
+  admin: {
+    users: (q = '') => request<AdminUserList>(`/admin/users?q=${encodeURIComponent(q)}`),
+    updateUser: (id: string, update: AdminUserUpdate) =>
+      request<AdminUser>(`/admin/users/${id}`, { method: 'PATCH', body: json(update) }),
+    resetPassword: (id: string, password: string) =>
+      request<void>(`/admin/users/${id}/password`, { method: 'POST', body: json({ password }) }),
+    deleteUser: (id: string) => request<void>(`/admin/users/${id}`, { method: 'DELETE' }),
+    prompts: () => request<PromptList>('/admin/prompts'),
+    savePrompt: (key: string, value: string) =>
+      request<PromptList>(`/admin/prompts/${encodeURIComponent(key)}`, { method: 'PUT', body: json({ value }) }),
+    resetPrompt: (key: string) =>
+      request<PromptList>(`/admin/prompts/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+  },
 
   scene: (messageId: string) => request<string>(`/messages/${messageId}/scene`),
   log: (messageId: string) => request<string>(`/messages/${messageId}/log`),

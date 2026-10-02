@@ -7,6 +7,7 @@ import hmac
 import math
 import secrets
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from .db import Database, SqliteDatabase
@@ -16,6 +17,9 @@ MAX_FAILED_ATTEMPTS = 5
 LOCK_SECONDS = 300
 MIN_PASSWORD_LENGTH = 6
 MAX_PASSWORD_LENGTH = 64
+USER = "user"
+ADMIN = "admin"
+ROLES = (USER, ADMIN)
 
 
 def normalize_name(value: str) -> str:
@@ -48,6 +52,34 @@ _SCHEMA = [
 ]
 
 
+# Columns added after the first release; older databases get them on open.
+_ADDED_COLUMNS = {
+    "users": [("role", f"TEXT NOT NULL DEFAULT '{USER}'"),
+              ("disabled", "INTEGER NOT NULL DEFAULT 0"),
+              ("daily_limit", "INTEGER"),  # NULL: the server's default limit
+              ("last_login", "{FLOAT} NOT NULL DEFAULT 0")],
+}
+_USER_COLUMNS = "user_id, name, role, disabled, daily_limit, created_at, last_login"
+
+
+@dataclass
+class UserInfo:
+    user_id: str
+    name: str
+    role: str
+    disabled: bool
+    daily_limit: int | None
+    created_at: float
+    last_login: float
+
+    def __post_init__(self) -> None:
+        self.disabled = bool(self.disabled)  # SQLite stores 0/1
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == ADMIN
+
+
 class AccountStore:
     """``db`` is the shared PostgreSQL database; without it, SQLite under ``root``."""
 
@@ -56,7 +88,7 @@ class AccountStore:
         self.db = db or SqliteDatabase(root / "accounts.sqlite3")
 
     def create_tables(self) -> None:
-        self.db.ensure_schema("accounts", _SCHEMA)
+        self.db.ensure_schema("accounts", _SCHEMA, _ADDED_COLUMNS)
 
     def _connect(self):
         self.create_tables()
@@ -155,21 +187,110 @@ class AccountStore:
 
     def start_session(self, user_id: str) -> str:
         token = secrets.token_urlsafe(24)
+        now = time.time()
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)", (token, user_id, time.time())
+                "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)",
+                (token, user_id, now),
             )
+            connection.execute("UPDATE users SET last_login = ? WHERE user_id = ?", (now, user_id))
         return token
 
     def session_user(self, token: str) -> str | None:
+        """The signed-in user of a session; a locked or deleted account has none."""
         if not token:
             return None
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT user_id FROM sessions WHERE token = ?", (token,)
+                "SELECT s.user_id FROM sessions s JOIN users u ON u.user_id = s.user_id "
+                "WHERE s.token = ? AND u.disabled = 0", (token,)
             ).fetchone()
         return row[0] if row else None
 
     def end_session(self, token: str) -> None:
         with self._connect() as connection:
             connection.execute("DELETE FROM sessions WHERE token = ?", (token,))
+
+    # Administration ---------------------------------------------------------------------
+
+    def get_user(self, user_id: str) -> UserInfo | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                f"SELECT {_USER_COLUMNS} FROM users WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        return UserInfo(*row) if row else None
+
+    def list_users(self) -> list[UserInfo]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"SELECT {_USER_COLUMNS} FROM users ORDER BY created_at"
+            ).fetchall()
+        return [UserInfo(*row) for row in rows]
+
+    def admin_count(self) -> int:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT COUNT(*) FROM users WHERE role = ? AND disabled = 0", (ADMIN,)
+            ).fetchone()
+        return row[0]
+
+    def set_role(self, user_id: str, role: str) -> None:
+        if role not in ROLES:
+            raise ValueError(f"Vai trò không hợp lệ: {role}")
+        self._update(user_id, "role = ?", role)
+
+    def set_disabled(self, user_id: str, disabled: bool) -> None:
+        """Lock or unlock an account; locking signs it out everywhere."""
+        with self._connect() as connection:
+            connection.execute("UPDATE users SET disabled = ? WHERE user_id = ?",
+                               (int(disabled), user_id))
+            if disabled:
+                connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+    def set_daily_limit(self, user_id: str, limit: int | None) -> None:
+        """A daily AI limit for this user; None goes back to the server default."""
+        if limit is not None and limit < 0:
+            raise ValueError("Hạn mức không được âm.")
+        self._update(user_id, "daily_limit = ?", limit)
+
+    def set_password(self, user_id: str, password: str) -> None:
+        """Set a new password (an admin reset) and sign the user out everywhere."""
+        if not valid_password(password):
+            raise ValueError(
+                f"Mật khẩu phải có từ {MIN_PASSWORD_LENGTH} đến {MAX_PASSWORD_LENGTH} ký tự."
+            )
+        salt = secrets.token_bytes(16)
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE users SET code_hash = ?, salt = ?, failed_attempts = 0, locked_until = 0 "
+                "WHERE user_id = ?", (_hash_password(password, salt), salt, user_id))
+            connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+    def delete_user(self, user_id: str) -> None:
+        """Remove the account and its sessions (its conversations are the caller's job)."""
+        with self._connect() as connection:
+            connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+            connection.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+
+    def ensure_admin(self, name: str, password: str) -> str | None:
+        """Create the first admin (from ADMIN_USERNAME/ADMIN_PASSWORD) when there is none.
+
+        An existing account with that name is promoted and keeps its password. Returns what
+        was done, or None when an admin already exists.
+        """
+        if self.admin_count():
+            return None
+        name = normalize_name(name)
+        user_id = self._user_id(name)
+        if self.get_user(user_id) is None:
+            user_id = self.create(name, password)
+            done = f"Đã tạo tài khoản quản trị «{name}»."
+        else:
+            done = f"Đã cấp quyền quản trị cho tài khoản có sẵn «{name}» (giữ mật khẩu cũ)."
+        self.set_role(user_id, ADMIN)
+        self.set_disabled(user_id, False)
+        return done
+
+    def _update(self, user_id: str, assignment: str, value) -> None:
+        with self._connect() as connection:
+            connection.execute(f"UPDATE users SET {assignment} WHERE user_id = ?", (value, user_id))

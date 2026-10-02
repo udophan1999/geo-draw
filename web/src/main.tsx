@@ -14,6 +14,7 @@ import { LoginPage, RegisterPage } from '@/routes/auth'
 // The chat page carries KaTeX, Markdown and the drawing tools: load it only inside the app,
 // so /login stays light.
 const ChatPage = lazy(() => import('@/routes/ChatPage').then((m) => ({ default: m.ChatPage })))
+const AdminPage = lazy(() => import('@/routes/AdminPage').then((m) => ({ default: m.AdminPage })))
 const chatPage = (
   <Suspense fallback={null}>
     <ChatPage />
@@ -34,6 +35,7 @@ const queryClient = new QueryClient({
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/admin', element: <Suspense fallback={null}><AdminPage /></Suspense> },
   {
     element: <AppLayout />,
     children: [

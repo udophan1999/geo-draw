@@ -15,7 +15,7 @@ from geo_draw.examples import MATH_EXAMPLES
 from geo_draw.geometry_knowledge import GEOMETRY_HELP_VI
 
 from .deps import GUEST_COOKIE, new_guest_id, valid_guest_id
-from .routers import auth, conversations, editor, files, messages, settings
+from .routers import admin, auth, conversations, editor, files, messages, settings
 from .state import ROOT, AppState
 
 GUEST_MAX_AGE = 60 * 60 * 24 * 30
@@ -36,6 +36,7 @@ def create_app(data_dir: Path | None = None, web_dist: Path | None = ROOT / "web
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        state.startup()
         yield
         state.close()
 
@@ -57,7 +58,7 @@ def create_app(data_dir: Path | None = None, web_dist: Path | None = ROOT / "web
         return response
 
     api = APIRouter(prefix="/api")
-    for module in (auth, settings, conversations, messages, files, editor):
+    for module in (auth, settings, conversations, messages, files, editor, admin):
         api.include_router(module.router)
 
     @api.get("/examples", tags=["meta"])

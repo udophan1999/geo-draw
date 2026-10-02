@@ -222,6 +222,23 @@ class ConversationStore:
             connection.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
         shutil.rmtree(self.conversation_dir(owner, conversation_id), ignore_errors=True)
 
+    def owner_stats(self) -> dict[str, tuple[int, float]]:
+        """For each owner: (number of conversations, time of the latest activity)."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT owner, COUNT(*), MAX(updated_at) FROM conversations GROUP BY owner"
+            ).fetchall()
+        return {owner: (count, last) for owner, count, last in rows}
+
+    def delete_owner(self, owner: str) -> None:
+        """Delete every conversation of ``owner`` with its messages and files."""
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM messages WHERE conversation_id IN "
+                "(SELECT id FROM conversations WHERE owner = ?)", (owner,))
+            connection.execute("DELETE FROM conversations WHERE owner = ?", (owner,))
+        shutil.rmtree(self.root / owner, ignore_errors=True)
+
     def conversation_dir(self, owner: str, conversation_id: str) -> Path:
         return self.root / owner / "conversations" / conversation_id
 

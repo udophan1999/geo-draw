@@ -96,6 +96,14 @@ Cập nhật phiên bản mới: `git pull` rồi chạy lại lệnh trên. Sao
 
 Máy chủ chỉ chạy **một** tiến trình uvicorn: các lượt đang chạy và luồng cập nhật trực tiếp nằm trong bộ nhớ của tiến trình đó, nên đừng tăng `--workers` hay chạy nhiều bản sao.
 
+## Quản trị
+
+Đặt `ADMIN_USERNAME` và `ADMIN_PASSWORD` trong `.env` trước lần chạy đầu tiên: khi khởi động, nếu chưa có quản trị viên nào, máy chủ tạo tài khoản đó (hoặc cấp quyền cho tài khoản cùng tên đã có, giữ mật khẩu cũ) và ghi một dòng vào log. Sau đó hai biến này không còn tác dụng.
+
+Quản trị viên mở **Trang quản trị** từ menu tài khoản (góc dưới thanh bên), hoặc vào `/admin`:
+- **Người dùng**: tìm theo tên; xem ngày tạo, lần hoạt động gần nhất, số cuộc trò chuyện, lượt AI hôm nay; đặt lại mật khẩu, đổi hạn mức AI riêng, cấp hoặc bỏ quyền quản trị, khóa hoặc mở khóa, xóa tài khoản cùng dữ liệu. Không ai tự khóa, tự bỏ quyền hay tự xóa chính mình được, nên luôn còn ít nhất một quản trị viên.
+- **System prompt**: sửa prompt của trợ giảng (chế độ Gợi ý và Lời giải chi tiết), có Khôi phục mặc định. Phần rào chắn không đưa đáp án và phần báo tiến độ luôn được giữ, chỉ xem được.
+
 ## Thiết lập DeepSeek
 
 Sao chép `.env.example` thành `.env` rồi điền:
