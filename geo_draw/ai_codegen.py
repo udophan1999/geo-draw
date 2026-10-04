@@ -9,6 +9,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -270,7 +271,7 @@ def extract_python(text: str) -> str:
         if start < 0:
             start = text.find("class GeoScene")
         return text[start:].strip()
-    raise ValueError("DeepSeek không trả về class GeoScene.")
+    raise ValueError("AI không trả về class GeoScene.")
 
 
 def _drawing_facts_text(problem: str) -> str:
@@ -1664,18 +1665,10 @@ def _ensure_light_theme(code: str) -> str:
     return code
 
 
-def _request_chat(
-    settings: AiSettings,
-    messages: list[dict],
-    timeout: int = 120,
-    model: str | None = None,
-    max_tokens: int = 6000,
-) -> str:
+def _open_chat(settings: AiSettings, payload: dict, timeout: int):
+    """POST a chat completion request; HTTP and network errors become Vietnamese ValueErrors."""
     if not settings.api_key:
-        raise ValueError("Chưa có API key DeepSeek. Dán key ở sidebar hoặc đặt DEEPSEEK_API_KEY.")
-    selected_model = model or settings.model
-    payload = {"model": selected_model, "messages": messages, "stream": False,
-               "max_tokens": max_tokens, "thinking": {"type": "disabled"}}
+        raise ValueError("Máy chủ chưa cấu hình khóa AI (DEEPSEEK_API_KEY).")
     request = urllib.request.Request(
         settings.base_url + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
@@ -1683,26 +1676,71 @@ def _request_chat(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            body = json.loads(response.read().decode("utf-8"))
+        return urllib.request.urlopen(request, timeout=timeout)
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         try:
             detail = json.loads(detail).get("error", {}).get("message", detail)
         except json.JSONDecodeError:
             pass
-        raise ValueError(f"DeepSeek trả về lỗi HTTP {exc.code}: {str(detail)[:500]}") from exc
+        raise ValueError(f"Máy chủ AI trả về lỗi HTTP {exc.code}: {str(detail)[:500]}") from exc
     except urllib.error.URLError as exc:
-        raise ValueError(f"Không kết nối được DeepSeek: {exc.reason}") from exc
+        raise ValueError(f"Không kết nối được máy chủ AI: {exc.reason}") from exc
     except TimeoutError as exc:
-        raise ValueError("DeepSeek phản hồi quá thời gian chờ.") from exc
+        raise ValueError("Máy chủ AI phản hồi quá thời gian chờ.") from exc
+
+
+def _request_chat(
+    settings: AiSettings,
+    messages: list[dict],
+    timeout: int = 120,
+    model: str | None = None,
+    max_tokens: int = 6000,
+) -> str:
+    payload = {"model": model or settings.model, "messages": messages, "stream": False,
+               "max_tokens": max_tokens, "thinking": {"type": "disabled"}}
+    try:
+        with _open_chat(settings, payload, timeout) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except TimeoutError as exc:
+        raise ValueError("Máy chủ AI phản hồi quá thời gian chờ.") from exc
     try:
         content = body["choices"][0]["message"]["content"]
         if not isinstance(content, str) or not content.strip():
             raise TypeError
         return content
     except (KeyError, IndexError, TypeError) as exc:
-        raise ValueError("Phản hồi DeepSeek không có nội dung mã hợp lệ.") from exc
+        raise ValueError("Phản hồi của AI không có nội dung mã hợp lệ.") from exc
+
+
+def stream_chat(
+    settings: AiSettings,
+    messages: list[dict],
+    timeout: int = 120,
+    model: str | None = None,
+    max_tokens: int = 4000,
+) -> Iterator[str]:
+    """Yield a chat reply piece by piece (OpenAI-style ``stream: true`` server-sent events)."""
+    payload = {"model": model or settings.model, "messages": messages, "stream": True,
+               "max_tokens": max_tokens, "thinking": {"type": "disabled"}}
+    try:
+        with _open_chat(settings, payload, timeout) as response:
+            for raw in response:
+                line = raw.decode("utf-8", errors="replace").strip()
+                if not line.startswith("data:"):
+                    continue  # blank separators and ": keep-alive" comments
+                data = line[len("data:"):].strip()
+                if data == "[DONE]":
+                    return
+                try:
+                    choice = json.loads(data)["choices"][0]
+                except (ValueError, KeyError, IndexError, TypeError):
+                    continue
+                piece = (choice.get("delta") or {}).get("content")
+                if piece:
+                    yield piece
+    except (TimeoutError, urllib.error.URLError) as exc:
+        raise ValueError("Mất kết nối với máy chủ AI khi đang trả lời. Hãy thử lại.") from exc
 
 
 def extract_problem_from_image(
@@ -1759,7 +1797,8 @@ def extract_problem_from_image(
 
 
 def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
-                        repair_log: str | None = None) -> AiResult:
+                        repair_log: str | None = None,
+                        previous_code: str | None = None) -> AiResult:
     missing_points = missing_reference_figure_points(problem)
     if missing_points:
         return AiResult(
@@ -1773,6 +1812,13 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
     mode = ("Use self.play animations and finish with self.wait(0.5)." if animate else
             "Do not use self.play. Add all mobjects with self.add(...) and finish with self.wait(0.1).")
     user = f"Animation mode: {mode}\n\nGeometry problem:\n{problem.strip()}"
+    if previous_code:
+        # Chat follow-ups: the problem now ends with "Yêu cầu bổ sung"; update the last drawing.
+        user += ("\n\nThe current drawing was made for an earlier version of this problem. "
+                 "Return a complete updated module that satisfies the whole problem above, "
+                 "including every numbered 'Yêu cầu bổ sung'. Keep the existing coordinates, "
+                 "labels and objects unless a request changes them. Current module:\n"
+                 + previous_code[-9000:])
     if repair_log:
         user += ("\n\nA previous render failed. Return a complete corrected module for the same problem. "
                  "If GEOMETRY_LAYOUT_CROWDED or GEOMETRY_ACCIDENTAL_SPECIAL appears, "

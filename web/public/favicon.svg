@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MathMate">
+  <!-- Thales: BC is a diameter of the circle, so triangle ABC has a right angle at A. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <circle cx="32" cy="34" r="20" fill="#fff" fill-opacity="0.1" stroke="#fff" stroke-opacity="0.55" stroke-width="3.0"/>
+  <path d="M12.00 34.00 L22.61 16.34 L52.00 34.00 Z" fill="#fff" fill-opacity="0.16" stroke="#fff" stroke-width="4.2" stroke-linejoin="round"/>
+  <path d="M17.98 24.06 L25.69 28.69 L30.33 20.98" fill="none" stroke="#FBBF24" stroke-width="3.57" stroke-linejoin="round" stroke-linecap="round"/>
+  <g fill="#fff">
+    <circle cx="22.61" cy="16.34" r="3.6"/>
+    <circle cx="12" cy="34" r="3.6"/>
+    <circle cx="52" cy="34" r="3.6"/>
+  </g>
+</svg>

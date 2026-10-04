@@ -1,0 +1,25 @@
+# Only geo_draw/, api/, web/, requirements.txt (and tests/, for the CI test stage) are used.
+.git
+.venv*
+venv
+**/__pycache__
+**/*.py[cod]
+.env
+.env.*
+generated
+media
+media_cache
+.manim_cache
+web/node_modules
+web/dist
+streamlit_app
+.streamlit
+.claude
+.cursor
+*.log
+.DS_Store
+backups
+scripts
+deploy.sh
+Jenkinsfile
+docker-compose*.yml

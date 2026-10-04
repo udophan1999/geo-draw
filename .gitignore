@@ -12,4 +12,7 @@ generated/
 *.log
 .DS_Store
 Thumbs.db
-.streamlit/
+.streamlit/secrets.toml
+
+.claude/settings.json
+backups/
