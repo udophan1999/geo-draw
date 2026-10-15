@@ -55,34 +55,42 @@ Kế hoạch chi tiết nằm ở [mobile-ios-plan.md](mobile-ios-plan.md); các
 ## Giai đoạn 2: Nền tảng (§2, §4, §5)
 
 ### Project
-- [ ] Tạo `mobile/ios/MathMate.xcodeproj`: iOS 17+, Swift 6, SwiftUI lifecycle, bundle id
-- [ ] Thêm SwiftPM: SwiftMath, swift-markdown, swift-snapshot-testing
-- [ ] `Localizable.xcstrings` (vi), `PrivacyInfo.xcprivacy`, icon app, màn hình khởi động
-- [ ] Cấu hình build Debug/Release với `API_BASE_URL` (máy local / production)
-- [ ] Cập nhật `.gitignore` cho Xcode (`xcuserdata`, `DerivedData`)
+- [x] Tạo `mobile/ios/MathMate.xcodeproj`: iOS 17+, Swift 6, SwiftUI lifecycle, bundle id
+- [x] Thêm SwiftPM: SwiftMath (fork)
+- [ ] Thêm swift-markdown, swift-snapshot-testing (khi cần ở giai đoạn 3/8)
+- [x] Icon app (từ `web/public/logo.svg`), màu chủ đạo, màn hình khởi động
+- [ ] `Localizable.xcstrings` (vi), `PrivacyInfo.xcprivacy`
+- [x] Cấu hình build Debug/Release với `API_BASE_URL` (máy local / production)
+- [x] Cập nhật `.gitignore` cho Xcode (`xcuserdata`, `DerivedData`)
 
 ### Design system
-- [ ] `mmGlass(in:interactive:)`, `MMGlassContainer`, `mmGlassID`, mỗi cái có phương án dự phòng cho iOS 17
-- [ ] Màu (theo `index.css` của web), cỡ chữ, `Brand` ("MathMate"), haptics
+- [x] `mmGlass(in:interactive:)`, `MMGlassContainer`, `mmGlassID`, mỗi cái có phương án dự phòng cho iOS 17
+- [x] Màu (theo `index.css` của web), `Brand` ("MathMate"), haptics
 - [ ] Preview mỗi component ở 4 tổ hợp: iOS 26 / 17 × sáng / tối
 
 ### Core
-- [ ] `Models.swift`: Codable cho `Me`, `Conversation`, `Message`, `Settings`, `Example`, `Progress`, `APIError` (`detail` + `suggestions`)
-- [ ] `APIClient`: async/await, tự gắn `X-Client`, `Authorization`, `X-Guest-Id`; lưu `X-Guest-Id` mới
-- [ ] `Keychain`: token và guest id (giữ lại sau khi cài lại app)
-- [ ] `SSEParser` + `JobFollower` (`AsyncStream<JobEvent>`), có unit test
+- [x] `Models.swift`: Codable cho `Me`, `Conversation`, `Message`, `Settings`, `Example`, `Progress`, `APIError` (`detail` + `suggestions`)
+- [x] `APIClient`: async/await, tự gắn `X-Client`, `Authorization`, `X-Guest-Id`; lưu `X-Guest-Id` mới
+- [x] `Keychain`: token và guest id (giữ lại sau khi cài lại app)
+- [x] `SSEParser`, có unit test
+- [ ] `JobFollower` (`AsyncStream<JobEvent>`, kết nối lại) — giai đoạn 3
 - [ ] `ImageLoader` có header auth và cache theo `?v=`
 
+### Kiểm thử giai đoạn 2
+- [x] 13 unit test (Swift Testing, `URLProtocol` giả): header, guest id, token, lỗi tiếng Việt, `SessionStore`, `SSEParser`
+- [x] 5 UI test với `web/e2e/server.py` (API thật, AI giả): dùng thử, sai mật khẩu, đăng ký, tên trùng + gợi ý, xóa tài khoản; qua trên iOS 17.2 và 26.5
+
 ### Màn hình
-- [ ] `SessionStore` (`@Observable`): `me`, `quota`, trạng thái đăng nhập / khách
-- [ ] Đăng nhập: lỗi 401, khóa 429, tài khoản bị khóa 403
-- [ ] Đăng ký: gợi ý tên khi trùng (409), chạm gợi ý thì điền vào ô
-- [ ] "Dùng thử không cần tài khoản" + nhắc "Đăng nhập để lưu lại lịch sử hỏi đáp"
-- [ ] Danh sách cuộc trò chuyện: kéo để làm mới, đổi tên, xóa (vuốt + xác nhận), cuộc mới
-- [ ] Bài mẫu khi chat trống (`/api/examples`)
-- [ ] Cài đặt: mode/model/quality/animate, quy ước vẽ (`/api/help`), đăng xuất (gọi `DELETE /api/devices` trước)
-- [ ] Xóa tài khoản trong Cài đặt (hỏi mật khẩu, xác nhận hai bước)
-- [ ] Màn "Cập nhật MathMate" khi build cũ hơn `min_ios_build`
+- [x] `SessionStore` (`@Observable`): `me`, `quota`, trạng thái đăng nhập / khách
+- [x] Đăng nhập: lỗi 401, khóa 429, tài khoản bị khóa 403
+- [x] Đăng ký: gợi ý tên khi trùng (409), chạm gợi ý thì điền vào ô
+- [x] "Dùng thử không cần tài khoản" + nhắc "Đăng nhập để lưu lại lịch sử hỏi đáp"
+- [x] Danh sách cuộc trò chuyện: kéo để làm mới, đổi tên, xóa (vuốt + xác nhận), cuộc mới
+- [x] Bài mẫu khi chat trống (`/api/examples`)
+- [x] Cài đặt: mode/model/quality/animate, quy ước vẽ (`/api/help`), đăng xuất
+- [ ] Đăng xuất gọi `DELETE /api/devices` trước (khi có push, giai đoạn 7)
+- [x] Xóa tài khoản trong Cài đặt (hỏi mật khẩu, xác nhận hai bước)
+- [x] Màn "Cập nhật MathMate" khi build cũ hơn `min_ios_build`
 
 ---
 
