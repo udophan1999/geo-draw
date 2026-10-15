@@ -48,7 +48,7 @@ def rerender(message_id: str, body: ManualEdits, owner: Owner = Depends(get_owne
                           quality=settings.quality, animate=settings.animate,
                           label_offsets=body.label_offsets, manual_edits=edits)
     if not (result.ok and result.image_path):
-        raise HTTPException(422, "Không thể cập nhật hình: " + render_error_summary(result.log))
+        raise HTTPException(422, "Không thể cập nhật hình. " + render_error_summary(result.log))
     save_edits(message.scene_path, body.label_offsets, edits)
     owner.store.update_drawing(message.id, result.image_path, result.video_path)
     return message_json(owner.store.get_message(message.id))

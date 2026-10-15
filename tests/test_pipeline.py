@@ -43,7 +43,7 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(outcome.ok, outcome.log[-500:])
         self.assertTrue(outcome.image_path.is_file())
         self.assertEqual(outcome.scene_path, self.folder / "scene.py")
-        self.assertTrue(outcome.message.startswith("Đã vẽ xong · Parser"))
+        self.assertEqual(outcome.message, "Đã vẽ xong · tam giác · điểm A, B, C")
         self.assertEqual(stages, [RENDERING])
 
     def test_ai_needs_a_key(self):
@@ -68,11 +68,32 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("GEOMETRY_LAYOUT_CROWDED", generate.call_args_list[1].kwargs["repair_log"])
         self.assertEqual(outcome.message, "Đã vẽ xong · MathMate AI")
 
-    def test_failed_render_is_summarised(self):
+    def test_failed_render_is_summarised_for_students(self):
         self.assertEqual(render_error_summary("x\nValueError: GEOMETRY_LAYOUT_CROWDED"),
-                         "Các điểm và đối tượng phụ đang quá sát nhau; cần đổi tỷ lệ hình.")
-        self.assertEqual(render_error_summary("a\nTypeError: bad\nexit"), "TypeError: bad")
-        self.assertEqual(render_error_summary(""), "Không có thông tin lỗi từ Manim.")
+                         "Các điểm trong hình đang quá sát nhau.")
+        # Raw Python errors stay in the log; the student gets a plain sentence.
+        for log in ("a\nTypeError: bad\nexit", ""):
+            summary = render_error_summary(log)
+            self.assertNotIn("Error", summary)
+            self.assertIn("vẽ lại", summary)
+
+    def test_failed_ai_drawing_hides_the_validator_message(self):
+        failed = AiResult(code="", raw="", ok=False, error="Câu cho học sinh.",
+                          detail="Point E needs safe_point_label")
+        with patch("geo_draw.pipeline.generate_manim_code", return_value=failed):
+            outcome = draw("Cho tam giác ABC.", self.folder, ai=AiSettings(api_key="k"))
+        self.assertFalse(outcome.ok)
+        self.assertEqual(outcome.message, "Câu cho học sinh.")
+        self.assertIn("safe_point_label", outcome.log)
+
+    def test_failed_render_message_names_the_app_not_the_engine(self):
+        image_less = RenderResult(None, None, "Traceback\nValueError: boom", False)
+        with patch("geo_draw.pipeline.render_scene", return_value=image_less):
+            outcome = draw("Cho tam giác ABC vuông tại A, AB = 3, AC = 4.", self.folder, ai=None)
+        self.assertFalse(outcome.ok)
+        self.assertTrue(outcome.message.startswith("MathMate chưa vẽ được hình."))
+        self.assertNotIn("Manim", outcome.message)
+        self.assertNotIn("ValueError", outcome.message)
 
 
 class SceneInfoTests(unittest.TestCase):

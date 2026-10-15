@@ -40,7 +40,7 @@ def create_app(data_dir: Path | None = None, web_dist: Path | None = ROOT / "web
         yield
         state.close()
 
-    app = FastAPI(title="geo-draw API", version="1.0", lifespan=lifespan)
+    app = FastAPI(title="geo-draw API", version="1.1.0", lifespan=lifespan)
     app.state.geo = state
 
     @app.middleware("http")

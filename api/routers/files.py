@@ -32,7 +32,7 @@ def video(message_id: str, owner: Owner = Depends(get_owner)) -> FileResponse:
 def scene(message_id: str, owner: Owner = Depends(get_owner)) -> str:
     path = owned_message(owner, message_id).scene_path
     if path is None or not path.is_file():
-        raise HTTPException(404, "Tin nhắn này không có mã Manim.")
+        raise HTTPException(404, "Tin nhắn này không có mã hình vẽ.")
     return path.read_text(encoding="utf-8")
 
 

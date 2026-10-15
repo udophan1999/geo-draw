@@ -25,6 +25,8 @@ GRAPH = "graph"
 NOT_DRAWABLE = ("Bài này không có hình hay đồ thị để vẽ. Khung hình dùng cho bài hình học và "
                 "bài hàm số, đồ thị, tích phân.")
 GRAPH_NEEDS_AI = f"Vẽ đồ thị cần chế độ {APP_NAME} AI (Cài đặt → Cách vẽ hình)."
+GRAPH_INCOMPLETE = (f"{APP_NAME} chưa vẽ được đồ thị cho đề này. Hãy thử ghi rõ hàm số "
+                    "và đoạn cần vẽ.")
 
 _GRAPH_WORDS = [
     "ham so", "do thi", "tich phan", "nguyen ham", "parabol", "dao ham", "cuc tri", "tiem can",
@@ -163,7 +165,8 @@ def generate_graph_code(problem: str, settings: AiSettings, animate: bool, *,
             return AiResult(code=code, raw=raw, ok=True)
         except ValueError as error:
             if attempt == 3:
-                return AiResult(code="", raw=first_raw, ok=False, error=str(error))
+                return AiResult(code="", raw=first_raw, ok=False, error=GRAPH_INCOMPLETE,
+                                detail=str(error))
             messages += [
                 {"role": "assistant", "content": raw[-12000:]},
                 {"role": "user", "content": f"Your module failed validation: {error}. Return the "
@@ -173,4 +176,4 @@ def generate_graph_code(problem: str, settings: AiSettings, animate: bool, *,
                 raw = _request_chat(settings, messages)
             except ValueError as exc:
                 return AiResult(code="", raw=first_raw, ok=False, error=str(exc))
-    return AiResult(code="", raw=first_raw, ok=False, error="Không tạo được đồ thị.")
+    return AiResult(code="", raw=first_raw, ok=False, error=GRAPH_INCOMPLETE)

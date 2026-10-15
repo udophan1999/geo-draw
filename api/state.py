@@ -65,6 +65,8 @@ class AppState:
         self.jobs = JobManager(self.workers)
         # conversation id -> marker of the figure job drawing it right now
         self.figure_jobs: dict[str, str] = {}
+        # conversations whose tutor is answering right now (their last message cannot be edited)
+        self.tutor_jobs: set[str] = set()
         self._history = HistoryStore(self.users_dir)
         self._history_imported: set[str] = set()
 

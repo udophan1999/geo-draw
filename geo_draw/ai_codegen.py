@@ -13,6 +13,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from .branding import APP_NAME
 from .geometry_knowledge import DRAWING_ERROR_MEMORY, MIDDLE_SCHOOL_GEOMETRY_RULES
 
 
@@ -231,7 +232,8 @@ class AiResult:
     code: str
     raw: str
     ok: bool
-    error: str = ""
+    error: str = ""  # shown to the student (Vietnamese, no technical terms)
+    detail: str = ""  # the technical cause, for the drawing log only
 
 
 def load_dotenv(path: Path) -> None:
@@ -1796,6 +1798,10 @@ def extract_problem_from_image(
     return text
 
 
+DRAWING_INCOMPLETE = (f"{APP_NAME} chưa dựng được hình khớp với mọi dữ kiện của đề. Hãy thử yêu cầu "
+                      "vẽ lại, hoặc ghi rõ hơn vị trí các điểm.")
+
+
 def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
@@ -1842,7 +1848,9 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
             return AiResult(code=code, raw=raw, ok=True)
         except ValueError as validation_error:
             if repair_attempt == 3:
-                return AiResult(code="", raw=first_raw, ok=False, error=str(validation_error))
+                # The validator's messages are written for the model, not for students.
+                return AiResult(code="", raw=first_raw, ok=False, error=DRAWING_INCOMPLETE,
+                                detail=str(validation_error))
             messages.extend([
                 {"role": "assistant", "content": raw[-12000:]},
                 {
@@ -1866,4 +1874,4 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                 raw = _request_chat(settings, messages)
             except ValueError as exc:
                 return AiResult(code="", raw=first_raw, ok=False, error=str(exc))
-    return AiResult(code="", raw=first_raw, ok=False, error="Không tạo được hình nguyên vẹn.")
+    return AiResult(code="", raw=first_raw, ok=False, error=DRAWING_INCOMPLETE)

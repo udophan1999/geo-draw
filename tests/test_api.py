@@ -287,6 +287,112 @@ class ChatTests(ApiTestCase):
         self.assertIn("Máy chủ gặp lỗi", events[0][1]["detail"])
 
 
+class MessageEditTests(ApiTestCase):
+    ai = AiSettings(api_key="test-key")
+    limit_guest, limit_user = 50, 50
+
+    def edit(self, client: TestClient, message_id: str, text: str):
+        return client.patch(f"/api/messages/{message_id}", json={"text": text})
+
+    def chat(self, client: TestClient, conversation_id: str) -> list[dict]:
+        detail = client.get(f"/api/conversations/{conversation_id}").json()
+        return [m for m in detail["messages"] if m["channel"] == CHAT]
+
+    def start(self, client: TestClient) -> str:
+        started = self.send(client, EQUATION).json()
+        read_events(client, started["job_id"])
+        return started["conversation"]["id"]
+
+    def test_editing_the_last_message_answers_it_again(self):
+        client = self.client()
+        self.register(client)
+        conversation_id = self.start(client)
+        # The tutor's answer to "x = 2" raises the hint level; the edit must undo that.
+        self.tutor_stream.side_effect = lambda *a, **k: iter(["Đúng rồi! [[bac:4]]"])
+        read_events(client, self.send(client, "x = 2", conversation_id).json()["job_id"])
+        detail = client.get(f"/api/conversations/{conversation_id}").json()
+        self.assertEqual(detail["conversation"]["hint_level"], 4)
+        last = self.chat(client, conversation_id)[-2]
+        old_reply = self.chat(client, conversation_id)[-1]
+
+        self.tutor_stream.side_effect = lambda *a, **k: iter(["Em xem lại nhé."])
+        started = self.edit(client, last["id"], "x = 3")
+        self.assertEqual(started.status_code, 202)
+        events = read_events(client, started.json()["job_id"])
+        self.assertEqual([kind for kind, _ in events],
+                         ["message", "progress", "delta", "message", "conversation", "done"])
+        self.assertEqual((events[0][1]["id"], events[0][1]["text"]), (last["id"], "x = 3"))
+        self.assertTrue(events[0][1]["meta"]["edited"])
+
+        chat = self.chat(client, conversation_id)
+        self.assertEqual([m["text"] for m in chat[-2:]], ["x = 3", "Em xem lại nhé."])
+        self.assertEqual(len(chat), 4)  # the problem, its reply, the edited answer, the new reply
+        self.assertNotIn(old_reply["id"], [m["id"] for m in chat])
+        self.assertEqual(client.get(f"/api/conversations/{conversation_id}").json()
+                         ["conversation"]["hint_level"], 1)
+        # The model saw the edited text, not the old one.
+        sent = self.tutor_stream.call_args.args[1]
+        self.assertEqual(sent[-1], {"role": "user", "content": "x = 3"})
+        self.assertNotIn("x = 2", json.dumps(sent, ensure_ascii=False))
+        self.assertEqual(client.get("/api/auth/me").json()["quota"]["used"], 3)
+
+    def test_only_the_last_message_of_the_student_can_be_edited(self):
+        client = self.client()
+        self.register(client)
+        conversation_id = self.start(client)
+        read_events(client, self.send(client, "x = 2", conversation_id).json()["job_id"])
+        problem, reply = self.chat(client, conversation_id)[:2]
+        for message in (problem, reply):
+            response = self.edit(client, message["id"], "khác")
+            self.assertEqual(response.status_code, 409)
+            self.assertIn("gần nhất", response.json()["detail"])
+        last = self.chat(client, conversation_id)[-2]
+        self.assertEqual(self.edit(client, last["id"], "   ").status_code, 422)
+        # Someone else's message does not exist for this caller.
+        stranger = self.client()
+        self.register(stranger, "khach2")
+        self.assertEqual(self.edit(stranger, last["id"], "x = 9").status_code, 404)
+        self.assertEqual(client.get("/api/auth/me").json()["quota"]["used"], 2)
+
+    def test_no_edit_while_the_tutor_is_answering(self):
+        client = self.client()
+        self.register(client)
+        conversation_id = self.start(client)
+        problem = self.chat(client, conversation_id)[0]
+        self.state.tutor_jobs.add(conversation_id)
+        response = self.edit(client, problem["id"], "Giải phương trình x + 1 = 0")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("đang trả lời", response.json()["detail"])
+
+    def test_editing_the_first_message_changes_the_problem(self):
+        client = self.client()
+        self.register(client)
+        conversation_id = self.start(client)
+        problem = self.chat(client, conversation_id)[0]
+        self.title_request.return_value = "Phương trình bậc nhất"
+        events = read_events(client, self.edit(client, problem["id"], "Giải phương trình 2x = 6").json()["job_id"])
+        conversation = [data for kind, data in events if kind == "conversation"][-1]
+        self.assertEqual(conversation["problem"], "Giải phương trình 2x = 6")
+        self.assertEqual(conversation["title"], "Phương trình bậc nhất")
+        sent = self.tutor_stream.call_args.args[1]
+        self.assertIn("Giải phương trình 2x = 6", sent[-1]["content"])
+
+    def test_editing_a_geometry_problem_draws_it_again(self):
+        client = self.client()
+        self.register(client)
+        self.use_parser(client)
+        started = self.send(client, TRIANGLE).json()
+        events = read_events(client, started["job_id"])
+        read_events(client, next(d["job_id"] for k, d in events if k == "figure_job"))
+        problem = self.chat(client, started["conversation"]["id"])[0]
+        events = read_events(client, self.edit(client, problem["id"],
+                                               "Cho tam giác ABC vuông tại A, AB = 5, AC = 12.").json()["job_id"])
+        figure_jobs = [d["job_id"] for k, d in events if k == "figure_job"]
+        self.assertEqual(len(figure_jobs), 1)
+        drawing = [d for k, d in read_events(client, figure_jobs[0]) if k == "message"][-1]
+        self.assertTrue(drawing["has_drawing"])
+
+
 class NoServerKeyTests(ApiTestCase):
     def test_the_tutor_needs_the_server_key_but_parser_drawing_does_not(self):
         client = self.client()

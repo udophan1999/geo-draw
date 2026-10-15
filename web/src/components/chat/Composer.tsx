@@ -1,12 +1,13 @@
+import { EditorContent } from '@tiptap/react'
 import { ArrowUp, ImagePlus, Loader2, Omega, Sigma, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { FormulaDialog, SymbolBar } from '@/components/chat/MathInput'
-import { MathMarkdown } from '@/components/MathMarkdown'
+import { SymbolBar } from '@/components/chat/MathInput'
+import { useMathEditor } from '@/components/chat/useMathEditor'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { IMAGE_TYPES, acceptImage } from '@/lib/images'
-import { latexToPlain } from '@/lib/plainMath'
+import { toMessageText } from '@/lib/messageText'
 
 type Props = {
   image: File | null
@@ -21,55 +22,35 @@ type Props = {
 }
 
 export function Composer({ image, onImage, onSend, busy, placeholder, header, actions }: Props) {
-  const [text, setText] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const textarea = useRef<HTMLTextAreaElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const [showSymbols, setShowSymbols] = useState(false)
-  const [formulaOpen, setFormulaOpen] = useState(false)
+  const { editor, empty, insertText, openFormula, formulaDialog } = useMathEditor({
+    label: 'Tin nhắn',
+    placeholder,
+    className: 'block max-h-[200px] min-h-[2.25rem] w-full overflow-y-auto px-4 pt-3 pb-1 text-sm outline-none',
+    onSubmit: () => void submit(),
+    onImage,
+  })
 
-  /** Put ``snippet`` at the caret (replacing any selection) and keep typing after it. */
-  const insert = (snippet: string, spaced = false) => {
-    const el = textarea.current
-    const start = el?.selectionStart ?? text.length
-    const end = el?.selectionEnd ?? text.length
-    if (spaced) {
-      // A formula is a word of its own: keep it apart from the text around it.
-      if (start > 0 && !/\s/.test(text[start - 1])) snippet = ' ' + snippet
-      if (!/^\s/.test(text.slice(end))) snippet += ' '
-    }
-    setText(text.slice(0, start) + snippet + text.slice(end))
-    requestAnimationFrame(() => {
-      el?.focus()
-      el?.setSelectionRange(start + snippet.length, start + snippet.length)
-    })
-  }
   const preview = useMemo(() => (image ? URL.createObjectURL(image) : null), [image])
   useEffect(() => () => {
     if (preview) URL.revokeObjectURL(preview)
   }, [preview])
 
-  // Grow with the text, up to a limit.
-  useEffect(() => {
-    const el = textarea.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
-  }, [text])
-
   const disabled = busy || submitting
-  const canSend = !disabled && (text.trim().length > 0 || image !== null)
+  const canSend = !disabled && (!empty || image !== null)
 
   const submit = async () => {
-    if (!canSend) return
+    if (!canSend || !editor) return
     setSubmitting(true)
-    const ok = await onSend(text.trim(), image)
+    const ok = await onSend(toMessageText(editor.state.doc).trim(), image)
     setSubmitting(false)
     if (ok) {
-      setText('')
+      editor.commands.clearContent(true)
       onImage(null)
     }
-    textarea.current?.focus()
+    editor.commands.focus()
   }
 
   return (
@@ -91,36 +72,8 @@ export function Composer({ image, onImage, onSend, busy, placeholder, header, ac
             </div>
           </div>
         )}
-        {showSymbols && <SymbolBar onInsert={insert} />}
-        {/\$|\\\(|\\\[/.test(text) && (
-          // The textarea shows LaTeX source; show how the message will look.
-          <div className="mx-3 mt-2 rounded-lg bg-muted/60 px-3 py-1.5" aria-label="Xem trước">
-            <span className="text-[11px] font-medium text-muted-foreground">Xem trước</span>
-            <MathMarkdown className="text-sm leading-relaxed">{text.replace(/\n/g, '  \n')}</MathMarkdown>
-          </div>
-        )}
-        <textarea
-          ref={textarea}
-          rows={1}
-          value={text}
-          placeholder={placeholder}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            // Vietnamese IMEs compose with Enter too; only send outside composition.
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault()
-              void submit()
-            }
-          }}
-          onPaste={(event) => {
-            const file = Array.from(event.clipboardData.files).find((f) => f.type.startsWith('image/'))
-            if (file) {
-              event.preventDefault()
-              onImage(acceptImage(file))
-            }
-          }}
-          className="block max-h-[200px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-sm outline-none placeholder:text-muted-foreground"
-        />
+        {showSymbols && <SymbolBar onInsert={insertText} />}
+        <EditorContent editor={editor} />
         <div className="flex items-center justify-between px-2 pb-2">
           <div className="flex items-center gap-0.5">
             <Tooltip>
@@ -142,11 +95,11 @@ export function Composer({ image, onImage, onSend, busy, placeholder, header, ac
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Nhập công thức" onClick={() => setFormulaOpen(true)}>
+                <Button variant="ghost" size="icon" aria-label="Nhập công thức" onClick={openFormula}>
                   <Sigma />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Nhập công thức (phân số, căn, số mũ…)</TooltipContent>
+              <TooltipContent>Nhập công thức (phân số, căn, số mũ…), hoặc gõ $x^2$</TooltipContent>
             </Tooltip>
           </div>
           <input
@@ -168,9 +121,9 @@ export function Composer({ image, onImage, onSend, busy, placeholder, header, ac
         </div>
       </div>
       <p className="mt-1.5 hidden text-center text-[11px] text-muted-foreground/70 sm:block">
-        Enter để gửi · Shift+Enter để xuống dòng
+        Enter để gửi · Shift+Enter để xuống dòng · gõ $x^2$ để viết công thức
       </p>
-      <FormulaDialog open={formulaOpen} onOpenChange={setFormulaOpen} onInsert={(latex) => insert(latexToPlain(latex) ?? `$${latex}$`, true)} />
+      {formulaDialog}
     </div>
   )
 }
