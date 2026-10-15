@@ -149,3 +149,30 @@
 .prose-chat ul { margin: 0.25rem 0 0.25rem 1.25rem; list-style: disc; }
 .prose-chat ol { margin: 0.25rem 0 0.25rem 1.25rem; list-style: decimal; }
 .prose-chat blockquote { border-left: 3px solid var(--border); padding-left: 0.75rem; color: var(--muted-foreground); }
+
+/* Message box (Tiptap): placeholder and inline formula chips, as in Notion. */
+.composer-editor p { margin: 0; }
+.composer-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+.composer-editor .tiptap-mathematics-render {
+  border-radius: 0.25rem;
+  padding: 0 0.125rem;
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+.composer-editor .tiptap-mathematics-render:hover,
+.composer-editor .tiptap-mathematics-render.ProseMirror-selectednode {
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+}
+.composer-editor .inline-math-error { color: var(--destructive); font-family: var(--font-mono, monospace); }
+
+/* MathLive turns its field (and so its keyboard and menu buttons) deaf to taps on touch
+   screens while the field is not focused, through :host(:not(:focus)). Safari's engine
+   sometimes matches that while the field has the focus, so the keyboard button needed a
+   second tap. A tap anywhere in the field focuses it anyway. */
+math-field::part(container) { pointer-events: auto; }

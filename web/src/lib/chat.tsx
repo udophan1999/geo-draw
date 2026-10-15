@@ -24,6 +24,8 @@ type ChatContextValue = {
   figures: Record<string, PendingFigure>
   /** Resolves true once the server accepted the message (the job then runs on). */
   send: (input: { text: string; image?: File | null; conversationId?: string; action?: TutorAction }) => Promise<boolean>
+  /** Edit the student's last message; the tutor's reply to it is written again. */
+  edit: (conversationId: string, messageId: string, text: string) => Promise<boolean>
   drawFigure: (conversationId: string, text?: string) => Promise<boolean>
   sending: boolean
 }
@@ -85,6 +87,46 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [client, refresh, updateFigure],
   )
 
+  /** Follow a tutor job: the user message, then the reply streaming in, then the saved reply. */
+  const followTurn = useCallback(
+    (id: string, jobId: string, preview: string | null) => {
+      let reply = ''
+      const finish = () => {
+        updateTurn(id, null)
+        if (preview) URL.revokeObjectURL(preview)
+        refresh(id)
+      }
+      stops.current.push(
+        followJob(jobId, {
+          onMessage: (message) => {
+            upsertMessage(client, message)
+            if (message.role === 'user') updateTurn(id, { userSaved: true })
+            else updateTurn(id, { reply: '', label: '' }) // the saved reply replaces the stream
+          },
+          onDelta: (piece) => {
+            reply += piece
+            updateTurn(id, { reply })
+          },
+          onProgress: ({ label }) => updateTurn(id, { label }),
+          onConversation: (conversation) => {
+            client.setQueryData<ConversationDetail>(keys.conversation(id), (old) =>
+              old ? { ...old, conversation } : old,
+            )
+            client.invalidateQueries({ queryKey: keys.conversations })
+          },
+          onFigureJob: (figureJobId) => followFigure(id, figureJobId),
+          onFigureSkipped: (detail) => toast.info(`Chưa vẽ hình: ${detail}`),
+          onDone: finish,
+          onFailed: (detail) => {
+            toast.error(detail)
+            finish()
+          },
+        }),
+      )
+    },
+    [client, followFigure, refresh, updateTurn],
+  )
+
   const send = useCallback<ChatContextValue['send']>(
     async ({ text, image, conversationId, action }) => {
       setSending(true)
@@ -105,42 +147,35 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         client.invalidateQueries({ queryKey: keys.conversations })
         navigate(`/c/${id}`)
       }
-      let reply = ''
-      const finish = () => {
-        updateTurn(id, null)
-        if (preview) URL.revokeObjectURL(preview)
-        refresh(id)
-      }
-      stops.current.push(
-        followJob(started.job_id, {
-          onMessage: (message) => {
-            upsertMessage(client, message)
-            if (message.role === 'user') updateTurn(id, { userSaved: true })
-            else updateTurn(id, { reply: '', label: '' }) // the saved reply replaces the stream
-          },
-          onDelta: (piece) => {
-            reply += piece
-            updateTurn(id, { reply })
-          },
-          onProgress: ({ label }) => updateTurn(id, { label }),
-          onConversation: (conversation) => {
-            client.setQueryData<ConversationDetail>(keys.conversation(id), (old) =>
-              old ? { ...old, conversation } : old,
-            )
-            client.invalidateQueries({ queryKey: keys.conversations })
-          },
-          onFigureJob: (jobId) => followFigure(id, jobId),
-          onFigureSkipped: (detail) => toast.info(`Chưa vẽ hình: ${detail}`),
-          onDone: finish,
-          onFailed: (detail) => {
-            toast.error(detail)
-            finish()
-          },
-        }),
-      )
+      followTurn(id, started.job_id, preview)
       return true
     },
-    [client, followFigure, navigate, refresh, updateTurn],
+    [client, followTurn, navigate, updateTurn],
+  )
+
+  const edit = useCallback<ChatContextValue['edit']>(
+    async (conversationId, messageId, text) => {
+      let started
+      try {
+        started = await api.editMessage(messageId, text)
+      } catch (error) {
+        toast.error(error instanceof ApiError ? error.message : 'Không sửa được tin nhắn.')
+        return false
+      }
+      // Show the edited text and drop the old reply at once; the job sends the saved versions.
+      client.setQueryData<ConversationDetail>(keys.conversation(conversationId), (old) => {
+        if (!old) return old
+        const index = old.messages.findIndex((m) => m.id === messageId)
+        if (index < 0) return old
+        const messages = old.messages.filter((m, i) => i <= index || m.channel !== 'chat')
+        messages[index] = { ...messages[index], text }
+        return { ...old, messages }
+      })
+      updateTurn(conversationId, { text, imagePreview: null, label: 'Đang gửi...', userSaved: true, reply: '' })
+      followTurn(conversationId, started.job_id, null)
+      return true
+    },
+    [client, followTurn, updateTurn],
   )
 
   const drawFigure = useCallback<ChatContextValue['drawFigure']>(
@@ -158,7 +193,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <ChatContext.Provider value={{ pending, figures, send, drawFigure, sending }}>{children}</ChatContext.Provider>
+    <ChatContext.Provider value={{ pending, figures, send, edit, drawFigure, sending }}>{children}</ChatContext.Provider>
   )
 }
 

@@ -188,6 +188,12 @@ export const api = {
       body: form,
     })
   },
+  /** Edit the student's last message; the tutor answers it again (one AI turn). */
+  editMessage: (messageId: string, text: string) =>
+    request<{ conversation: Conversation; job_id: string }>(`/messages/${messageId}`, {
+      method: 'PATCH',
+      body: json({ text }),
+    }),
   /** Draw the figure (empty text) or refine it with a request. */
   drawFigure: (conversationId: string, text = '') =>
     request<{ job_id: string }>(`/conversations/${conversationId}/figure`, {

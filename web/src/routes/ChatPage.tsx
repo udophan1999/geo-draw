@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 export function ChatPage() {
   const { conversationId } = useParams()
   const conversation = useConversation(conversationId)
-  const { pending, figures, send, drawFigure } = useChat()
+  const { pending, figures, send, edit, drawFigure } = useChat()
   const turn = conversationId ? pending[conversationId] : undefined
   const figureTurn = conversationId ? figures[conversationId] : undefined
   const detail = conversation.data
@@ -105,6 +105,9 @@ export function ChatPage() {
               legacyProblem={legacyProblem}
               loading={Boolean(conversationId) && conversation.isPending}
               onExample={(example) => void sendMessage(example.problem, null)}
+              onEdit={conversationId && !busy
+                ? (messageId, text) => edit(conversationId, messageId, text)
+                : undefined}
             />
           </div>
           <Composer
