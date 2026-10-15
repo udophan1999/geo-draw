@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Phase 1 UI spike. `-screen inline|composer|sse` opens one screen (for simctl screenshots);
+/// Phase 1 UI spike. `-screen inline|composer|cursor|sse` opens one screen (for simctl screenshots);
 /// `-api http://127.0.0.1:8796` points the SSE screen at a server (web/e2e/server.py).
 @main
 struct UISpikeApp: App {
@@ -19,10 +19,12 @@ struct RootView: View {
         case "inline": InlineScreen()
         case "composer": ComposerScreen()
         case "sse": StreamingScreen(base: api, prompt: prompt)
+        case "cursor": CursorScreen()
         default:
             TabView {
                 InlineScreen().tabItem { Label("Công thức", systemImage: "function") }
                 ComposerScreen().tabItem { Label("Soạn tin", systemImage: "square.and.pencil") }
+                CursorScreen().tabItem { Label("Con trỏ", systemImage: "character.cursor.ibeam") }
                 StreamingScreen(base: api, prompt: prompt)
                     .tabItem { Label("SSE", systemImage: "antenna.radiowaves.left.and.right") }
             }

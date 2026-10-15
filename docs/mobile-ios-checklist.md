@@ -45,10 +45,10 @@ Kế hoạch chi tiết nằm ở [mobile-ios-plan.md](mobile-ios-plan.md); các
 - [x] ⚠️ Fork SwiftMath (`xuanthinhJB/SwiftMath@mathmate`, `8da9a4e`): cung `\overset{\frown}`, `\backsim`; chọn font TeX Gyre Termes (đủ tiếng Việt)
 - [x] Công thức trong dòng chữ: `Text` + `Image` căn baseline, xuống dòng đúng, trên iOS 17.2 và 26.5 (`mobile/ios/Spikes/UISpike`)
 - [x] `UITextView` + `NSTextAttachment`: chèn chip, Backspace trả lại `$latex$`, xuất `toMessageText`; 3 XCUITest qua trên iOS 17 và 26
-- [ ] ⚠️ Con trỏ trong trình soạn công thức: lấy toạ độ atom từ `MTMathListDisplay`; tham khảo kostub/MathEditor
+- [x] ⚠️ Con trỏ trong trình soạn công thức: port `MTDisplay+Editing` của kostub/MathEditor vào fork (`f09276c`), chạm đúng chỗ kể cả lồng nhiều cấp
 - [x] SSE bằng `URLSession.bytes`: đọc đủ `delta` với API thật + AI giả
 - [ ] SSE: kết nối lại sau khi app vào nền (làm ở giai đoạn 3, `JobFollower`)
-- [ ] **Kết luận spike**, ghi vào plan: danh sách luật viết lại LaTeX, có cần fork SwiftMath không, ước lượng lại giai đoạn 5
+- [x] **Kết luận spike**: làm tiếp với fork SwiftMath + TeX Gyre Termes; giai đoạn 5 giữ 4–6 tuần (xem [mobile-ios-spike.md](mobile-ios-spike.md))
 
 ---
 

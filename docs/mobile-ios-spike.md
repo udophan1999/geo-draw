@@ -57,16 +57,23 @@ Latin Modern (mặc định) thiếu "đ", nên "đ" được lấy từ font kh
 | Công thức khối | Ảnh trong `ScrollView` ngang; công thức quá dài cuộn được, không làm vỡ bố cục |
 | Liquid Glass | `mmGlass(in:)`: `glassEffect` trên iOS 26, `.ultraThinMaterial` trên iOS 17. Build và chạy được trên cả hai |
 | Ô soạn tin | `UITextView` + `FormulaAttachment`: gõ `$…$` thành chip, Backspace ngay sau đó trả lại `$latex$`, Backspace về sau xóa cả chip, dán `$…$` thành chip, xuất `$latex$` khớp web. 3 XCUITest qua trên cả iOS 17 và 26 (`UITests/ComposerTests.swift`). Quy tắc dùng `NSRegularExpression` (đo UTF-16 như `NSTextStorage`) |
+| Con trỏ trong công thức | Port `MTDisplay+Editing` của kostub/MathEditor (MIT) vào fork: `closestIndex(to:)` và `caretPosition(for:)` cho dòng chữ, phân số, căn, mũ/chỉ số. Chạm vào công thức trên simulator đặt con trỏ đúng chỗ, kể cả lồng nhiều cấp (tử số → căn → trước Δ: `[2, 4:[3, 6:[0]]]`). 6 test trong fork + 1 XCUITest (`UITests/CursorTests.swift`) qua trên iOS 17 và 26 |
 | SSE | `URLSession.bytes` + `SSEParser` tự viết, với `web/e2e/server.py` (API thật, AI giả): lấy guest id qua `X-Guest-Id`, nhận 110 `delta` và các sự kiện `message`/`progress`/`conversation`/`done`, câu trả lời hiển thị dần |
 
-Fork cần thêm hai thay đổi để app tự vẽ công thức: `MTTypesetter.createLineForMathList(_:font:style:)` (`e7af82a`) và `MTDisplay.position`/`textColor` (`61d0237`) thành `public`.
+Fork cần thêm vài thay đổi để app tự vẽ và chỉnh công thức: `MTTypesetter.createLineForMathList(_:font:style:)` (`e7af82a`), `MTDisplay.position`/`textColor` (`61d0237`) thành `public`, và phần chỉnh sửa (`f09276c`). Khác với iosMath, SwiftMath tính bề rộng của chữ có số mũ bao luôn số mũ, nên khi hai khung chồng nhau thì số mũ được ưu tiên, và vị trí con trỏ trên một dòng đo bằng CTLine.
 
 Cần chỉnh khi làm thật:
 - Công thức khối nên căn giữa khi vừa màn hình (hiện căn trái).
 - Cỡ chữ công thức hơi nhỏ hơn chữ thường (Termes có x-height thấp hơn SF): thử nhân khoảng 1,1.
 - `MathSegments` của spike chỉ tách `$`/`$$`; bản thật phải chạy `MathNormalizer` (port `normalizeMath`) trước và qua `shared/fixtures`.
+- `MTDisplay.position` là trạng thái dùng chung: vẽ ở một chỗ rồi hit-test ở chỗ khác sẽ lệch. Bản thật nên giữ display ở gốc 0 và chỉ dịch context khi vẽ.
+
+## Kết luận spike
+
+**Làm tiếp, không đổi hướng.** Bốn rủi ro lớn của giai đoạn 1 đều đã có lời giải chạy được trên iOS 17 và 26: hiển thị công thức (fork SwiftMath + TeX Gyre Termes, 104/104 và 134/134), công thức trong dòng chữ, ô soạn tin có chip, con trỏ trong công thức, và SSE với server thật.
+
+Ước lượng giai đoạn 5 (trình soạn công thức) giữ ở 4–6 tuần: phần hit-test và con trỏ đã có; còn lại là thao tác trên `MTMathList` (chèn, xóa theo cấu trúc, placeholder; tham khảo `MTMathList+Editing` và `MTEditableMathLabel` của MathEditor), bàn phím toán và thư viện mẫu.
 
 ## Còn lại
 
-- [ ] Con trỏ trong trình soạn công thức: port `closestIndexToPoint`/vị trí con trỏ của kostub/MathEditor vào fork (các class hiển thị của SwiftMath là `internal`, nên phần này phải nằm trong fork)
-- [ ] Đo lại với dữ liệu production
+- [ ] Đo lại với dữ liệu production (cần một bản backup)
