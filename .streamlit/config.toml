@@ -1,0 +1,7 @@
+[theme]
+primaryColor = "#2563EB"
+baseRadius = "medium"
+
+[client]
+# Hide the "Deploy" button and developer menu items for end users.
+toolbarMode = "minimal"

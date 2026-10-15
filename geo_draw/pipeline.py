@@ -1,0 +1,142 @@
+"""One drawing turn: problem text → DeepSeek or parser → Manim render (with AI repairs).
+
+UI-independent: progress is reported through ``on_progress(stage, label)`` so the
+Streamlit app, the FastAPI server and later the mobile backend can all show it.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+
+from .ai_codegen import AiSettings, generate_manim_code, missing_reference_figure_points
+from .branding import APP_NAME
+from .engine import build_figure
+from .graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind, generate_graph_code
+from .parser import parse_problem
+from .renderer import render_scene
+from .scene_builder import write_scene
+
+REPAIR_ATTEMPTS = 3
+
+# Progress stages passed to on_progress.
+GENERATING = "generating"
+RENDERING = "rendering"
+REPAIRING = "repairing"
+
+ProgressCallback = Callable[[str, str], None]
+
+
+@dataclass
+class DrawingOutcome:
+    ok: bool
+    message: str
+    scene_path: Path | None = None
+    image_path: Path | None = None
+    video_path: Path | None = None
+    log: str = ""
+
+
+# Figure names of the parser (geo_draw/parser.py), as shown to students.
+FIGURE_NAMES = {
+    "triangle": "tam giác", "square": "hình vuông", "rectangle": "hình chữ nhật",
+    "rhombus": "hình thoi", "parallelogram": "hình bình hành", "trapezoid": "hình thang",
+    "circle": "đường tròn",
+}
+
+
+def parser_scene(text: str, animate: bool, scene_path: Path) -> tuple[Path, str]:
+    problem = parse_problem(text)
+    figure = build_figure(problem)
+    path = write_scene(figure, scene_path, animate=animate)
+    name = FIGURE_NAMES.get(problem.figure, "hình")
+    summary = f"{name} · điểm {', '.join(sorted(figure.points))}"
+    return path, summary
+
+
+def render_error_summary(log: str) -> str:
+    """Why a drawing failed, in words a student understands. The full log stays in the
+    drawing's log (the "Nhật ký vẽ" tab); raw Python errors are never shown."""
+    known_errors = {
+        "GEOMETRY_INVALID_SEGMENT": "Một đoạn thẳng trong hình chưa được dựng đúng.",
+        "GEOMETRY_PARALLEL_NO_SEGMENT": "Chưa xác định được các đoạn thẳng song song.",
+        "GEOMETRY_LAYOUT_CROWDED": "Các điểm trong hình đang quá sát nhau.",
+    }
+    for code, message in known_errors.items():
+        if code in log:
+            return message
+    return "Hình còn chi tiết chưa dựng được. Hãy thử yêu cầu vẽ lại, hoặc diễn đạt đề rõ hơn."
+
+
+def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l",
+         animate: bool = False, previous_code: str | None = None,
+         on_progress: ProgressCallback | None = None) -> DrawingOutcome:
+    """Draw ``problem`` into ``folder`` (``scene.py`` + ``media/``).
+
+    ``ai=None`` uses the local parser. ``previous_code`` is the scene of the drawing being
+    extended by a chat follow-up; DeepSeek is asked to keep its layout.
+    """
+    report = on_progress or (lambda stage, label: None)
+    kind = drawing_kind(problem)
+    if kind is None:
+        return DrawingOutcome(False, NOT_DRAWABLE)
+    if kind == GRAPH and ai is None:
+        return DrawingOutcome(False, GRAPH_NEEDS_AI)
+    # Functions and integrals get axes and curves; the geometry prompt would invent a triangle.
+    generate = generate_graph_code if kind == GRAPH else generate_manim_code
+    if ai is not None:
+        if not ai.api_key:
+            return DrawingOutcome(False, "Máy chủ chưa cấu hình khóa AI.")
+        missing_points = [] if kind == GRAPH else missing_reference_figure_points(problem)
+        if missing_points:
+            return DrawingOutcome(
+                False,
+                "Đề nhắc đến hình minh họa nhưng chưa nêu vị trí các điểm "
+                + ", ".join(missing_points)
+                + ". Hãy gửi ảnh có đầy đủ hình vẽ hoặc bổ sung các quan hệ "
+                "của những điểm này vào đề.",
+            )
+
+    folder.mkdir(parents=True, exist_ok=True)
+    scene_path = folder / "scene.py"
+    media_dir = folder / "media"
+
+    def render():
+        return render_scene(scene_path, media_dir, quality=quality, animate=animate)
+
+    if ai is not None:
+        report(GENERATING, f"{APP_NAME} đang vẽ đồ thị..." if kind == GRAPH else
+               f"{APP_NAME} đang phân tích đề và vẽ hình...")
+        generated = generate(problem, ai, animate, previous_code=previous_code)
+        if not generated.ok:
+            return DrawingOutcome(False, generated.error, log=generated.detail)
+        scene_path.write_text(generated.code, encoding="utf-8")
+        summary = f"{APP_NAME} AI"
+    else:
+        scene_path, summary = parser_scene(problem, animate, scene_path)
+
+    report(RENDERING, f"{APP_NAME} đang hoàn thiện hình vẽ...")
+    result = render()
+    if not result.ok and ai is not None:
+        for attempt in range(1, REPAIR_ATTEMPTS + 1):
+            report(REPAIRING,
+                   f"Bản vẽ chưa đạt — {APP_NAME} đang tự cân chỉnh lần {attempt}/{REPAIR_ATTEMPTS}...")
+            repair_context = (
+                result.log[-4500:]
+                + "\n\nPrevious module to improve:\n"
+                + scene_path.read_text(encoding="utf-8")[-9000:]
+            )
+            repaired = generate(problem, ai, animate, repair_log=repair_context)
+            if not repaired.ok:
+                break
+            scene_path.write_text(repaired.code, encoding="utf-8")
+            result = render()
+            if result.ok:
+                break
+
+    if result.ok and result.image_path:
+        return DrawingOutcome(True, f"Đã vẽ xong · {summary}", scene_path,
+                              result.image_path, result.video_path, result.log)
+    return DrawingOutcome(False, f"{APP_NAME} chưa vẽ được hình. " + render_error_summary(result.log),
+                          scene_path, None, None, result.log)

@@ -1,0 +1,62 @@
+# MathMate on the shared VPS: the app only, served by the VPS Traefik over HTTPS.
+#
+#   ./deploy.sh                       (by hand on the VPS)  — or the Jenkins pipeline
+#
+# Same shape as the other apps on the box (see Wordime's docker-compose.prod.yml):
+# - Postgres is the EXISTING shared instance. Not managed here: a `postgres:` service would
+#   give this app a second, empty database. Reach it by container name on ${DB_NETWORK}.
+# - No host port: Traefik runs in host-network mode, finds this container over the Docker
+#   socket and dials its IP on the `mathmate-web` bridge (port 8000 inside the container).
+# - Photos and drawings are files in the `mathmate-data` volume; accounts, conversations and
+#   usage are in Postgres. Back up both (scripts/backup.sh).
+
+name: mathmate  # fixed, so names never depend on the checkout or Jenkins workspace folder
+
+services:
+  app:
+    build:
+      context: .
+      target: runtime
+    image: ${IMAGE:-mathmate:latest}
+    restart: unless-stopped
+    env_file:
+      - path: ${ENV_FILE:-.env}
+    environment:
+      GEO_DRAW_DATA_DIR: /data
+      # Always HTTPS here, so the session cookies are sent over HTTPS only.
+      GEO_DRAW_COOKIE_SECURE: "1"
+      # Believe X-Forwarded-For only from Traefik. Host-mode Traefik connects from the
+      # bridge's gateway (a private address); uvicorn then reads the header from the right
+      # and stops at the real client, so the per-IP limits cannot be dodged. Never "*".
+      FORWARDED_ALLOW_IPS: ${TRAEFIK_PROXY_IPS:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16}
+    volumes:
+      - mathmate-data:/data
+    networks:
+      - shared-db
+      - web
+    labels:
+      - "traefik.enable=true"
+      # Which of the two networks Traefik dials (it cannot route to shared-db).
+      - "traefik.docker.network=mathmate-web"
+      # Entrypoint and resolver names match the VPS Traefik static config.
+      - "traefik.http.routers.mathmate.rule=Host(`${APP_DOMAIN:?Đặt APP_DOMAIN trong .env}`)"
+      - "traefik.http.routers.mathmate.entrypoints=websecure"
+      - "traefik.http.routers.mathmate.tls.certresolver=letsencrypt"
+      # The port INSIDE the container. Do not add a buffering middleware to this router:
+      # it would hold the tutor's live answers (SSE) back until the turn ends.
+      - "traefik.http.services.mathmate.loadbalancer.server.port=8000"
+
+networks:
+  # The external network the shared Postgres is on. Find it with:
+  #   docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' <pg-container>
+  shared-db:
+    external: true
+    name: ${DB_NETWORK:?Đặt DB_NETWORK trong .env}
+  # The bridge host-mode Traefik dials; the fixed name keeps the label above matching.
+  web:
+    name: mathmate-web
+    driver: bridge
+
+volumes:
+  mathmate-data:
+    name: mathmate-data  # fixed: a renamed Jenkins job must not start an empty volume
