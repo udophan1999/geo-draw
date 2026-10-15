@@ -63,6 +63,21 @@ class AccountStoreTests(unittest.TestCase):
         self.assertIsNone(self.store.session_user(token))
         self.assertEqual(self.store.display_name(user_id), "An")
 
+    def test_sessions_end_after_a_long_time_unused(self):
+        user_id = self.store.create("An", "pass2468")
+        start = 1_000_000.0
+        day = 24 * 3600
+        with patch("geo_draw.accounts.time.time", return_value=start):
+            used, idle = self.store.start_session(user_id), self.store.start_session(user_id)
+        # Using a session keeps it alive: 80 days, then 80 more, is never 90 unused.
+        for days in (80, 160):
+            with patch("geo_draw.accounts.time.time", return_value=start + days * day):
+                self.assertEqual(self.store.session_user(used), user_id)
+        with patch("geo_draw.accounts.time.time", return_value=start + 160 * day):
+            self.assertIsNone(self.store.session_user(idle))
+        with patch("geo_draw.accounts.time.time", return_value=start + 80 * day):
+            self.assertIsNone(self.store.session_user(idle))  # ended for good, not just hidden
+
 
 if __name__ == "__main__":
     unittest.main()
