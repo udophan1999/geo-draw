@@ -4,6 +4,9 @@ numpy>=1.26.0
 fastapi>=0.115
 uvicorn[standard]>=0.30
 python-multipart>=0.0.9
+# Push notifications to the iOS app (APNs needs HTTP/2 and an ES256-signed token)
+httpx[http2]>=0.27
+cryptography>=42
 # PostgreSQL (used when DATABASE_URL is set; SQLite files otherwise)
 psycopg[binary,pool]>=3.2
 # Legacy Streamlit UI (streamlit_app/), removed once the React app reaches parity

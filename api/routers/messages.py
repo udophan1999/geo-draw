@@ -10,6 +10,9 @@
 - ``GET /api/jobs/{id}/events``: ``progress``, ``delta`` (tutor text as it arrives),
   ``message`` (saved message JSON), ``conversation``, ``figure_job``, then ``done`` or
   ``failed`` (not ``error``, which EventSource reserves for connection problems).
+
+A tutor or figure job that ends while nobody follows its events sends a push notification
+to the owner's phones (``_notify_if_unwatched``).
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from fastapi.responses import StreamingResponse
 
 from geo_draw.ai_codegen import AiSettings
 from geo_draw.chat import run_figure_turn
-from geo_draw.conversations import CHAT, FIGURE, USER, Conversation, Message
+from geo_draw.conversations import ASSISTANT, CHAT, FIGURE, USER, Conversation, Message
 from geo_draw.graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind
 from geo_draw.tutor import (
     ACTIONS, ASK, GENERIC, REPLY_DRAWING, REPLY_NOT_DRAWN, REPLY_SHOWN, SPECIFIC,
@@ -119,7 +122,32 @@ def start_figure_job(state: AppState, owner: Owner, conversation: Conversation,
             if state.figure_jobs.get(conversation.id) == marker:
                 del state.figure_jobs[conversation.id]
 
-    return state.jobs.submit(owner.identity, work)
+    return state.jobs.submit(owner.identity, work,
+                             _notify_if_unwatched(state, owner, conversation, FIGURE))
+
+
+def _notify_if_unwatched(state: AppState, owner: Owner, conversation: Conversation,
+                         channel: str):
+    """``on_finish`` for a job: notify the owner's phones when no event stream saw the end."""
+    def on_finish(job: Job) -> None:
+        if job.watched_at_end or not state.push.enabled:
+            return
+        replies = [data for kind, data in job.events
+                   if kind == "message" and data.get("role") == ASSISTANT
+                   and data.get("channel") == channel]
+        if channel == FIGURE:
+            ok = any(reply["has_drawing"] for reply in replies)
+            title = "Hình vẽ đã xong" if ok else "Chưa vẽ được hình"
+        else:
+            ok = bool(replies) and not replies[-1]["meta"].get("error")
+            title = "MathMate đã trả lời" if ok else "MathMate chưa trả lời được"
+        current = owner.store.get(owner.store_owner, conversation.id)
+        if current is None:  # deleted meanwhile
+            return
+        state.push.notify(owner.identity, title, current.title,
+                          {"conversation_id": conversation.id, "kind": channel},
+                          thread_id=conversation.id)
+    return on_finish
 
 
 def _has_drawing(owner: Owner, conversation: Conversation) -> bool:
@@ -194,7 +222,8 @@ async def send_message(
                            image=image_bytes, image_type=image_type, action=action, ai=ai,
                            figure=figure_state, prompts=state.config.values(), on_event=on_event)
 
-    job = state.jobs.submit(owner.identity, work)
+    job = state.jobs.submit(owner.identity, work,
+                            _notify_if_unwatched(state, owner, conversation, CHAT))
     return {"conversation": conversation_json(conversation), "job_id": job.id}
 
 
@@ -262,7 +291,8 @@ def edit_message(message_id: str, body: MessageEdit, request: Request,
                              ai=ai, figure=_figure_state(state, owner, conversation),
                              prompts=state.config.values(), on_event=on_event)
 
-    job = state.jobs.submit(owner.identity, work)
+    job = state.jobs.submit(owner.identity, work,
+                            _notify_if_unwatched(state, owner, conversation, CHAT))
     return {"conversation": conversation_json(conversation), "job_id": job.id}
 
 
@@ -307,18 +337,19 @@ async def job_events(job_id: str, request: Request, owner: Owner = Depends(get_o
 
     async def stream():
         sent = 0
-        while True:
-            events, finished = await asyncio.to_thread(job.wait, sent, KEEPALIVE_SECONDS)
-            if not events and not finished:
-                yield ": keepalive\n\n"
-                continue
-            for kind, data in events:
-                yield f"event: {kind}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-            sent += len(events)
-            if finished and sent >= len(job.events):
-                return
-            if await request.is_disconnected():
-                return  # the job keeps running and still saves its result
+        with job.listening():  # a job that ends unwatched sends a push notification instead
+            while True:
+                events, finished = await asyncio.to_thread(job.wait, sent, KEEPALIVE_SECONDS)
+                if not events and not finished:
+                    yield ": keepalive\n\n"
+                    continue
+                for kind, data in events:
+                    yield f"event: {kind}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+                sent += len(events)
+                if finished and sent >= len(job.events):
+                    return
+                if await request.is_disconnected():
+                    return  # the job keeps running and still saves its result
 
     return StreamingResponse(stream(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

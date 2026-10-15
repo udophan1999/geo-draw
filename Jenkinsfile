@@ -5,7 +5,7 @@
 //   - Traefik in host-network mode, watching the docker socket
 //   - The shared Postgres, with a `mathmate` database and role already created (README:
 //     "Chạy production bằng Docker", including the Postgres 15 GRANT ON SCHEMA public step)
-//   - A managed config file with fileId 'mathmate.mathmate.com' holding the production
+//   - A managed config file with fileId 'mathmate.tvcsoft.com' holding the production
 //     environment (every variable of .env.example that applies, real values)
 //
 // The build never touches the production database. The app creates its tables on start.
@@ -49,7 +49,7 @@ pipeline {
       // Compose needs .env even to parse the file (${DB_NETWORK}, ${APP_DOMAIN}).
       steps {
         configFileProvider([
-          configFile(fileId: 'mathmate.mathmate.com', targetLocation: '.env')
+          configFile(fileId: 'mathmate.tvcsoft.com', targetLocation: '.env')
         ]) {
           sh '''
             set -eu
@@ -63,7 +63,7 @@ pipeline {
     stage('Deploy') {
       steps {
         configFileProvider([
-          configFile(fileId: 'mathmate.mathmate.com', targetLocation: '.env')
+          configFile(fileId: 'mathmate.tvcsoft.com', targetLocation: '.env')
         ]) {
           sh '''
             set -eu
@@ -78,7 +78,7 @@ pipeline {
       // "running" is not enough: check the health endpoint, the database, and the public URL.
       steps {
         configFileProvider([
-          configFile(fileId: 'mathmate.mathmate.com', targetLocation: '.env')
+          configFile(fileId: 'mathmate.tvcsoft.com', targetLocation: '.env')
         ]) {
           sh '''
             set -eu
