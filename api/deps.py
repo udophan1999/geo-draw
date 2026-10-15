@@ -1,4 +1,9 @@
-"""Who is calling: a signed-in user (session cookie) or a guest (guest cookie)."""
+"""Who is calling: a signed-in user or a guest.
+
+The web app identifies both with HttpOnly cookies. The mobile apps cannot rely on cookies, so
+they send ``X-Client: ios`` (or ``android``), get the session token in the login body and send
+it back as ``Authorization: Bearer <token>``, and keep their guest id in ``X-Guest-Id``.
+"""
 
 from __future__ import annotations
 
@@ -16,6 +21,9 @@ from .state import AppState
 
 SESSION_COOKIE = "geo_session"
 GUEST_COOKIE = "geo_guest"
+GUEST_HEADER = "X-Guest-Id"
+CLIENT_HEADER = "X-Client"
+APP_CLIENTS = ("ios", "android")
 _GUEST_ID = re.compile(r"^[0-9a-f]{24}$")
 
 
@@ -54,6 +62,19 @@ class Owner:
         return self.user_id or f"guest:{self.guest_id}"
 
 
+def is_app_client(request: Request) -> bool:
+    """A mobile app: it gets tokens and guest ids in the body and headers, never cookies."""
+    return request.headers.get(CLIENT_HEADER, "").lower() in APP_CLIENTS
+
+
+def session_token(request: Request) -> str:
+    """The session token from ``Authorization: Bearer`` (apps) or the session cookie (web)."""
+    scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+    if scheme.lower() == "bearer" and token.strip():
+        return token.strip()
+    return request.cookies.get(SESSION_COOKIE, "")
+
+
 def client_ip(request: Request) -> str:
     """The caller's IP. Behind a proxy, uvicorn fills it from X-Forwarded-For, but only for
     proxies listed in FORWARDED_ALLOW_IPS (see docker-compose.traefik.yml)."""
@@ -73,14 +94,14 @@ def user_owner(state: AppState, user_id: str) -> Owner:
 
 def get_owner(request: Request) -> Owner:
     state = app_state(request)
-    token = request.cookies.get(SESSION_COOKIE, "")
+    token = session_token(request)
     user_id = state.accounts.session_user(token) if token else None
     if user_id:
         state.import_history(user_id)
         owner = user_owner(state, user_id)
         owner.ip = client_ip(request)
         return owner
-    guest_id = request.state.guest_id  # set by the guest-cookie middleware
+    guest_id = request.state.guest_id  # set by the guest-id middleware
     return Owner(None, guest_id, None, state.guest_store(guest_id),
                  state.sessions_dir / guest_id, state.guest_owner(guest_id), ip=client_ip(request))
 

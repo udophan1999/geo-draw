@@ -127,6 +127,75 @@ class AuthTests(ApiTestCase):
         self.assertEqual(locked.status_code, 429)
 
 
+class AppClientTests(ApiTestCase):
+    """The mobile apps: a Bearer token and an X-Guest-Id header instead of cookies."""
+    ai = AiSettings(api_key="test-key")
+    limit_guest, limit_user = 50, 50
+
+    def app_client(self, guest_id: str | None = None, token: str | None = None) -> TestClient:
+        client = self.client()
+        client.headers["X-Client"] = "ios"
+        if guest_id:
+            client.headers["X-Guest-Id"] = guest_id
+        if token:
+            client.headers["Authorization"] = f"Bearer {token}"
+        return client
+
+    def test_sign_in_returns_a_token_and_sets_no_cookie(self):
+        client = self.app_client()
+        registered = self.register(client)
+        self.assertEqual(registered.status_code, 201)
+        token = registered.json()["token"]
+        self.assertNotIn("geo_session", client.cookies)
+        self.assertIsNone(client.get("/api/auth/me").json()["user"])
+
+        signed_in = self.app_client(token=token)
+        self.assertEqual(signed_in.get("/api/auth/me").json()["user"]["name"], "an7a")
+        login = self.app_client().post("/api/auth/login",
+                                       json={"username": "an7a", "password": "hinhhoc1"})
+        self.assertEqual(login.status_code, 200)
+        self.assertNotEqual(login.json()["token"], token)
+
+        self.assertEqual(signed_in.post("/api/auth/logout").status_code, 204)
+        self.assertIsNone(signed_in.get("/api/auth/me").json()["user"])
+        second = self.app_client(token=login.json()["token"])
+        self.assertEqual(second.get("/api/auth/me").json()["user"]["name"], "an7a")
+
+    def test_the_web_never_gets_a_token(self):
+        response = self.register(self.client())
+        self.assertNotIn("token", response.json())
+        bad = self.app_client(token="not-a-session")
+        self.assertIsNone(bad.get("/api/auth/me").json()["user"])
+
+    def test_bearer_works_for_conversations_and_job_events(self):
+        token = self.register(self.app_client()).json()["token"]
+        client = self.app_client(token=token)
+        started = self.send(client, EQUATION)
+        self.assertEqual(started.status_code, 202)
+        kinds = [kind for kind, _ in read_events(client, started.json()["job_id"])]
+        self.assertEqual(kinds[-1], "done")
+        self.assertEqual(len(client.get("/api/conversations").json()), 1)
+        self.assertEqual(self.app_client().get("/api/conversations").json(), [])
+
+    def test_guest_id_travels_in_a_header(self):
+        first = self.app_client().get("/api/auth/me")
+        guest_id = first.headers["X-Guest-Id"]
+        self.assertRegex(guest_id, r"^[0-9a-f]{24}$")
+        self.assertNotIn("set-cookie", first.headers)
+
+        guest = self.app_client(guest_id)
+        again = guest.get("/api/auth/me")
+        self.assertNotIn("X-Guest-Id", again.headers)  # a known id is not issued again
+        started = self.send(guest, EQUATION)
+        read_events(guest, started.json()["job_id"])
+        self.assertEqual(len(self.app_client(guest_id).get("/api/conversations").json()), 1)
+        self.assertEqual(self.app_client(guest_id).get("/api/auth/me").json()["quota"]["used"], 1)
+        self.assertEqual(self.app_client().get("/api/conversations").json(), [])
+        # A forged id never becomes a folder name: the caller gets a fresh id instead.
+        forged = self.app_client("../../etc").get("/api/auth/me")
+        self.assertRegex(forged.headers["X-Guest-Id"], r"^[0-9a-f]{24}$")
+
+
 class ChatTests(ApiTestCase):
     ai = AiSettings(api_key="test-key")
     limit_guest, limit_user = 50, 50
