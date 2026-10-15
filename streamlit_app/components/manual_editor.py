@@ -40,7 +40,7 @@ def manual_editor(message: Message, quality: str, animate: bool) -> None:
             session.conversations().update_drawing(message.id, result.image_path,
                                                    result.video_path)
             st.rerun()
-        st.error("Không thể cập nhật hình: " + render_error_summary(result.log))
+        st.error("Không thể cập nhật hình. " + render_error_summary(result.log))
 
     with st.expander("🛠️ Chỉnh hình thủ công", expanded=False):
         st.caption(

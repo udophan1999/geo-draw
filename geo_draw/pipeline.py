@@ -38,28 +38,35 @@ class DrawingOutcome:
     log: str = ""
 
 
+# Figure names of the parser (geo_draw/parser.py), as shown to students.
+FIGURE_NAMES = {
+    "triangle": "tam giác", "square": "hình vuông", "rectangle": "hình chữ nhật",
+    "rhombus": "hình thoi", "parallelogram": "hình bình hành", "trapezoid": "hình thang",
+    "circle": "đường tròn",
+}
+
+
 def parser_scene(text: str, animate: bool, scene_path: Path) -> tuple[Path, str]:
     problem = parse_problem(text)
     figure = build_figure(problem)
     path = write_scene(figure, scene_path, animate=animate)
-    summary = f"Parser · hình {problem.figure} · điểm: {', '.join(sorted(figure.points))}"
+    name = FIGURE_NAMES.get(problem.figure, "hình")
+    summary = f"{name} · điểm {', '.join(sorted(figure.points))}"
     return path, summary
 
 
 def render_error_summary(log: str) -> str:
+    """Why a drawing failed, in words a student understands. The full log stays in the
+    drawing's log (the "Nhật ký vẽ" tab); raw Python errors are never shown."""
     known_errors = {
-        "GEOMETRY_INVALID_SEGMENT": "Ký hiệu hình học nhận sai dữ liệu đoạn thẳng.",
-        "GEOMETRY_PARALLEL_NO_SEGMENT": "Chưa truyền đoạn thẳng cần đánh dấu song song.",
-        "GEOMETRY_LAYOUT_CROWDED": "Các điểm và đối tượng phụ đang quá sát nhau; cần đổi tỷ lệ hình.",
+        "GEOMETRY_INVALID_SEGMENT": "Một đoạn thẳng trong hình chưa được dựng đúng.",
+        "GEOMETRY_PARALLEL_NO_SEGMENT": "Chưa xác định được các đoạn thẳng song song.",
+        "GEOMETRY_LAYOUT_CROWDED": "Các điểm trong hình đang quá sát nhau.",
     }
     for code, message in known_errors.items():
         if code in log:
             return message
-    lines = [line.strip() for line in log.splitlines() if line.strip()]
-    for line in reversed(lines):
-        if line.startswith(("ValueError:", "TypeError:", "ImportError:", "NameError:")):
-            return line
-    return lines[-1] if lines else "Không có thông tin lỗi từ Manim."
+    return "Hình còn chi tiết chưa dựng được. Hãy thử yêu cầu vẽ lại, hoặc diễn đạt đề rõ hơn."
 
 
 def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l",
@@ -103,13 +110,13 @@ def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l
                f"{APP_NAME} đang phân tích đề và vẽ hình...")
         generated = generate(problem, ai, animate, previous_code=previous_code)
         if not generated.ok:
-            return DrawingOutcome(False, generated.error)
+            return DrawingOutcome(False, generated.error, log=generated.detail)
         scene_path.write_text(generated.code, encoding="utf-8")
         summary = f"{APP_NAME} AI"
     else:
         scene_path, summary = parser_scene(problem, animate, scene_path)
 
-    report(RENDERING, "Manim đang render...")
+    report(RENDERING, f"{APP_NAME} đang hoàn thiện hình vẽ...")
     result = render()
     if not result.ok and ai is not None:
         for attempt in range(1, REPAIR_ATTEMPTS + 1):
@@ -131,5 +138,5 @@ def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l
     if result.ok and result.image_path:
         return DrawingOutcome(True, f"Đã vẽ xong · {summary}", scene_path,
                               result.image_path, result.video_path, result.log)
-    return DrawingOutcome(False, "Manim render thất bại: " + render_error_summary(result.log),
+    return DrawingOutcome(False, f"{APP_NAME} chưa vẽ được hình. " + render_error_summary(result.log),
                           scene_path, None, None, result.log)

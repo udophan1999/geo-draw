@@ -178,8 +178,8 @@ function AdvancedOptions({ drawing }: { drawing: Message }) {
           <Tabs key={String(editable)} defaultValue={editable ? 'edit' : 'code'} className="w-full">
             <TabsList>
               {editable && <TabsTrigger value="edit">Chỉnh hình</TabsTrigger>}
-              <TabsTrigger value="code">Mã Manim</TabsTrigger>
-              {drawing.has_log && <TabsTrigger value="log">Log render</TabsTrigger>}
+              <TabsTrigger value="code">Mã hình vẽ</TabsTrigger>
+              {drawing.has_log && <TabsTrigger value="log">Nhật ký vẽ</TabsTrigger>}
             </TabsList>
             {editable && (
               <TabsContent value="edit" className="pt-2">
