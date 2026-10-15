@@ -1,6 +1,6 @@
 // Typesets every formula of a JSON list with SwiftMath and reports what fails.
 //
-//   swift run MathSpike <formulas.json> <output folder>
+//   [MATH_FONT=<bundled font name>] swift run MathSpike <formulas.json> <output folder>
 //
 // formulas.json: [{"id": "...", "latex": "..."}]. Writes <output>/<id>.png for each formula
 // that renders, and <output>/report.json with the parse errors.
@@ -21,6 +21,10 @@ let formulas = try JSONDecoder().decode([Formula].self,
 let output = URL(fileURLWithPath: arguments[2], isDirectory: true)
 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
 
+// MATH_FONT picks one of SwiftMath's bundled fonts (e.g. texgyretermes-math); default Latin Modern.
+let mathFont = ProcessInfo.processInfo.environment["MATH_FONT"]
+    .flatMap { MTFontManager().font(withName: $0, size: 28) }
+
 var outcomes: [Outcome] = []
 for formula in formulas {
     var parseError: NSError?
@@ -29,6 +33,7 @@ for formula in formulas {
     if message == nil {
         let image = MTMathImage(latex: formula.latex, fontSize: 28, textColor: .black,
                                 labelMode: .text)
+        if let mathFont { image.font = mathFont }
         image.contentInsets = MTEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
         let (renderError, rendered) = image.asImage()
         if let renderError {

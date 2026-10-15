@@ -7,7 +7,8 @@ let package = Package(
     name: "MathSpike",
     platforms: [.macOS(.v14)],
     dependencies: [
-        .package(url: "https://github.com/mgriebling/SwiftMath.git", from: "1.0.0"),
+        // Fork with arcs and \backsim (see docs/mobile-ios-spike.md).
+        .package(url: "https://github.com/xuanthinhJB/SwiftMath.git", branch: "mathmate"),
     ],
     targets: [
         .executableTarget(name: "MathSpike", dependencies: ["SwiftMath"]),
