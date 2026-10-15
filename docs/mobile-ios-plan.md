@@ -63,7 +63,7 @@ Mọi thay đổi giữ nguyên hành vi của web (cookie) và có test trong `
    - `logout` đọc token từ cả header lẫn cookie.
 2. **Khách dùng thử không dùng cookie.** Middleware `guest_cookie` ưu tiên header `X-Guest-Id` (kiểm tra bằng `valid_guest_id`). Khi thiếu, server cấp id mới và trả lại qua header `X-Guest-Id`. App lưu id này trong Keychain để giữ lại cuộc trò chuyện sau khi cài lại app.
 3. **Xóa tài khoản ngay trong app** (Apple bắt buộc theo guideline 5.1.1(v) khi app có đăng ký). Thêm `DELETE /api/auth/me` (yêu cầu nhập lại mật khẩu), dùng lại logic xóa của `admin.py`: `delete_owner`, xóa tài khoản và thư mục `users/<id>`.
-4. **Thông báo đẩy:**
+4. **Thông báo đẩy** (đã làm, xem checklist bên dưới khi chạy trên máy thật):
    - Bảng `devices` (owner, apns_token, platform, updated_at), viết theo quy ước store (`?`, `ON CONFLICT`, `db.sql()`).
    - Thêm `POST/DELETE /api/devices`.
    - Một `PushSender` gửi APNs qua HTTP/2 với JWT ký bằng khóa `.p8`. Biến môi trường mới: `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_KEY_PATH`, `APNS_TOPIC`, `APNS_SANDBOX`.
@@ -72,6 +72,17 @@ Mọi thay đổi giữ nguyên hành vi của web (cookie) và có test trong `
 5. **Phiên bản tối thiểu:** thêm `GET /api/app-config` trả `{min_ios_build}`. App cũ hơn sẽ hiện màn "Cập nhật MathMate". Đây là bản iOS của `lib/version.ts`.
 6. **Ghi rõ trong tài liệu:** SSE `/api/jobs/{id}/events` phát lại *mọi* sự kiện từ đầu ở mỗi lần kết nối (`sent = 0`) và giữ job 1 giờ. Vì vậy khi kết nối lại, client phải xóa phần `reply` đang có và dựng lại từ các `delta`.
 7. **Ghi chú cho client:** `image_url`/`video_url` là đường dẫn tương đối và cần header auth, nên app tải ảnh bằng `URLSession` của chính nó (không dùng `AsyncImage`) và cache theo `?v=`.
+
+### Checklist APNs khi chạy trên iPhone thật
+
+Simulator không nhận được token APNs thật, nên mọi bước dưới đây cần iPhone thật và tài khoản Apple Developer trả phí.
+
+1. **Khóa APNs (một lần):** developer.apple.com → Keys → "+" → bật *Apple Push Notifications service* → tải `AuthKey_<KEY_ID>.p8`. Apple chỉ cho tải **một lần**, nên phải cất kỹ, ví dụ trong trình quản lý mật khẩu.
+2. **App ID:** bundle id (ví dụ `com.tonyvibecode.mathmate`) bật capability *Push Notifications*. Trong Xcode: target → Signing & Capabilities → `+ Push Notifications` và `+ Background Modes → Remote notifications`.
+3. **Máy chủ:** điền `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_TOPIC` (= bundle id) và `APNS_KEY` (hoặc `APNS_KEY_PATH`) vào `.env` khi chạy trên máy, và vào managed config của Jenkins cho production. Sau đó khởi động lại server.
+4. **Môi trường:** bản build chạy từ Xcode nhận token **sandbox**; TestFlight và App Store nhận token **production**. App gửi đúng `environment` khi gọi `POST /api/devices` (đọc `aps-environment` trong entitlements, hoặc dùng `#if DEBUG`). Gửi sai thì APNs trả `BadDeviceToken` và server xóa token đó.
+5. **Mạng:** iPhone phải gọi được tới API (cùng Wi-Fi với máy chạy `uvicorn --host 0.0.0.0`, hoặc dùng domain production). Máy chủ phải ra được Internet tới `api.push.apple.com:443` và `api.sandbox.push.apple.com:443`.
+6. **Kiểm tra:** đăng nhập trên iPhone, cho phép thông báo, gửi một câu hỏi rồi về màn hình chính. Thông báo "MathMate đã trả lời" phải hiện ra; chạm vào thì mở đúng cuộc trò chuyện. Nếu không thấy, đọc log `mathmate.push` trên máy chủ.
 
 ## 4. Cấu trúc thư mục `mobile/ios/`
 

@@ -196,7 +196,8 @@ class PostgresApiTests(PostgresTestCase):
         super().setUp()
         from api.main import create_app
 
-        self.app = create_app(self.root, ai=AiSettings(api_key="test-key"), database_url=self.url)
+        self.app = create_app(self.root, ai=AiSettings(api_key="test-key"), database_url=self.url,
+                              apns=None)
         self.state = self.app.state.geo
         self.addCleanup(self.state.close)
         self.addCleanup(lambda: self.state.jobs.shutdown(wait=True))

@@ -13,9 +13,11 @@ from geo_draw.app_config import ConfigStore
 from geo_draw.ai_codegen import AiSettings, settings_from_env
 from geo_draw.conversations import ConversationStore
 from geo_draw.db import database_from_url
+from geo_draw.devices import DeviceStore
 from geo_draw.history import HistoryStore, import_into_conversations
 
 from .jobs import JobManager
+from .push import ApnsClient, ApnsConfig, PushNotifier
 from .quota import QuotaStore
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -53,6 +55,8 @@ class AppState:
     admin_username: str | None = field(default_factory=lambda: os.environ.get("ADMIN_USERNAME") or None)
     admin_password: str | None = field(default_factory=lambda: os.environ.get("ADMIN_PASSWORD") or None)
     workers: int = 2
+    # APNs credentials (see api/push.py); None: no push notifications.
+    apns: ApnsConfig | None = field(default_factory=ApnsConfig.from_env)
 
     def __post_init__(self) -> None:
         self.users_dir = self.data_dir / "users"
@@ -64,6 +68,8 @@ class AppState:
         self.quota = QuotaStore(self.data_dir / "usage.sqlite3", self.db)
         self.config = ConfigStore(self.data_dir, self.db)
         self.jobs = JobManager(self.workers)
+        self.devices = DeviceStore(self.data_dir, self.db)
+        self.push = PushNotifier(self.devices, ApnsClient(self.apns) if self.apns else None)
         # conversation id -> marker of the figure job drawing it right now
         self.figure_jobs: dict[str, str] = {}
         # conversations whose tutor is answering right now (their last message cannot be edited)
@@ -109,6 +115,7 @@ class AppState:
         """Delete an account with all its conversations, drawings, settings and sessions."""
         self.conversations.delete_owner(user_id)
         self.accounts.delete_user(user_id)
+        self.devices.delete_owner(user_id)
         shutil.rmtree(self.users_dir / user_id, ignore_errors=True)  # settings.json, files left
 
     def guest_store(self, guest_id: str) -> ConversationStore:
@@ -124,5 +131,6 @@ class AppState:
 
     def close(self) -> None:
         self.jobs.shutdown()
+        self.push.close()
         if self.db:
             self.db.close()

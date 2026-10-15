@@ -47,7 +47,8 @@ class ApiTestCase(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.data = Path(self._tmp.name)
         # database_url=None: always SQLite in the temp dir, whatever DATABASE_URL says.
-        self.app = create_app(self.data, ai=self.ai, database_url=None,
+        # apns=None: never reach Apple, whatever APNS_* the .env holds.
+        self.app = create_app(self.data, ai=self.ai, database_url=None, apns=None,
                               daily_limit_guest=self.limit_guest,
                               daily_limit_user=self.limit_user)
         self.state = self.app.state.geo
