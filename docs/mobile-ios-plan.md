@@ -1,5 +1,7 @@
 # Kế hoạch app iOS native cho MathMate
 
+Tiến độ theo dõi ở [mobile-ios-checklist.md](mobile-ios-checklist.md).
+
 App iOS viết bằng SwiftUI, dùng Liquid Glass trên iOS 26 và lui về material trên iOS 17–25. Phạm vi là ngang bằng web ngay từ bản đầu, kể cả trình soạn công thức. Android làm sau bằng Kotlin + Jetpack Compose.
 
 ## 1. Phạm vi: ngang bằng web
