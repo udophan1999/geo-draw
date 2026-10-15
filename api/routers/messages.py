@@ -5,6 +5,7 @@
   job, announced on the tutor's event stream as ``figure_job``. Drawing requests typed in
   the chat are routed to the figure: "vẽ giúp mình" draws it and gets a canned reply (no AI
   tutor turn); "kẻ thêm đường cao AH" refines it and the tutor still answers.
+- ``PATCH /api/messages/{id}``: edit the student's last message; the tutor answers again.
 - ``POST /api/conversations/{id}/figure``: draw the figure, or refine it with a request.
 - ``GET /api/jobs/{id}/events``: ``progress``, ``delta`` (tutor text as it arrives),
   ``message`` (saved message JSON), ``conversation``, ``figure_job``, then ``done`` or
@@ -16,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from contextlib import contextmanager
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -26,14 +28,15 @@ from geo_draw.conversations import CHAT, FIGURE, USER, Conversation, Message
 from geo_draw.graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind
 from geo_draw.tutor import (
     ACTIONS, ASK, GENERIC, REPLY_DRAWING, REPLY_NOT_DRAWN, REPLY_SHOWN, SPECIFIC,
-    drawing_request, is_geometry_problem, record_canned_reply, run_tutor_turn,
+    drawing_request, editable_message, is_geometry_problem, record_canned_reply,
+    rerun_tutor_turn, run_tutor_turn,
 )
 from geo_draw.tutor_prompts import FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN
 
-from ..deps import Owner, app_state, get_owner, owned_conversation
+from ..deps import Owner, app_state, get_owner, owned_conversation, owned_message
 from ..jobs import Job
 from ..quota import TOTAL, client_counter
-from ..schemas import FigureRequest, conversation_json, message_json
+from ..schemas import FigureRequest, MessageEdit, conversation_json, message_json
 from ..state import AppState
 from .settings import load_settings
 
@@ -164,10 +167,8 @@ async def send_message(
     ai = _ai(state, load_settings(owner).model)
     convert = _event_payload(owner)
 
-    def figure_state() -> str:
-        if conversation.id in state.figure_jobs:
-            return FIGURE_DRAWING
-        return FIGURE_SHOWN if _has_drawing(owner, conversation) else FIGURE_NONE
+    figure_state = _figure_state(state, owner, conversation)
+    state.tutor_jobs.add(conversation.id)  # before the job starts: no edit meanwhile
 
     def work(push) -> None:
         def start_figure(request: str = "") -> None:
@@ -188,9 +189,78 @@ async def send_message(
             elif wants_drawing == SPECIFIC:
                 start_figure(text)  # "kẻ thêm đường cao AH": refine, and the tutor answers too
 
-        run_tutor_turn(owner.store, owner.store_owner, conversation.id, text=text,
-                       image=image_bytes, image_type=image_type, action=action, ai=ai,
-                       figure=figure_state, prompts=state.config.values(), on_event=on_event)
+        with _answering(state, conversation.id):
+            run_tutor_turn(owner.store, owner.store_owner, conversation.id, text=text,
+                           image=image_bytes, image_type=image_type, action=action, ai=ai,
+                           figure=figure_state, prompts=state.config.values(), on_event=on_event)
+
+    job = state.jobs.submit(owner.identity, work)
+    return {"conversation": conversation_json(conversation), "job_id": job.id}
+
+
+@contextmanager
+def _answering(state: AppState, conversation_id: str):
+    """Mark a conversation whose tutor is answering, so its last message is not edited
+    in the middle of the reply."""
+    state.tutor_jobs.add(conversation_id)
+    try:
+        yield
+    finally:
+        state.tutor_jobs.discard(conversation_id)
+
+
+def _figure_state(state: AppState, owner: Owner, conversation: Conversation):
+    def figure_state() -> str:
+        if conversation.id in state.figure_jobs:
+            return FIGURE_DRAWING
+        return FIGURE_SHOWN if _has_drawing(owner, conversation) else FIGURE_NONE
+    return figure_state
+
+
+@router.patch("/messages/{message_id}", status_code=202)
+def edit_message(message_id: str, body: MessageEdit, request: Request,
+                 owner: Owner = Depends(get_owner)) -> dict:
+    """Edit the student's last chat message; the tutor's reply to it is written again.
+
+    Costs one AI turn. Editing the first message changes the problem, and a plane-geometry
+    problem is drawn again.
+    """
+    state = app_state(request)
+    message = owned_message(owner, message_id)
+    conversation = owned_conversation(owner, message.conversation_id)
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(422, "Tin nhắn không được để trống.")
+    last = editable_message(owner.store, conversation.id)
+    if message.channel != CHAT or last is None or last.id != message.id:
+        raise HTTPException(409, "Chỉ sửa được tin nhắn gần nhất của bạn.")
+    if conversation.id in state.tutor_jobs:
+        raise HTTPException(409, "MathMate đang trả lời. Đợi trả lời xong rồi hãy sửa.")
+    if not state.ai_available:
+        raise HTTPException(503, "Máy chủ chưa cấu hình khóa AI nên chưa giải toán được.")
+    _consume_ai_turn(state, owner)
+    chat = owner.store.messages(conversation.id, CHAT)
+    new_problem = chat[0].id == message.id and text != message.text
+    ai = _ai(state, load_settings(owner).model)
+    convert = _event_payload(owner)
+    state.tutor_jobs.add(conversation.id)  # before the job starts: no second edit meanwhile
+
+    def work(push) -> None:
+        def on_event(kind: str, payload: object) -> None:
+            push(kind, convert(payload))
+            if (kind == "message" and payload.role == USER and new_problem
+                    and is_geometry_problem(payload.text)):
+                try:
+                    figure = start_figure_job(state, owner, conversation)
+                except HTTPException as exc:
+                    push("figure_skipped", {"detail": exc.detail})
+                else:
+                    push("figure_job", {"job_id": figure.id})
+
+        with _answering(state, conversation.id):
+            rerun_tutor_turn(owner.store, owner.store_owner, conversation.id, message.id, text,
+                             ai=ai, figure=_figure_state(state, owner, conversation),
+                             prompts=state.config.values(), on_event=on_event)
 
     job = state.jobs.submit(owner.identity, work)
     return {"conversation": conversation_json(conversation), "job_id": job.id}

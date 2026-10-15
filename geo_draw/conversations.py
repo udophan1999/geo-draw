@@ -300,6 +300,25 @@ class ConversationStore:
                 (self._path_text(image_path), self._path_text(video_path), message_id),
             )
 
+    def edit_message(self, message_id: str, text: str, meta: dict) -> Message | None:
+        """Replace a message's text and meta (the student edited their last message)."""
+        with self._connect() as connection:
+            connection.execute("UPDATE messages SET text = ?, meta = ? WHERE id = ?",
+                               (text, json.dumps(meta, ensure_ascii=False), message_id))
+        return self.get_message(message_id)
+
+    def delete_messages(self, message_ids: list[str]) -> None:
+        """Delete messages and their folders (a reply that is being written again)."""
+        messages = [m for m in map(self.get_message, message_ids) if m]
+        with self._connect() as connection:
+            for message_id in message_ids:
+                connection.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+        for message in messages:
+            for path in (message.image_path, message.scene_path):
+                folder = path.parent if path else None
+                if folder and folder.name == message.id:
+                    shutil.rmtree(folder, ignore_errors=True)
+
     def get_message(self, message_id: str) -> Message | None:
         with self._connect() as connection:
             row = connection.execute(

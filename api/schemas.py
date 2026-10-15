@@ -29,6 +29,10 @@ class TitleUpdate(BaseModel):
     title: str = Field(min_length=1, max_length=120)
 
 
+class MessageEdit(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)
+
+
 class FigureRequest(BaseModel):
     text: str = Field("", max_length=2000)
 

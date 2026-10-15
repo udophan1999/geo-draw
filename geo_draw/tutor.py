@@ -96,6 +96,79 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
                                      image_path=image_path, channel=CHAT, meta=meta)
     emit("message", user_message)
 
+    reply = _answer(store, owner, conversation_id, history=history, request=request,
+                    problem=problem, mode=mode, level=level, solved=conversation.solved,
+                    meta=meta, first_turn=first_turn, ai=ai, figure=figure, prompts=prompts,
+                    emit=emit)
+    return [user_message, reply]
+
+
+class EditNotAllowed(ValueError):
+    """The message cannot be edited (not the student's last one, or empty)."""
+
+
+def editable_message(store: ConversationStore, conversation_id: str) -> Message | None:
+    """The student's last chat message: the only one that can be edited."""
+    sent = [m for m in store.messages(conversation_id, CHAT) if m.role == USER]
+    return sent[-1] if sent else None
+
+
+def rerun_tutor_turn(store: ConversationStore, owner: str, conversation_id: str,
+                     message_id: str, text: str, *, ai: AiSettings,
+                     figure: Callable[[], str] = lambda: FIGURE_NONE,
+                     prompts: dict[str, str] | None = None,
+                     on_event: EventCallback | None = None) -> list[Message]:
+    """The student edited their last message: replace it, drop the tutor's reply to it and
+    answer again, from the mode and hint level the message was sent with.
+
+    Editing the first message changes the problem (and the title) too.
+    """
+    emit = on_event or (lambda kind, payload: None)
+    conversation = store.get(owner, conversation_id)
+    if conversation is None:
+        raise ValueError("Conversation not found")
+    text = (text or "").strip()
+    if not text:
+        raise EditNotAllowed("Tin nhắn không được để trống.")
+    chat = store.messages(conversation_id, CHAT)
+    last = editable_message(store, conversation_id)
+    index = next((i for i, m in enumerate(chat) if m.id == message_id), None)
+    if index is None or last is None or last.id != message_id:
+        raise EditNotAllowed("Chỉ sửa được tin nhắn gần nhất của bạn.")
+    edited, history = chat[index], chat[:index]
+    store.delete_messages([m.id for m in chat[index + 1:]])
+
+    # Back to how things stood when the message was sent: its reply may have raised the
+    # hint level or marked the problem solved.
+    mode = edited.meta.get("mode") or conversation.mode
+    level = clamp_level(edited.meta.get("hint_level") or conversation.hint_level)
+    answered = [m for m in history if m.role == ASSISTANT and not m.meta.get("error")]
+    solved = bool(answered and answered[-1].meta.get("solved"))
+    store.update(owner, conversation_id, mode=mode, hint_level=level, solved=solved)
+
+    first_turn = index == 0
+    problem = store.problem_of(conversation)
+    if first_turn:
+        problem = text
+        store.update(owner, conversation_id, problem=problem)
+        store.rename(owner, conversation_id, problem)
+
+    meta = {"mode": mode, "hint_level": level, "action": edited.meta.get("action", ASK),
+            "edited": True}
+    user_message = store.edit_message(edited.id, text, meta)
+    emit("message", user_message)
+    reply = _answer(store, owner, conversation_id, history=history, request=text,
+                    problem=problem, mode=mode, level=level, solved=solved, meta=meta,
+                    first_turn=first_turn, ai=ai, figure=figure, prompts=prompts, emit=emit)
+    return [user_message, reply]
+
+
+def _answer(store: ConversationStore, owner: str, conversation_id: str, *,
+            history: list[Message], request: str, problem: str, mode: str, level: int,
+            solved: bool, meta: dict, first_turn: bool, ai: AiSettings,
+            figure: Callable[[], str], prompts: dict[str, str] | None,
+            emit: EventCallback) -> Message:
+    """Stream and save the tutor's reply to ``request``; update the conversation's progress."""
     model_messages = [{"role": "system",
                        "content": build_system_prompt(problem, mode, level, figure(),
                                                       prompts)}]
@@ -107,7 +180,6 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
     emit("progress", {"stage": "thinking",
                       "label": "Đang soạn lời giải..." if mode == SOLUTION else "Đang suy nghĩ..."})
     reply_text, reply_meta = "", dict(meta)
-    solved = conversation.solved
     hidden = _ProgressTagFilter()
     try:
         for piece in stream_chat(ai, model_messages, max_tokens=6000 if mode == SOLUTION else 1500):
@@ -134,7 +206,7 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
             if title:
                 store.rename(owner, conversation_id, title)
     emit("conversation", store.get(owner, conversation_id))
-    return [user_message, reply]
+    return reply
 
 
 TITLE_PROMPT = """
