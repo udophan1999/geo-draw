@@ -38,9 +38,11 @@ Kế hoạch chi tiết nằm ở [mobile-ios-plan.md](mobile-ios-plan.md); các
 
 ## Giai đoạn 1: Spike rủi ro (§6, §7, §8): quyết định làm tiếp hay đổi hướng
 
-- [ ] ⚠️ Project thử với SwiftMath, render toàn bộ 7 tab mẫu công thức; ghi lại từng lệnh vẽ được / không vẽ được
-- [ ] ⚠️ Kiểm tra riêng các lệnh: `\widehat`, `\overset{\frown}`, `\backsim`, `cases`, `\left\{…\mid…\right\}`, `\mathbb`, `\overrightarrow`, `\qquad`
-- [ ] ⚠️ Lấy khoảng 200 câu trả lời thật của gia sư (**chỉ đọc**, không ghi vào `generated/`) và đo tỉ lệ render được
+- [x] ⚠️ Project thử với SwiftMath, render toàn bộ 7 tab mẫu công thức: 96/104, xem [mobile-ios-spike.md](mobile-ios-spike.md)
+- [x] ⚠️ Kiểm tra riêng các lệnh: thiếu `\overrightarrow`, `\overset`, `\backsim`, `\varnothing`, `\dfrac`; `cases` cần `&`
+- [x] ⚠️ Đo trên câu trả lời thật (local: 51 câu, 134 công thức): 127/134, lỗi duy nhất là `\dfrac`
+- [ ] Đo lại với dữ liệu production (từ bản backup, chỉ đọc)
+- [ ] ⚠️ Fork SwiftMath: nhận chữ tiếng Việt (đang bị bỏ đi không báo lỗi), thêm `\overrightarrow` và `\overset`; chọn font có đủ tiếng Việt
 - [ ] Công thức trong dòng chữ: `Text` + `Image` căn baseline, xuống dòng đúng, cả sáng/tối và Dynamic Type
 - [ ] `UITextView` + `NSTextAttachment`: chèn chip, Backspace trả lại `$latex$`, xuất `toMessageText`
 - [ ] ⚠️ Con trỏ trong trình soạn công thức: lấy toạ độ atom từ `MTMathListDisplay`; tham khảo kostub/MathEditor
