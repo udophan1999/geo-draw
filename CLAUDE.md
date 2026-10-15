@@ -22,6 +22,9 @@ npm --prefix web run build                             # build web/dist; uvicorn
 npx --prefix web tsc -b web && npm --prefix web run lint    # type-check + oxlint
 npm --prefix web run test:e2e                          # Playwright UI tests (first time: npx --prefix web playwright install chromium webkit)
 streamlit run app.py                                   # legacy Streamlit UI (http://localhost:8501)
+scripts/dev_ios.sh                                     # build the iOS app and open it in the Simulator (API: ./start.sh dev)
+scripts/dev_ios.sh test --sim "iPhone 15" --os 17.2    # iOS unit + UI tests (starts a fake-AI API on :8797)
+scripts/dev_ios.sh open                                # generate mobile/ios/MathMate.xcodeproj and open Xcode
 python -m unittest discover -s tests -v                # all tests
 python -m unittest tests.test_geometry_primitives -v   # one file
 python -m unittest tests.test_ai_codegen.AiCodegenTests.test_missing_referenced_figure_stops_before_ai_generation  # one test
