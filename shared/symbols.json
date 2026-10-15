@@ -1,0 +1,122 @@
+[
+  {
+    "symbol": "²",
+    "name": "Bình phương"
+  },
+  {
+    "symbol": "³",
+    "name": "Lập phương"
+  },
+  {
+    "symbol": "√",
+    "name": "Căn bậc hai"
+  },
+  {
+    "symbol": "∛",
+    "name": "Căn bậc ba"
+  },
+  {
+    "symbol": "π",
+    "name": "Pi"
+  },
+  {
+    "symbol": "±",
+    "name": "Cộng trừ"
+  },
+  {
+    "symbol": "×",
+    "name": "Nhân"
+  },
+  {
+    "symbol": "÷",
+    "name": "Chia"
+  },
+  {
+    "symbol": "≠",
+    "name": "Khác"
+  },
+  {
+    "symbol": "≤",
+    "name": "Nhỏ hơn hoặc bằng"
+  },
+  {
+    "symbol": "≥",
+    "name": "Lớn hơn hoặc bằng"
+  },
+  {
+    "symbol": "≈",
+    "name": "Xấp xỉ"
+  },
+  {
+    "symbol": "°",
+    "name": "Độ"
+  },
+  {
+    "symbol": "∠",
+    "name": "Góc"
+  },
+  {
+    "symbol": "△",
+    "name": "Tam giác"
+  },
+  {
+    "symbol": "⊥",
+    "name": "Vuông góc"
+  },
+  {
+    "symbol": "∥",
+    "name": "Song song"
+  },
+  {
+    "symbol": "∽",
+    "name": "Đồng dạng"
+  },
+  {
+    "symbol": "∈",
+    "name": "Thuộc"
+  },
+  {
+    "symbol": "∉",
+    "name": "Không thuộc"
+  },
+  {
+    "symbol": "⊂",
+    "name": "Tập con"
+  },
+  {
+    "symbol": "∪",
+    "name": "Hợp"
+  },
+  {
+    "symbol": "∩",
+    "name": "Giao"
+  },
+  {
+    "symbol": "∅",
+    "name": "Tập rỗng"
+  },
+  {
+    "symbol": "⇒",
+    "name": "Suy ra"
+  },
+  {
+    "symbol": "⇔",
+    "name": "Tương đương"
+  },
+  {
+    "symbol": "∞",
+    "name": "Vô cực"
+  },
+  {
+    "symbol": "α",
+    "name": "Alpha"
+  },
+  {
+    "symbol": "β",
+    "name": "Beta"
+  },
+  {
+    "symbol": "Δ",
+    "name": "Delta"
+  }
+]
