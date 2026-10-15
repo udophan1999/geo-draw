@@ -11,25 +11,28 @@ Kế hoạch chi tiết nằm ở [mobile-ios-plan.md](mobile-ios-plan.md); các
 ### Xác thực cho app
 - [x] Token Bearer: `login`/`register` trả `token` khi có `X-Client: ios`; `get_owner` và `logout` đọc `Authorization: Bearer` (`ce46382`)
 - [x] Guest id qua header `X-Guest-Id`; server cấp id mới qua header phản hồi, không đặt cookie (`ce46382`)
-- [ ] Hạn của session: hết hạn sau N ngày không dùng (đề xuất 90). Hiện session trên server không bao giờ hết hạn
+- [x] Hạn của session: hết hạn sau 90 ngày không dùng, `last_used` ghi tối đa mỗi giờ một lần (`9154f21`)
 - [ ] Quyết định nhánh đích cho PR: `dev` hay `master`
 
 ### Tài khoản
 - [x] `DELETE /api/auth/me`: hỏi lại mật khẩu, tính vào khóa đăng nhập, chặn quản trị viên cuối cùng (`8e6586d`)
-- [ ] 🔁 Nút "Xóa tài khoản" trong phần Cài đặt của web
+- [x] 🔁 Nút "Xóa tài khoản" trong phần Cài đặt của web (`56921ef`)
 
 ### Thông báo đẩy
 - [x] Bảng `devices` + `POST/DELETE /api/devices` (`3b5074f`)
 - [x] `PushNotifier` + `ApnsClient` (HTTP/2, JWT ES256), xóa token chết (`3b5074f`)
 - [x] Gửi push khi job kết thúc mà không ai xem (`watched_at_end`) (`3b5074f`)
-- [ ] `migrate_sqlite` chép cả bảng `devices` (không gấp: app sẽ tự đăng ký lại)
+- [x] `migrate_sqlite` chép cả bảng `devices`; sửa luôn lỗi mất `role`/`daily_limit` khi chép (`6c8e0dc`)
 
 ### Cấu hình app và dữ liệu dùng chung
-- [ ] `GET /api/app-config` trả `{min_ios_build}`, kèm test
-- [ ] Tạo `shared/formula_templates.json` từ `formulaTemplates.ts`; 🔁 web import từ JSON
-- [ ] Tạo `shared/symbols.json` từ `SYMBOLS` trong `MathInput.tsx`; 🔁 web import từ JSON
-- [ ] Tạo `shared/fixtures/math_cases.json` cho `normalizeMath`, `latexToPlain`, `toMessageText`; 🔁 thêm test web (Vitest hoặc Playwright) đọc fixtures này
-- [ ] Cập nhật `CLAUDE.md` (mục `shared/`, `app-config`) và mở PR cho giai đoạn 0
+- [x] `GET /api/app-config` trả `{min_ios_build, ios_store_url}`, kèm test (`e283c6b`)
+- [x] Tạo `shared/formula_templates.json` từ `formulaTemplates.ts`; 🔁 web import từ JSON (alias `@shared`)
+- [x] Tạo `shared/symbols.json` từ `SYMBOLS` trong `MathInput.tsx`; 🔁 web import từ JSON
+- [x] Tạo `shared/fixtures/math_cases.json` cho `normalizeMath`, `latexToPlain`, `toMessageText`; 🔁 test web `e2e/shared-fixtures.spec.ts` đọc fixtures này
+- [ ] 🔁 Lỗi: hai chip công thức liền nhau xuất ra `$x$$y$`, dễ bị hiểu thành `$$` (công thức khối). Cần quyết định cách tách (ví dụ thêm khoảng trắng) rồi thêm ca này vào fixtures
+- [ ] `latexToPlain` chưa đổi `\backsim` (mẫu "Tam giác đồng dạng" nên vẫn là chip); thêm vào nếu muốn hiện thành `∽`
+- [x] Cập nhật `CLAUDE.md` (mục `shared/`, `app-config`, hạn session)
+- [ ] Mở PR cho giai đoạn 0
 
 ---
 
