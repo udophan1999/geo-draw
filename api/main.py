@@ -77,6 +77,11 @@ def create_app(data_dir: Path | None = None, web_dist: Path | None = ROOT / "web
         """The THCS drawing conventions shown in the settings dialog (Markdown)."""
         return {"markdown": GEOMETRY_HELP_VI.strip()}
 
+    @api.get("/app-config", tags=["meta"])
+    def app_config() -> dict:
+        """What the mobile apps check at launch: builds below ``min_ios_build`` must update."""
+        return {"min_ios_build": state.min_ios_build, "ios_store_url": state.ios_store_url}
+
     @api.get("/health", tags=["meta"])
     def health() -> dict:
         return {"ok": True}
