@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -103,6 +104,12 @@ class AppState:
     @property
     def ai_available(self) -> bool:
         return bool(self.ai.api_key)
+
+    def delete_account(self, user_id: str) -> None:
+        """Delete an account with all its conversations, drawings, settings and sessions."""
+        self.conversations.delete_owner(user_id)
+        self.accounts.delete_user(user_id)
+        shutil.rmtree(self.users_dir / user_id, ignore_errors=True)  # settings.json, files left
 
     def guest_store(self, guest_id: str) -> ConversationStore:
         return ConversationStore(self.sessions_dir / guest_id, self.db)

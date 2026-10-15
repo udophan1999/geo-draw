@@ -18,6 +18,10 @@ class Credentials(BaseModel):
     password: str = Field(max_length=64)
 
 
+class PasswordConfirmation(BaseModel):
+    password: str = Field(max_length=64)
+
+
 class Settings(BaseModel):
     mode: Literal["ai", "parser"] = "ai"
     model: Literal["deepseek-v4-flash", "deepseek-v4-pro"] = "deepseek-v4-flash"

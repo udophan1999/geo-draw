@@ -196,6 +196,48 @@ class AppClientTests(ApiTestCase):
         self.assertRegex(forged.headers["X-Guest-Id"], r"^[0-9a-f]{24}$")
 
 
+class AccountDeletionTests(ApiTestCase):
+    ai = AiSettings(api_key="test-key")
+    limit_guest, limit_user = 50, 50
+
+    def delete_account(self, client: TestClient, password: str):
+        return client.request("DELETE", "/api/auth/me", json={"password": password})
+
+    def test_a_user_deletes_their_own_account_and_data(self):
+        client = self.client()
+        self.register(client, "Lan")
+        user_id = self.state.accounts.verify("Lan", "hinhhoc1")
+        read_events(client, self.send(client, EQUATION).json()["job_id"])
+        other = self.client()
+        other.post("/api/auth/login", json={"username": "Lan", "password": "hinhhoc1"})
+
+        wrong = self.delete_account(client, "sai-roi")
+        self.assertEqual((wrong.status_code, wrong.json()["detail"]), (401, "Mật khẩu không đúng."))
+        self.assertEqual(self.delete_account(client, "hinhhoc1").status_code, 204)
+        self.assertEqual(self.state.conversations.list(user_id), [])
+        self.assertFalse((self.state.users_dir / user_id).exists())
+        for signed_out in (client, other):  # every session ends
+            self.assertIsNone(signed_out.get("/api/auth/me").json()["user"])
+        self.assertEqual(self.register(self.client(), "Lan").status_code, 201)
+
+    def test_guests_cannot_and_wrong_passwords_lock(self):
+        self.assertEqual(self.delete_account(self.client(), "x").status_code, 401)
+        client = self.client()
+        self.register(client)
+        for _ in range(5):
+            self.delete_account(client, "wrong!")
+        self.assertEqual(self.delete_account(client, "hinhhoc1").status_code, 429)
+        self.assertEqual(client.get("/api/auth/me").json()["user"]["name"], "an7a")
+
+    def test_the_app_deletes_with_its_token(self):
+        app = self.client()
+        app.headers["X-Client"] = "ios"
+        token = self.register(app).json()["token"]
+        app.headers["Authorization"] = f"Bearer {token}"
+        self.assertEqual(self.delete_account(app, "hinhhoc1").status_code, 204)
+        self.assertIsNone(app.get("/api/auth/me").json()["user"])
+
+
 class ChatTests(ApiTestCase):
     ai = AiSettings(api_key="test-key")
     limit_guest, limit_user = 50, 50

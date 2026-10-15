@@ -14,7 +14,7 @@ from ..deps import (
     user_owner,
 )
 from ..quota import client_counter
-from ..schemas import Credentials
+from ..schemas import Credentials, PasswordConfirmation
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 SESSION_MAX_AGE = 60 * 60 * 24 * 30
@@ -103,4 +103,31 @@ def logout(request: Request, response: Response) -> None:
     token = session_token(request)
     if token:
         app_state(request).accounts.end_session(token)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+
+
+@router.delete("/me", status_code=204)
+def delete_account(body: PasswordConfirmation, request: Request, response: Response,
+                   owner: Owner = Depends(get_owner)) -> None:
+    """Delete the caller's own account and all its data (the App Store asks for this).
+
+    The password is asked again, and wrong ones count towards the same lock as at login.
+    """
+    if owner.is_guest:
+        raise HTTPException(401, "Hãy đăng nhập.")
+    state = app_state(request)
+    accounts = state.accounts
+    locked = accounts.locked_seconds(owner.name)
+    if not locked and accounts.verify(owner.name, body.password) != owner.user_id:
+        locked = accounts.locked_seconds(owner.name)
+        if not locked:
+            raise HTTPException(401, "Mật khẩu không đúng.")
+    if locked:
+        raise HTTPException(
+            429, f"Nhập sai quá nhiều lần. Hãy thử lại sau {-(-locked // 60)} phút."
+        )
+    if owner.is_admin and accounts.admin_count() <= 1:
+        raise HTTPException(409, "Bạn là quản trị viên duy nhất. Hãy cấp quyền quản trị cho "
+                                 "một tài khoản khác trước khi xóa tài khoản này.")
+    state.delete_account(owner.user_id)
     response.delete_cookie(SESSION_COOKIE, path="/")
