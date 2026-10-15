@@ -52,7 +52,11 @@ targets:
   MathMateTests:
     type: bundle.unit-test
     platform: iOS
-    sources: [MathMateTests]
+    sources:
+      - MathMateTests
+      # The cases the web passes too (web/e2e/shared-fixtures.spec.ts).
+      - path: ../../shared/fixtures/math_cases.json
+        buildPhase: resources
     dependencies:
       - target: MathMate
     settings:

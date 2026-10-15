@@ -147,6 +147,111 @@ struct SessionStoreTests {
     }
 }
 
+
+@Suite
+@MainActor
+struct ChatStoreTests {
+    init() { StubProtocol.reset() }
+
+    static let conversation = #"{"id":"c1","title":"Phương trình","created_at":1,"updated_at":2,"problem":"x+1=3","mode":"hint","hint_level":1,"solved":false,"is_geometry":false}"#
+    static func message(_ id: String, role: String, text: String) -> String {
+        #"{"id":"\#(id)","conversation_id":"c1","role":"\#(role)","text":"\#(text)","created_at":1,"image_url":null,"video_url":null,"has_drawing":false,"has_log":false,"channel":"chat","meta":{}}"#
+    }
+    static let events = """
+        event: message
+        data: \(message("m1", role: "user", text: "x+1=3"))
+
+        event: progress
+        data: {"stage":"tutor","label":"Gia sư đang suy nghĩ..."}
+
+        event: delta
+        data: {"text":"Em thử "}
+
+        event: delta
+        data: {"text":"chuyển vế nhé."}
+
+        event: message
+        data: \(message("m2", role: "assistant", text: "Em thử chuyển vế nhé."))
+
+        event: conversation
+        data: \(conversation.replacingOccurrences(of: #""hint_level":1"#, with: #""hint_level":2"#))
+
+        event: done
+        data: {}
+
+
+        """
+
+    private func store() -> ChatStore {
+        StubProtocol.reply("/api/messages", json: #"{"conversation":\#(Self.conversation),"job_id":"j1"}"#)
+        StubProtocol.reply("/api/conversations/c1", json: #"{"conversation":\#(Self.conversation.replacingOccurrences(of: #""hint_level":1"#, with: #""hint_level":2"#)),"messages":[\#(Self.message("m1", role: "user", text: "x+1=3")),\#(Self.message("m2", role: "assistant", text: "Em thử chuyển vế nhé."))]}"#)
+        return ChatStore(api: client())
+    }
+
+    private func waitUntilIdle(_ chat: ChatStore) async {
+        for _ in 0..<200 where chat.pending["c1"] != nil { try? await Task.sleep(for: .milliseconds(20)) }
+    }
+
+    @Test func aTurnStreamsThenSavesTheReply() async throws {
+        StubProtocol.queue("/api/jobs/j1/events", events: Self.events)
+        let chat = store()
+        var finished = 0
+        chat.onTurnFinished = { finished += 1 }
+        let id = await chat.send(text: "x+1=3")
+        #expect(id == "c1")
+        #expect(chat.pending["c1"]?.text == "x+1=3")
+        await waitUntilIdle(chat)
+        #expect(chat.pending["c1"] == nil)
+        let detail = try #require(chat.details["c1"])
+        #expect(detail.messages.map(\.id) == ["m1", "m2"])
+        #expect(detail.conversation.hintLevel == 2)
+        #expect(finished == 1)
+        let sent = try #require(StubProtocol.requests.first { $0.url?.path == "/api/messages" }?.httpBody)
+        #expect(String(decoding: sent, as: UTF8.self).contains("name=\"text\"\r\n\r\nx+1=3"))
+    }
+
+    @Test func aDroppedStreamIsFollowedAgainWithoutDoublingTheReply() async throws {
+        // The first connection drops after one piece; the server replays everything after.
+        let dropped = Self.events.components(separatedBy: "event: delta")[0] + "event: delta\ndata: {\"text\":\"Em thử \"}\n\n"
+        StubProtocol.queue("/api/jobs/j1/events", events: dropped)
+        StubProtocol.queue("/api/jobs/j1/events", events: Self.events)
+        let chat = store()
+        await chat.send(text: "x+1=3")
+        for _ in 0..<200 where chat.pending["c1"]?.label != "" && chat.pending["c1"] != nil {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        await waitUntilIdle(chat)
+        #expect(StubProtocol.requests.filter { $0.url?.path == "/api/jobs/j1/events" }.count == 2)
+        #expect(chat.details["c1"]?.messages.map(\.text) == ["x+1=3", "Em thử chuyển vế nhé."])
+    }
+
+    @Test func aRefusedMessageShowsTheServerReason() async {
+        StubProtocol.reply("/api/messages", status: 429, json: #"{"detail":"Bạn đã dùng hết 10 lượt dùng AI hôm nay."}"#)
+        let chat = ChatStore(api: client())
+        let id = await chat.send(text: "x+1=3")
+        #expect(id == nil)
+        #expect(chat.notice?.text == "Bạn đã dùng hết 10 lượt dùng AI hôm nay.")
+        #expect(chat.notice?.isError == true)
+    }
+}
+}
+
+struct MathBlocksTests {
+    @Test func paragraphsDisplayFormulasAndInlineMath() {
+        let blocks = MathBlocks.parse("Ta có $a^2$ và **b**.\n\n$$\nx = 1\n$$\n\n- Bước $1$\n## Kết luận")
+        #expect(blocks == [
+            .paragraph([.init(kind: .plain, pieces: [.text("Ta có "), .math("a^2"), .text(" và **b**.")])]),
+            .display("x = 1"),
+            .paragraph([.init(kind: .bullet, pieces: [.text("Bước "), .math("1")]),
+                        .init(kind: .heading, pieces: [.text("Kết luận")])]),
+        ])
+    }
+
+    @Test func unclosedFormulasAndMoneyStayText() {
+        #expect(MathBlocks.pieces("Còn $x + 1") == [.text("Còn $x + 1")])
+        #expect(MathBlocks.pieces("giá 5 $ và $ 3") == [.text("giá 5 $ và $ 3")])
+        #expect(MathBlocks.parse("Đang viết $$x+") == [.paragraph([.init(kind: .plain, pieces: [.text("Đang viết $$x+")])])])
+    }
 }
 
 struct SSEParserTests {

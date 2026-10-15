@@ -96,23 +96,27 @@ Kế hoạch chi tiết nằm ở [mobile-ios-plan.md](mobile-ios-plan.md); các
 
 ## Giai đoạn 3: Chat (§6, §9)
 
-- [ ] `MathNormalizer`: port `normalizeMath`, chạy qua `shared/fixtures`
-- [ ] `MathMarkdownView`: Markdown + công thức trong dòng + công thức khối cuộn ngang
-- [ ] `MathImageCache` theo latex + cỡ chữ + màu + giao diện sáng/tối
-- [ ] Phương án dự phòng khi SwiftMath không vẽ được: hiện mã LaTeX bằng font monospace
-- [ ] `ChatStore`: `pending` (bong bóng tạm, nhãn tiến độ, `reply` từ `delta`), `figures`, theo dõi `figure_job`
-- [ ] Stream mượt: tối đa khoảng 20 lần render/giây, chỉ parse lại đoạn cuối, `$` chưa đóng hiện thành chữ
-- [ ] Kết nối lại khi app quay lại từ nền: xóa `reply` rồi dựng lại từ đầu
-- [ ] Cuộc trò chuyện mới: chuyển sang cuộc vừa tạo khi job tạo ra nó
-- [ ] `TutorBar`: Gợi ý/Lời giải (morph bằng `glassEffectID`), 5 chấm bậc gợi ý, "Gợi ý sâu hơn", "Đã giải xong"
-- [ ] Các action `deeper`/`solution`/`hint`
-- [ ] Tin lỗi AI (`meta.error`), hết quota (429), máy chủ chưa có khóa AI (503)
-- [ ] Hiển thị quota còn lại
-- [ ] Sao chép tin nhắn (giữ `$latex$`)
-- [ ] ✏️ Sửa tin cuối: 409 khi gia sư đang trả lời; sửa tin đầu thì đổi đề và tên
-- [ ] Gửi ảnh: `PhotosPicker`, nén JPEG, giới hạn kích thước
-- [ ] Ảnh trong bong bóng của học sinh
-- [ ] `figure_skipped`: báo lý do không vẽ hình
+- [x] Kiểm thử: 19 unit test (fixtures dùng chung, `ChatStore` có mất kết nối, `MathBlocks`) + 4 UI test chat (stream, gợi ý sâu hơn, sửa tin, công thức dài, lỗi AI) qua trên iOS 17.2 và 26.5
+- [x] Sửa lỗi iPhone: "Cuộc trò chuyện mới" không mở được (split view cần selection khác nil)
+
+- [x] `MathNormalizer`: port `normalizeMath`, chạy qua `shared/fixtures`
+- [x] `MathMarkdownView`: Markdown + công thức trong dòng + công thức khối cuộn ngang (`MathText`: công thức theo cỡ chữ của kiểu chữ, khối căn giữa)
+- [x] `MathImageCache` theo latex + cỡ chữ + màu + giao diện sáng/tối
+- [x] Phương án dự phòng khi SwiftMath không vẽ được: hiện mã LaTeX bằng font monospace
+- [x] `ChatStore`: `pending` (bong bóng tạm, nhãn tiến độ, `reply` từ `delta`), `figures`, theo dõi `figure_job`
+- [x] `$` và `$$` chưa đóng (đang stream) hiện thành chữ
+- [ ] Stream mượt với câu trả lời dài: giới hạn số lần render, chỉ parse lại đoạn cuối (đo khi có câu trả lời thật dài)
+- [x] Kết nối lại khi app quay lại từ nền: xóa `reply` rồi dựng lại từ đầu (tự theo lại job; unit test mất kết nối giữa chừng)
+- [x] Cuộc trò chuyện mới: chuyển sang cuộc vừa tạo khi job tạo ra nó
+- [x] `TutorBar`: Gợi ý/Lời giải (morph bằng `glassEffectID`), 5 chấm bậc gợi ý, "Gợi ý sâu hơn", "Đã giải xong"
+- [x] Các action `deeper`/`solution`/`hint`
+- [x] Tin lỗi AI (`meta.error`), hết quota (429), máy chủ chưa có khóa AI (503)
+- [ ] Hiển thị quota còn lại ngay trong chat (hiện có trong Cài đặt)
+- [x] Sao chép tin nhắn (giữ `$latex$`) (menu nhấn giữ)
+- [x] ✏️ Sửa tin cuối: 409 khi gia sư đang trả lời; sửa tin đầu thì đổi đề và tên (sheet tự hiện bàn phím; ô chữ thường, chip công thức ở giai đoạn 4)
+- [x] Gửi ảnh: `PhotosPicker`, nén JPEG, giới hạn kích thước (≤ 2048 px, JPEG 0,8)
+- [x] Ảnh trong bong bóng của học sinh (`AuthImage`, tải kèm phiên đăng nhập)
+- [x] `figure_skipped`: báo lý do không vẽ hình
 
 ---
 

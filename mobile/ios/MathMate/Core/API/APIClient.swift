@@ -18,7 +18,7 @@ struct APIError: LocalizedError, Equatable, Sendable {
 /// the session token as `Authorization: Bearer` and the guest id as `X-Guest-Id` (api/deps.py).
 final class APIClient: Sendable {
     let baseURL: URL
-    private let session: URLSession
+    let session: URLSession
     private let credentials: CredentialStore
 
     init(baseURL: URL, credentials: CredentialStore, session: URLSession = .shared) {
