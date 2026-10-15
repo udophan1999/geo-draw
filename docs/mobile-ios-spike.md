@@ -47,10 +47,26 @@ Latin Modern (mặc định) thiếu "đ", nên "đ" được lấy từ font kh
 
 **Dùng SwiftMath qua fork `xuanthinhJB/SwiftMath@mathmate` với font TeX Gyre Termes.** Phần hiển thị công thức không còn rủi ro lớn. Fork đã xong (nhỏ hơn ước lượng 3–5 ngày, vì upstream `main` đã sửa phần lớn), nên ước lượng của giai đoạn 3 và 5 giữ nguyên.
 
-## Còn lại trong spike
+## App spike trên simulator
 
-- [ ] Công thức trong dòng chữ (`Text` + `Image`, căn baseline) trên simulator iOS 17 và 26
-- [ ] `UITextView` + `NSTextAttachment` (chip, Backspace trả lại LaTeX)
-- [ ] Port `closestIndexToPoint` và vẽ con trỏ trên một công thức
-- [ ] SSE bằng `URLSession.bytes` với server thật
-- [ ] Chạy lại phép đo với dữ liệu production
+`mobile/ios/Spikes/UISpike` (XcodeGen: `xcodegen generate`; chạy một màn bằng `-screen inline|composer|sse`). Đã chạy trên iPhone 15 (iOS 17.2) và iPhone 17 Pro (iOS 26.5).
+
+| Hạng mục | Kết quả |
+|---|---|
+| Công thức trong dòng chữ | `Text` + `Text(Image)` qua interpolation, `baselineOffset(-descent)`: công thức nằm đúng baseline và xuống dòng cùng chữ; Markdown đậm, hệ phương trình, phân số, cung, vectơ, tích phân, chữ tiếng Việt đều đúng; `$` chưa đóng (đang stream) giữ nguyên là chữ. Giống hệt nhau trên iOS 17 và 26 |
+| Công thức khối | Ảnh trong `ScrollView` ngang; công thức quá dài cuộn được, không làm vỡ bố cục |
+| Liquid Glass | `mmGlass(in:)`: `glassEffect` trên iOS 26, `.ultraThinMaterial` trên iOS 17. Build và chạy được trên cả hai |
+| Ô soạn tin | `UITextView` + `FormulaAttachment`: gõ `$…$` thành chip, Backspace ngay sau đó trả lại `$latex$`, Backspace về sau xóa cả chip, dán `$…$` thành chip, xuất `$latex$` khớp web. 3 XCUITest qua trên cả iOS 17 và 26 (`UITests/ComposerTests.swift`). Quy tắc dùng `NSRegularExpression` (đo UTF-16 như `NSTextStorage`) |
+| SSE | `URLSession.bytes` + `SSEParser` tự viết, với `web/e2e/server.py` (API thật, AI giả): lấy guest id qua `X-Guest-Id`, nhận 110 `delta` và các sự kiện `message`/`progress`/`conversation`/`done`, câu trả lời hiển thị dần |
+
+Fork cần thêm hai thay đổi để app tự vẽ công thức: `MTTypesetter.createLineForMathList(_:font:style:)` (`e7af82a`) và `MTDisplay.position`/`textColor` (`61d0237`) thành `public`.
+
+Cần chỉnh khi làm thật:
+- Công thức khối nên căn giữa khi vừa màn hình (hiện căn trái).
+- Cỡ chữ công thức hơi nhỏ hơn chữ thường (Termes có x-height thấp hơn SF): thử nhân khoảng 1,1.
+- `MathSegments` của spike chỉ tách `$`/`$$`; bản thật phải chạy `MathNormalizer` (port `normalizeMath`) trước và qua `shared/fixtures`.
+
+## Còn lại
+
+- [ ] Con trỏ trong trình soạn công thức: port `closestIndexToPoint`/vị trí con trỏ của kostub/MathEditor vào fork (các class hiển thị của SwiftMath là `internal`, nên phần này phải nằm trong fork)
+- [ ] Đo lại với dữ liệu production

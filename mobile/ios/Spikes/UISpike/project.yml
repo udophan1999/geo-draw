@@ -1,0 +1,55 @@
+# Phase 1 UI spike (docs/mobile-ios-spike.md). Generate the project with `xcodegen`, then:
+#   xcodebuild -project UISpike.xcodeproj -scheme UISpike -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2' build
+# Launch one screen directly with the argument `-screen inline|composer|cursor|sse`.
+name: UISpike
+options:
+  bundleIdPrefix: com.mathmate.spike
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  SwiftMath:
+    url: https://github.com/xuanthinhJB/SwiftMath.git
+    branch: mathmate
+targets:
+  UISpike:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    dependencies:
+      - package: SwiftMath
+    info:
+      path: Sources/Info.plist
+      properties:
+        UILaunchScreen: {}
+        CFBundleDisplayName: MathMate Spike
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mathmate.spike.ui
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGNING_ALLOWED: "NO"
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+  UISpikeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: UISpike
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mathmate.spike.uitests
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: "YES"
+        CODE_SIGNING_ALLOWED: "NO"
+        TEST_TARGET_NAME: UISpike
+schemes:
+  UISpike:
+    build:
+      targets:
+        UISpike: all
+        UISpikeUITests: [test]
+    test:
+      targets: [UISpikeUITests]
