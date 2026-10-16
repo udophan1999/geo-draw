@@ -23,7 +23,13 @@ targets:
   MathMate:
     type: application
     platform: iOS
-    sources: [MathMate]
+    sources:
+      - MathMate
+      # The symbol bar and the formula gallery, shared with the web app.
+      - path: ../../shared/symbols.json
+        buildPhase: resources
+      - path: ../../shared/formula_templates.json
+        buildPhase: resources
     dependencies:
       - package: SwiftMath
     info:
@@ -37,6 +43,7 @@ targets:
           [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown,
            UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         MMAPIBaseURL: $(MATHMATE_API_URL)
+        NSCameraUsageDescription: MathMate dùng camera để chụp đề bài gửi cho gia sư.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
     settings:

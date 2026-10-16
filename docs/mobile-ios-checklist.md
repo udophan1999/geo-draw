@@ -122,19 +122,22 @@ Kế hoạch chi tiết nằm ở [mobile-ios-plan.md](mobile-ios-plan.md); các
 
 ## Giai đoạn 4: Composer (§7)
 
-- [ ] `ComposerTextView` (`UIViewRepresentable`), tự giãn chiều cao, có giới hạn tối đa
-- [ ] `FormulaAttachment`: chip vẽ bằng SwiftMath, căn baseline
-- [ ] `MessageTextCodec`: chuyển qua lại giữa ô soạn và `$latex$`/`\n`, chạy qua `shared/fixtures`
-- [ ] Gõ `$…$` đóng lại thì thành chip
-- [ ] Dán chữ có `$…$` thì thành chip; dán ảnh thì đính kèm
-- [ ] Chạm chip để sửa trong trình soạn công thức
-- [ ] Backspace ngay sau chip trả lại `$latex$`
-- [ ] Return xuống dòng, nút gửi để gửi; bàn phím vật lý: Enter gửi, Shift+Enter xuống dòng (`UIKeyCommand`)
-- [ ] Thanh ký hiệu (từ `shared/symbols.json`) dạng thanh glass trên bàn phím
-- [ ] Nút 📎: Chụp đề (VisionKit) / Thư viện ảnh; xem trước và gỡ ảnh
-- [ ] Kéo thả ảnh trên iPad
-- [ ] Thanh soạn tin nổi dùng glass + `safeAreaInset`, né bàn phím đúng
-- [ ] Nút "Vẽ hình" trong composer khi chưa có bảng hình vẽ
+- [x] Kiểm thử: 24 unit test (thêm `latexToPlain` + `toMessageText` theo fixtures dùng chung, nạp tin nhắn thành chip, chèn công thức) + 6 UI test ô soạn tin; toàn bộ 15 UI test qua trên iOS 17.2 và 26.5
+- [ ] 🍎 Thử trên máy thật những gì simulator không thử được: chụp đề bằng VisionKit, dán ảnh, kéo thả trên iPad, Enter/Shift+Enter trên bàn phím rời, gõ Telex/VNI
+
+- [x] `ComposerTextView` (`UIViewRepresentable`), tự giãn chiều cao, có giới hạn tối đa (`MathTextView` + `ComposerField`)
+- [x] `FormulaAttachment`: chip vẽ bằng SwiftMath, căn baseline (vẽ lại khi đổi sáng/tối)
+- [x] `MessageTextCodec`: chuyển qua lại giữa ô soạn và `$latex$`/`\n`, chạy qua `shared/fixtures`
+- [x] Gõ `$…$` đóng lại thì thành chip
+- [x] Dán chữ có `$…$` thì thành chip; dán ảnh thì đính kèm
+- [x] Chạm chip để sửa trong trình soạn công thức (trình soạn tạm: LaTeX + xem trước + thư viện 7 tab; bản trực quan ở giai đoạn 5)
+- [x] Backspace ngay sau chip trả lại `$latex$`
+- [x] Return xuống dòng, nút gửi để gửi; bàn phím vật lý: Enter gửi, Shift+Enter xuống dòng (`UIKeyCommand`) (bỏ qua khi bộ gõ đang ghép chữ)
+- [x] Thanh ký hiệu (từ `shared/symbols.json`) dạng thanh glass trên bàn phím (nút Ω như web)
+- [x] Nút 📎: Chụp đề (VisionKit) / Thư viện ảnh; xem trước và gỡ ảnh
+- [x] Kéo thả ảnh trên iPad
+- [x] Thanh soạn tin nổi dùng glass + `safeAreaInset`, né bàn phím đúng
+- [x] Nút "Vẽ hình" trong composer khi chưa có bảng hình vẽ
 
 ---
 

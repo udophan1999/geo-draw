@@ -1,4 +1,3 @@
-import PhotosUI
 import SwiftUI
 
 /// A conversation with the tutor, or a new one when `conversationId` is nil
@@ -73,9 +72,10 @@ struct ChatView: View {
                         Task { await act(action) }
                     }
                 }
-                ChatComposer(placeholder: detail == nil ? "Nhập đề bài hoặc đính kèm ảnh đề…"
+                ChatComposer(placeholder: detail == nil ? "Nhập đề bài hoặc chụp ảnh đề…"
                                                         : "Trả lời câu hỏi của gia sư, hoặc hỏi thêm…",
-                             busy: busy || chat.sending) { text, image in
+                             busy: busy || chat.sending,
+                             onDraw: canAskForFigure ? { Task { await draw() } } : nil) { text, image in
                     await send(text, image: image)
                 }
             }
@@ -127,6 +127,18 @@ struct ChatView: View {
         Haptics.tap()
         if conversationId == nil { onCreated(id) }
         return true
+    }
+
+    /// "Vẽ hình" in the composer when no figure is shown yet (geometry problems get the figure
+    /// button in the toolbar, and their figure is drawn by itself).
+    private var canAskForFigure: Bool {
+        guard let detail else { return false }
+        return !detail.conversation.isGeometry && drawings.isEmpty && figureLabel == nil
+    }
+
+    private func draw() async {
+        guard let id = conversationId else { return }
+        if await chat.drawFigure(conversationId: id) { showingFigure = true }
     }
 
     private func act(_ action: TutorAction) async {
@@ -329,131 +341,6 @@ private struct NoticeBanner: View {
                     if chat.notice?.id == notice.id { withAnimation { chat.notice = nil } }
                 }
         }
-    }
-}
-
-// MARK: - Composer (plain text for now; formula chips come in phase 4)
-
-private struct ChatComposer: View {
-    let placeholder: String
-    let busy: Bool
-    let onSend: (String, (data: Data, preview: UIImage)?) async -> Bool
-
-    @State private var text = ""
-    @State private var photo: PhotosPickerItem?
-    @State private var image: (data: Data, preview: UIImage)?
-    @State private var submitting = false
-    @FocusState private var focused: Bool
-
-    private var canSend: Bool {
-        !busy && !submitting && (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || image != nil)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let image {
-                ZStack(alignment: .topTrailing) {
-                    Image(uiImage: image.preview).resizable().scaledToFill()
-                        .frame(width: 72, height: 72).clipShape(.rect(cornerRadius: 10))
-                    Button { self.image = nil; photo = nil } label: {
-                        Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, .black.opacity(0.6))
-                    }
-                    .accessibilityLabel("Bỏ ảnh")
-                    .offset(x: 6, y: -6)
-                }
-            }
-            HStack(alignment: .bottom, spacing: 10) {
-                PhotosPicker(selection: $photo, matching: .images) {
-                    Image(systemName: "photo.on.rectangle").font(.title3)
-                }
-                .accessibilityLabel("Đính kèm ảnh đề")
-                .padding(.bottom, 6)
-                TextField(placeholder, text: $text, axis: .vertical)
-                    .lineLimit(1...6)
-                    .focused($focused)
-                    .padding(.vertical, 8)
-                    .accessibilityIdentifier("composer")
-                Button {
-                    Task { await submit() }
-                } label: {
-                    Group {
-                        if submitting { ProgressView() } else { Image(systemName: "arrow.up.circle.fill").font(.title) }
-                    }
-                    .frame(width: 34, height: 34)
-                }
-                .disabled(!canSend)
-                .accessibilityLabel("Gửi")
-                .accessibilityIdentifier("send")
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .mmGlass(in: .rect(cornerRadius: 24))
-        .onChange(of: photo) {
-            guard let photo else { return }
-            Task {
-                if let data = try? await photo.loadTransferable(type: Data.self) { image = ImagePrep.prepare(data) }
-            }
-        }
-    }
-
-    private func submit() async {
-        guard canSend else { return }
-        submitting = true
-        defer { submitting = false }
-        if await onSend(text.trimmingCharacters(in: .whitespacesAndNewlines), image) {
-            text = ""
-            image = nil
-            photo = nil
-        }
-    }
-}
-
-// MARK: - Editing the last message
-
-private struct EditMessageSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let message: Message
-    let onSave: (String) async -> Bool
-    @State private var text = ""
-    @State private var saving = false
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Tin nhắn", text: $text, axis: .vertical)
-                        .lineLimit(3...12)
-                        .focused($focused)
-                        .accessibilityIdentifier("editText")
-                } footer: {
-                    Text("\(Brand.appName) sẽ trả lời lại tin nhắn đã sửa (tốn 1 lượt AI).")
-                }
-            }
-            .navigationTitle("Sửa tin nhắn")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Hủy") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Gửi lại") {
-                        Task {
-                            saving = true
-                            if await onSave(text.trimmingCharacters(in: .whitespacesAndNewlines)) { dismiss() }
-                            saving = false
-                        }
-                    }
-                    .disabled(saving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text == message.text)
-                    .accessibilityIdentifier("saveEdit")
-                }
-            }
-        }
-        .onAppear {
-            text = message.text
-            focused = true  // straight to the keyboard
-        }
-        .presentationDetents([.medium, .large])
     }
 }
 
