@@ -72,7 +72,6 @@ struct ChatComposer: View {
                     controller.insertFormula(latex)
                 }
             }
-            .presentationDetents([.medium, .large])
         }
     }
 

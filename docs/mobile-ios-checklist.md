@@ -143,30 +143,41 @@ Kế hoạch chi tiết nằm ở [mobile-ios-plan.md](mobile-ios-plan.md); các
 
 ## Giai đoạn 5: Trình soạn công thức (§8) ⚠️ lớn nhất
 
-### Mô hình
-- [ ] `MathNode`: row, symbol, frac, sqrt/root, sup/sub, fence, accent, cases/matrix, text, placeholder
-- [ ] `MathCursor`: vị trí, vùng chọn, đi trái/phải/lên/xuống theo cấu trúc
-- [ ] `LatexSerializer` (cây → LaTeX)
-- [ ] `LatexParser` cho tập LaTeX của các mẫu và `latexToPlain`; gặp lệnh lạ thì báo để chuyển sang chế độ sửa LaTeX thô
-- [ ] Test vòng: parse rồi serialize phải ra như cũ, với mọi mẫu trong `shared/formula_templates.json`
+Hướng làm khác §8: không tự xây cây cú pháp, mà dùng `MTMathList` của SwiftMath làm mô hình (như MathEditor). Bộ máy soạn thảo nằm trong fork (`MTMathEditor`, `MTMathList+Editing`, `xuanthinhJB/SwiftMath@mathmate`), test được bằng `swift test` trên macOS; app chỉ lo vẽ và bàn phím.
+
+### Mô hình (fork SwiftMath)
+- [x] Mô hình = `MTMathList`; parse và serialize bằng `MTMathListBuilder` (`31863d0`)
+- [x] Chỉ số con trỏ `MTMathListIndex`, thêm nhánh `.innerList` cho accent/overline: góc `\widehat`, đoạn thẳng, vectơ, cung sửa được bên trong
+- [x] `MTMathList+Editing` (port MathEditor): chèn, xóa, tìm atom theo chỉ số lồng nhau
+- [x] Xuất LaTeX đúng cho web: `\widehat` không thành `\hat`, `\overrightarrow` không thành `\vec`, cung thành `\overset{\frown}{…}`; bỏ ô trống khi xuất
+- [x] Mở LaTeX có sẵn rồi xuất ra không đổi (test vòng); `\left(…\right)` thành ngoặc thường để sửa được bên trong; `\dfrac` thành `\frac`
+- [x] `cases`/ma trận không sửa trực quan được: mở ở chế độ "Sửa LaTeX"
+- [ ] Test vòng với mọi mẫu trong `shared/formula_templates.json`
+- [ ] Vùng chọn (chọn nhiều atom) và đi lên/xuống giữa tử và mẫu
 
 ### Thao tác
-- [ ] Chèn mẫu: `#?` thành placeholder, `#@` lấy vùng chọn hoặc atom ngay trước con trỏ
-- [ ] Sau khi chèn, nhảy tới placeholder đầu tiên; Tab sang placeholder kế tiếp
-- [ ] Xóa theo cấu trúc (Backspace ở đầu tử số thì tách phân số, v.v.)
+- [x] Gõ ký tự, lệnh (`\le`, `\pi`…) và ký tự Unicode (≤, ∠, π…)
+- [x] `^` mũ, `_` chỉ số (bấm lại để thoát), `/` phân số (số/chữ đứng trước thành tử), `√`, căn bậc n
+- [x] Chèn mẫu: `#?` thành ô trống, `#@` lấy số hạng ngay trước con trỏ; con trỏ nhảy tới ô trống đầu tiên
+- [x] Backspace theo cấu trúc: đi vào phân số/căn/mũ thay vì xóa cả khối; ở đầu một phần thì lùi lại; khối rỗng mới bị xóa
+- [x] Phím ← →: đi qua mọi phần theo thứ tự đọc
 - [ ] Undo/redo, lắc máy để hoàn tác
 
-### Hiển thị và nhập
-- [ ] `EditorView`: render bằng SwiftMath, vẽ con trỏ và vùng chọn, chạm để đặt con trỏ
-- [ ] Bàn phím toán (`inputView`) gồm 4 trang: `123`, `abc`, `∠△`, `f(x)`; phím di chuyển; nút chuyển sang bàn phím hệ thống
-- [ ] Thư viện mẫu 7 tab (ô mẫu vẽ bằng SwiftMath) trong sheet glass
-- [ ] Chế độ "Sửa LaTeX" thô, xem trước trực tiếp
-- [ ] `LatexToPlain`: port `plainMath.ts`; công thức đơn giản thì chèn thành chữ Unicode
-- [ ] Nhãn tiếng Việt cho mọi phím và tooltip
+### Hiển thị và nhập (app)
+- [x] `FormulaCanvas`: vẽ bằng SwiftMath, con trỏ nhấp nháy (bằng Timer: animation lặp làm UI test chờ mãi), ô trống tại con trỏ tô đen, chạm để đặt con trỏ; bàn phím rời gõ được
+- [x] Bàn phím toán 4 trang `123`, `abc`, `Hình`, `f(x)` + trang `Mẫu` (thư viện 7 tab từ `shared/`); nhãn phím vẽ bằng SwiftMath
+- [x] Chế độ "Sửa LaTeX", xem trước trực tiếp; chuyển qua lại với bàn phím
+- [x] `LatexToPlain`: công thức đơn giản chèn thành chữ Unicode (`BC²`, `∠ABC`) (giai đoạn 4)
+- [x] Nhãn tiếng Việt cho mọi phím (VoiceOver)
+- [ ] Thử trên iPad (bàn phím toán rộng hơn) và Dynamic Type lớn
+
+### Kiểm thử
+- [x] 16 test trong fork (`MathEditorTests`), toàn bộ 597 test của SwiftMath qua
+- [x] 5 UI test trình soạn: phân số, `BC²=AB²`, góc và cung, Backspace theo cấu trúc, "Sửa LaTeX" với `cases`
 
 ### Ngang bằng web
-- [ ] Bảng so sánh: cùng thao tác trên web và iOS ra cùng LaTeX, cho mọi mẫu ở 7 tab
-- [ ] VoiceOver đọc được công thức (dùng `accessibilityLabel` từ `latexToPlain` hoặc LaTeX)
+- [ ] Bảng so sánh: cùng thao tác trên web (MathLive) và iOS ra cùng LaTeX, cho mọi mẫu ở 7 tab
+- [x] VoiceOver đọc được công thức (`accessibilityValue` = LaTeX của công thức đang soạn)
 
 ---
 

@@ -59,20 +59,80 @@ final class ComposerTests: XCTestCase {
         XCTAssertEqual(message, "AB⊥CD")
     }
 
-    func testTheFormulaEditorInsertsAChipAndPlainUnicodeWhenItCan() {
-        type("Tính")
+    // MARK: The visual formula editor
+
+    /// The editor takes keys, so accessibility shows it as a text view.
+    private var editorElement: XCUIElement { app.descendants(matching: .any)["formulaEditor"] }
+    private var formula: String { editorElement.value as? String ?? "" }
+
+    private func openFormula() {
         app.buttons["openFormula"].tap()
+        XCTAssertTrue(editorElement.waitForExistence(timeout: 5))
+    }
+
+    private func keys(_ ids: String...) {
+        for id in ids { app.buttons["key-\(id)"].tap() }
+    }
+
+    private func page(_ name: String) { app.buttons["page-\(name)"].tap() }
+
+    func testAFractionFromTheKeyboardBecomesAChip() {
+        type("Tính")
+        openFormula()
+        keys("frac", "1", "right", "2")
+        XCTAssertEqual(formula, "\\frac{1}{2}")
+        app.buttons["insertFormula"].tap()
+        XCTAssertEqual(message, "Tính $\\frac{1}{2}$ ")
+    }
+
+    func testSimpleFormulasArriveAsUnicode() {
+        openFormula()
+        page("abc")
+        keys("B", "C")
+        page("123")
+        keys("square", "=")
+        page("abc")
+        keys("A", "B")
+        page("123")
+        keys("square")
+        XCTAssertEqual(formula, "BC^{2}=AB^{2}")
+        app.buttons["insertFormula"].tap()
+        XCTAssertEqual(message, "BC²=AB² ")
+    }
+
+    func testGeometryNotationIsEditableInside() {
+        openFormula()
+        page("Hình")
+        keys("hat", "A", "B", "C")
+        XCTAssertEqual(formula, "\\widehat{ABC}")
+        app.buttons["insertFormula"].tap()
+        XCTAssertEqual(message, "∠ABC ", "a simple angle becomes plain text")
+
+        openFormula()
+        page("Hình")
+        keys("arc", "A", "B")
+        XCTAssertEqual(formula, "\\overset{\\frown}{AB}")
+        app.buttons["insertFormula"].tap()
+        XCTAssertEqual(message, "∠ABC $\\overset{\\frown}{AB}$ ")
+    }
+
+    func testBackspaceGoesThroughTheStructure() {
+        openFormula()
+        keys("1", "frac", "2")  // 1 / 2: the 1 becomes the numerator
+        XCTAssertEqual(formula, "\\frac{1}{2}")
+        keys("backspace", "backspace")  // the 2, then back into the numerator
+        keys("backspace", "backspace")  // the 1, then the empty fraction
+        XCTAssertEqual(formula, "")
+    }
+
+    func testLatexCanBeTypedDirectly() {
+        openFormula()
+        app.buttons["toggleLatex"].tap()
         let latex = app.textFields["latexField"].exists ? app.textFields["latexField"] : app.textViews["latexField"]
         XCTAssertTrue(latex.waitForExistence(timeout: 5))
-        latex.typeText("BC^2=AB^2+AC^2")
+        latex.typeText("\\begin{cases}x=1\\\\y=2\\end{cases}")
         app.buttons["insertFormula"].tap()
-        XCTAssertEqual(message, "Tính BC²=AB²+AC² ")
-
-        app.buttons["openFormula"].tap()
-        XCTAssertTrue(latex.waitForExistence(timeout: 5))
-        latex.typeText("\\frac{1}{2}")
-        app.buttons["insertFormula"].tap()
-        XCTAssertEqual(message, "Tính BC²=AB²+AC² $\\frac{1}{2}$ ")
+        XCTAssertEqual(message, "$\\begin{cases}x=1\\\\y=2\\end{cases}$ ")
     }
 
     func testAMessageWithAFormulaIsSentAsLatex() {
