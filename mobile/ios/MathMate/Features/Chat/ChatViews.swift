@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// A conversation with the tutor, or a new one when `conversationId` is nil
-/// (web: routes/ChatPage.tsx). The figure panel comes in phase 6; for now a sheet shows the
-/// latest drawing.
+/// (web: routes/ChatPage.tsx). The figure lives in an inspector: a sheet on iPhone, a column on
+/// the right on iPad (shown by itself for geometry problems there).
 struct ChatView: View {
     @Environment(SessionStore.self) private var session
     @Environment(ChatStore.self) private var chat
@@ -12,6 +12,7 @@ struct ChatView: View {
 
     @State private var editing: Message?
     @State private var showingFigure = false
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var detail: ConversationDetail? { conversationId.flatMap { chat.details[$0] } }
     private var turn: PendingTurn? { conversationId.flatMap { chat.pending[$0] } }
@@ -20,6 +21,19 @@ struct ChatView: View {
         detail?.messages.filter { $0.channel == .figure && $0.hasDrawing && $0.imageUrl != nil } ?? []
     }
     private var figureLabel: String? { conversationId.flatMap { chat.figures[$0] } }
+    private var figureMessages: [Message] { detail?.messages.filter { $0.channel == .figure } ?? [] }
+    /// Shown for geometry problems, or once a figure was asked for (web: hasFigurePanel).
+    private var hasFigure: Bool {
+        !figureMessages.isEmpty || figureLabel != nil || detail?.conversation.isGeometry == true
+    }
+    private var figureFailed: Bool {
+        figureLabel == nil && figureMessages.last.map { $0.role == .assistant && !$0.hasDrawing } == true
+    }
+    /// The figure card goes after the last chat message sent before the newest figure message.
+    private var figureCardAfter: String? {
+        guard let newest = figureMessages.last else { return nil }
+        return chatMessages.last(where: { $0.createdAt <= newest.createdAt })?.id
+    }
     private var busy: Bool { turn != nil }
     /// Conversations from before the tutor have drawings only.
     private var legacyProblem: String? {
@@ -36,11 +50,14 @@ struct ChatView: View {
                         WelcomeMessages { example in Task { await send(example.problem, image: nil) } }
                     }
                     if let legacyProblem { LegacyProblem(problem: legacyProblem) }
+                    if hasFigure && figureCardAfter == nil && !figureMessages.isEmpty { figureCard }
                     ForEach(chatMessages) { message in
                         MessageRow(message: message,
                                    editable: !busy && message.id == chatMessages.last(where: { $0.role == .user })?.id,
                                    onEdit: { editing = message })
+                        if message.id == figureCardAfter { figureCard }
                     }
+                    if figureMessages.isEmpty && figureLabel != nil { figureCard }
                     if let turn { PendingRow(turn: turn) }
                     Color.clear.frame(height: 1).id("bottom")
                 }
@@ -88,9 +105,9 @@ struct ChatView: View {
         .navigationTitle(detail?.conversation.title ?? "Cuộc trò chuyện mới")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let detail, !drawings.isEmpty || figureLabel != nil || detail.conversation.isGeometry {
+            if detail != nil, hasFigure {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingFigure = true } label: {
+                    Button { showingFigure.toggle() } label: {
                         if figureLabel != nil {
                             ProgressView()
                         } else {
@@ -101,11 +118,20 @@ struct ChatView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingFigure) {
-            if let id = conversationId {
-                FigureSheet(conversationId: id, drawings: drawings, label: figureLabel)
-                    .presentationDetents([.medium, .large])
+        .inspector(isPresented: $showingFigure) {
+            Group {
+                if let id = conversationId {
+                    DrawingPanel(conversationId: id)
+                } else {
+                    EmptyView()
+                }
             }
+            .inspectorColumnWidth(min: 320, ideal: 420, max: 560)
+            .presentationDetents([.medium, .large])
+        }
+        // iPad: the figure column opens by itself for a geometry problem.
+        .onChange(of: hasFigure, initial: true) {
+            if sizeClass == .regular && hasFigure { showingFigure = true }
         }
         .sheet(item: $editing) { message in
             EditMessageSheet(message: message) { text in
@@ -116,6 +142,10 @@ struct ChatView: View {
         .task(id: conversationId) {
             if let id = conversationId { await chat.load(id) }
         }
+    }
+
+    private var figureCard: some View {
+        FigureCard(latest: drawings.last, busyLabel: figureLabel, failed: figureFailed) { showingFigure = true }
     }
 
     private func scrollDown(_ proxy: ScrollViewProxy) {
@@ -340,46 +370,6 @@ private struct NoticeBanner: View {
                     try? await Task.sleep(for: .seconds(5))
                     if chat.notice?.id == notice.id { withAnimation { chat.notice = nil } }
                 }
-        }
-    }
-}
-
-// MARK: - The figure (the full panel comes in phase 6)
-
-private struct FigureSheet: View {
-    @Environment(ChatStore.self) private var chat
-    let conversationId: String
-    let drawings: [Message]
-    let label: String?
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    if let label {
-                        HStack(spacing: 8) { ProgressView(); Text(label).foregroundStyle(.secondary) }
-                            .padding(.top, 24)
-                    }
-                    if let path = drawings.last?.imageUrl {
-                        AuthImage(path: path)
-                            .background(Color.white, in: .rect(cornerRadius: 12))
-                            .padding(.horizontal, 16)
-                    } else if label == nil {
-                        ContentUnavailableView("Chưa có hình vẽ", systemImage: "triangle",
-                                               description: Text("Bấm “Vẽ hình” để \(Brand.appName) vẽ hình cho đề bài."))
-                    }
-                }
-            }
-            .navigationTitle("Hình vẽ")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(drawings.isEmpty ? "Vẽ hình" : "Vẽ lại") {
-                        Task { await chat.drawFigure(conversationId: conversationId) }
-                    }
-                    .disabled(label != nil)
-                }
-            }
         }
     }
 }

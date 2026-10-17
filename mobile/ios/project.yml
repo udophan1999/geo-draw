@@ -44,6 +44,7 @@ targets:
            UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         MMAPIBaseURL: $(MATHMATE_API_URL)
         NSCameraUsageDescription: MathMate dùng camera để chụp đề bài gửi cho gia sư.
+        NSPhotoLibraryAddUsageDescription: MathMate lưu hình vẽ vào thư viện ảnh khi bạn chọn Lưu hình.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
     settings:

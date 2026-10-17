@@ -183,14 +183,17 @@ Hướng làm khác §8: không tự xây cây cú pháp, mà dùng `MTMathList`
 
 ## Giai đoạn 6: Hình vẽ (§9)
 
-- [ ] Thẻ hình vẽ trong chat; chạm vào mở sheet (`.medium`/`.large`)
-- [ ] iPad: cột thứ ba của `NavigationSplitView`
-- [ ] Chọn phiên bản hình đang xem
-- [ ] "Yêu cầu chỉnh hình" + danh sách yêu cầu đã gửi
-- [ ] Nhãn tiến độ khi đang vẽ; "Vẽ lại" khi lỗi
-- [ ] Phóng to / kéo hình (double-tap để zoom)
-- [ ] Video bằng `AVPlayer`
-- [ ] `ShareLink`: lưu vào Ảnh / gửi đi
+- [x] Thẻ hình vẽ trong chat (ảnh thu nhỏ, đang vẽ, lỗi), đặt sau tin chat cuối trước hình mới nhất; chạm vào mở bảng hình vẽ
+- [x] Bảng hình vẽ là `.inspector`: sheet `.medium`/`.large` trên iPhone, cột bên phải trên iPad (tự mở với bài hình học)
+- [x] Chọn phiên bản hình đang xem; phiên bản mới thì tự hiện và cuộn lên đầu
+- [x] "Yêu cầu chỉnh hình" + "Đã yêu cầu: …"; gửi xong thì đóng bàn phím
+- [x] Nhãn tiến độ khi đang vẽ; báo lỗi + "Vẽ lại"; "Vẽ hình" khi chưa có hình
+- [x] Phóng to / kéo hình, chạm hai lần để zoom, nút −/vừa khung/+ (`ZoomableImage`, `UIScrollView`)
+- [x] Video: tải về bằng phiên đăng nhập rồi phát bằng `AVPlayer`
+- [x] `ShareLink`: chia sẻ / lưu hình (`NSPhotoLibraryAddUsageDescription`)
+- [x] UI test: bài tam giác vẽ thật bằng parser trên server test, chỉnh hình ra phiên bản 2, chuyển phiên bản
+- [ ] Trình chỉnh hình thủ công và mã/nhật ký vẽ (web đang ẩn bằng `SHOW_ADVANCED = false`; làm khi web bật lại)
+- [ ] 🍎 Thử video và "Lưu hình" trên máy thật
 
 ---
 
