@@ -1,0 +1,94 @@
+# The MathMate iOS app (plan: docs/mobile-ios-plan.md, progress: docs/mobile-ios-checklist.md).
+#   cd mobile/ios && xcodegen generate && open MathMate.xcodeproj
+#   xcodebuild test -project MathMate.xcodeproj -scheme MathMate \
+#     -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.2'
+# Debug talks to http://127.0.0.1:8000 (`./start.sh dev` from the repo root); Release to production.
+name: MathMate
+options:
+  bundleIdPrefix: com.tvcsoft
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: vi
+packages:
+  SwiftMath:
+    # Fork with arcs, \backsim and editing support (docs/mobile-ios-spike.md).
+    url: https://github.com/xuanthinhJB/SwiftMath.git
+    branch: mathmate
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  MathMate:
+    type: application
+    platform: iOS
+    sources:
+      - MathMate
+      # The symbol bar and the formula gallery, shared with the web app.
+      - path: ../../shared/symbols.json
+        buildPhase: resources
+      - path: ../../shared/formula_templates.json
+        buildPhase: resources
+    dependencies:
+      - package: SwiftMath
+    info:
+      path: MathMate/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: MathMate
+        CFBundleDevelopmentRegion: vi
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations~ipad:
+          [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown,
+           UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        MMAPIBaseURL: $(MATHMATE_API_URL)
+        NSCameraUsageDescription: MathMate dùng camera để chụp đề bài gửi cho gia sư.
+        NSPhotoLibraryAddUsageDescription: MathMate lưu hình vẽ vào thư viện ảnh khi bạn chọn Lưu hình.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tvcsoft.mathmate
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+      configs:
+        Debug:
+          MATHMATE_API_URL: "http://127.0.0.1:8000"
+        Release:
+          MATHMATE_API_URL: "https://mathmate.tonyvibecode.com"
+  MathMateTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - MathMateTests
+      # The cases the web passes too (web/e2e/shared-fixtures.spec.ts).
+      - path: ../../shared/fixtures/math_cases.json
+        buildPhase: resources
+    dependencies:
+      - target: MathMate
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tvcsoft.mathmate.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+  MathMateUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [MathMateUITests]
+    dependencies:
+      - target: MathMate
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tvcsoft.mathmate.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_TARGET_NAME: MathMate
+schemes:
+  MathMate:
+    build:
+      targets:
+        MathMate: all
+        MathMateTests: [test]
+        MathMateUITests: [test]
+    test:
+      config: Debug
+      targets: [MathMateTests, MathMateUITests]

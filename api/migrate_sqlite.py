@@ -5,8 +5,8 @@
 In Docker, copy the old data folder into the volume first, then run it inside the container
 (``docker compose run --rm app python -m api.migrate_sqlite /data``).
 
-Copies accounts and login sessions, every conversation and message (users and guests), and
-today's usage. Photos and drawings stay files in the data folder; their paths are rewritten
+Copies accounts (with their role, lock and limit) and login sessions, every conversation and
+message (users and guests), today's usage and the phones registered for push notifications. Photos and drawings stay files in the data folder; their paths are rewritten
 relative to it, so they resolve wherever the folder now lives. Running it again only adds
 what is missing.
 """
@@ -21,6 +21,7 @@ from pathlib import Path
 from geo_draw.accounts import AccountStore
 from geo_draw.conversations import ConversationStore
 from geo_draw.db import PostgresDatabase, database_from_url
+from geo_draw.devices import DeviceStore
 
 from .quota import QuotaStore
 
@@ -90,20 +91,30 @@ def migrate(data_dir: Path, db: PostgresDatabase) -> dict[str, int]:
     AccountStore(users_dir, db).create_tables()
     ConversationStore(users_dir, db).create_tables()
     QuotaStore(data_dir / "usage.sqlite3", db).create_tables()
-    counts = {"users": 0, "sessions": 0, "conversations": 0, "messages": 0, "usage": 0}
+    DeviceStore(data_dir, db).create_tables()
+    counts = {"users": 0, "sessions": 0, "conversations": 0, "messages": 0, "usage": 0,
+              "devices": 0}
 
     accounts = users_dir / "accounts.sqlite3"
     users = _rows(accounts, "SELECT user_id, name, code_hash, salt, failed_attempts, locked_until, "
-                            "created_at FROM users")
-    sessions = _rows(accounts, "SELECT token, user_id, created_at FROM sessions")
+                            "created_at, role, disabled, daily_limit, last_login FROM users")
+    if not users:  # older files lack the admin columns
+        users = [(*row, "user", 0, None, 0) for row in _rows(
+            accounts, "SELECT user_id, name, code_hash, salt, failed_attempts, locked_until, "
+                      "created_at FROM users")]
+    sessions = _rows(accounts, "SELECT token, user_id, created_at, last_used FROM sessions")
+    if not sessions:
+        sessions = [(*row, 0) for row in _rows(
+            accounts, "SELECT token, user_id, created_at FROM sessions")]
     with db.connect() as connection:
         for row in users:
             connection.execute(
                 "INSERT INTO users (user_id, name, code_hash, salt, failed_attempts, locked_until, "
-                "created_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING", row)
+                "created_at, role, disabled, daily_limit, last_login) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING", row)
         for row in sessions:
-            connection.execute("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?) "
-                               "ON CONFLICT DO NOTHING", row)
+            connection.execute("INSERT INTO sessions (token, user_id, created_at, last_used) "
+                               "VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING", row)
     counts["users"], counts["sessions"] = len(users), len(sessions)
 
     found = _copy_conversations(db, users_dir / "conversations.sqlite3", lambda owner: owner)
@@ -122,6 +133,17 @@ def migrate(data_dir: Path, db: PostgresDatabase) -> dict[str, int]:
             connection.execute("INSERT INTO usage (owner, day, count) VALUES (?, ?, ?) "
                                "ON CONFLICT DO NOTHING", row)
     counts["usage"] = len(usage)
+
+    devices = _rows(data_dir / "devices.sqlite3",
+                    "SELECT token, owner, platform, environment, updated_at FROM devices")
+    with db.connect() as connection:
+        for token, owner, platform, environment, updated_at in devices:
+            # A guest's identity is "guest:<id>" in both databases, so owners copy as they are.
+            connection.execute(
+                "INSERT INTO devices (token, owner, platform, environment, updated_at) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                (token, owner, platform, environment, updated_at))
+    counts["devices"] = len(devices)
     return counts
 
 

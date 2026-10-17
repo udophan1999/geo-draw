@@ -54,6 +54,10 @@ class AppState:
     # The first admin, created at startup when no admin exists yet (see ensure_admin).
     admin_username: str | None = field(default_factory=lambda: os.environ.get("ADMIN_USERNAME") or None)
     admin_password: str | None = field(default_factory=lambda: os.environ.get("ADMIN_PASSWORD") or None)
+    # The oldest iOS build (CFBundleVersion) that may still talk to this API; older apps show
+    # "Cập nhật MathMate". Raise it when an API change breaks old builds.
+    min_ios_build: int = field(default_factory=lambda: _int_env("GEO_DRAW_MIN_IOS_BUILD", 0))
+    ios_store_url: str | None = field(default_factory=lambda: os.environ.get("IOS_APP_STORE_URL") or None)
     workers: int = 2
     # APNs credentials (see api/push.py); None: no push notifications.
     apns: ApnsConfig | None = field(default_factory=ApnsConfig.from_env)

@@ -15,6 +15,10 @@ from .history import user_id_for
 
 MAX_FAILED_ATTEMPTS = 5
 LOCK_SECONDS = 300
+# A session ends after this long without use (the apps keep theirs for good otherwise).
+SESSION_IDLE_SECONDS = 90 * 24 * 3600
+# last_used is written at most this often, not on every request.
+SESSION_TOUCH_SECONDS = 3600
 MIN_PASSWORD_LENGTH = 6
 MAX_PASSWORD_LENGTH = 64
 USER = "user"
@@ -58,6 +62,7 @@ _ADDED_COLUMNS = {
               ("disabled", "INTEGER NOT NULL DEFAULT 0"),
               ("daily_limit", "INTEGER"),  # NULL: the server's default limit
               ("last_login", "{FLOAT} NOT NULL DEFAULT 0")],
+    "sessions": [("last_used", "{FLOAT} NOT NULL DEFAULT 0")],  # 0: never since created_at
 }
 _USER_COLUMNS = "user_id, name, role, disabled, daily_limit, created_at, last_login"
 
@@ -190,22 +195,35 @@ class AccountStore:
         now = time.time()
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)",
-                (token, user_id, now),
+                "INSERT INTO sessions (token, user_id, created_at, last_used) VALUES (?, ?, ?, ?)",
+                (token, user_id, now, now),
             )
             connection.execute("UPDATE users SET last_login = ? WHERE user_id = ?", (now, user_id))
         return token
 
     def session_user(self, token: str) -> str | None:
-        """The signed-in user of a session; a locked or deleted account has none."""
+        """The signed-in user of a session; a locked or deleted account has none, and a
+        session unused for ``SESSION_IDLE_SECONDS`` ends."""
         if not token:
             return None
+        now = time.time()
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT s.user_id FROM sessions s JOIN users u ON u.user_id = s.user_id "
-                "WHERE s.token = ? AND u.disabled = 0", (token,)
+                "SELECT s.user_id, s.created_at, s.last_used FROM sessions s "
+                "JOIN users u ON u.user_id = s.user_id WHERE s.token = ? AND u.disabled = 0",
+                (token,)
             ).fetchone()
-        return row[0] if row else None
+            if row is None:
+                return None
+            user_id, created_at, last_used = row
+            last_used = max(last_used, created_at)
+            if now - last_used > SESSION_IDLE_SECONDS:
+                connection.execute("DELETE FROM sessions WHERE token = ?", (token,))
+                return None
+            if now - last_used > SESSION_TOUCH_SECONDS:
+                connection.execute("UPDATE sessions SET last_used = ? WHERE token = ?",
+                                   (now, token))
+        return user_id
 
     def end_session(self, token: str) -> None:
         with self._connect() as connection:

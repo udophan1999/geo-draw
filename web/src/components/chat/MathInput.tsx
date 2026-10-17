@@ -13,17 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { FORMULA_GROUPS } from '@/components/chat/formulaTemplates'
 import { MATHLIVE_VI } from '@/components/chat/mathliveVi'
+import symbols from '@shared/symbols.json'
 import { cn } from '@/lib/utils'
 
-const SYMBOLS: [string, string][] = [
-  ['²', 'Bình phương'], ['³', 'Lập phương'], ['√', 'Căn bậc hai'], ['∛', 'Căn bậc ba'],
-  ['π', 'Pi'], ['±', 'Cộng trừ'], ['×', 'Nhân'], ['÷', 'Chia'], ['≠', 'Khác'],
-  ['≤', 'Nhỏ hơn hoặc bằng'], ['≥', 'Lớn hơn hoặc bằng'], ['≈', 'Xấp xỉ'], ['°', 'Độ'],
-  ['∠', 'Góc'], ['△', 'Tam giác'], ['⊥', 'Vuông góc'], ['∥', 'Song song'], ['∽', 'Đồng dạng'],
-  ['∈', 'Thuộc'], ['∉', 'Không thuộc'], ['⊂', 'Tập con'], ['∪', 'Hợp'], ['∩', 'Giao'],
-  ['∅', 'Tập rỗng'], ['⇒', 'Suy ra'], ['⇔', 'Tương đương'], ['∞', 'Vô cực'],
-  ['α', 'Alpha'], ['β', 'Beta'], ['Δ', 'Delta'],
-]
+// Shared with the iOS app (shared/symbols.json).
+const SYMBOLS: [string, string][] = symbols.map(({ symbol, name }) => [symbol, name])
 
 export function SymbolBar({ onInsert }: { onInsert: (text: string) => void }) {
   return (
