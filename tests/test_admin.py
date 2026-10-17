@@ -162,6 +162,18 @@ class AdminApiTests(ApiTestCase):
         self.assertEqual(admin.delete(f"/api/admin/users/{me}").status_code, 409)
         self.assertEqual(admin.patch("/api/admin/users/nobody", json={"disabled": True}).status_code, 404)
 
+    def test_the_last_admin_cannot_delete_their_own_account(self):
+        admin = self.admin()
+
+        def delete():
+            return admin.request("DELETE", "/api/auth/me", json={"password": "quantri123"})
+
+        self.assertEqual(delete().status_code, 409)
+        other = self.client()
+        self.register(other, "Phó")
+        admin.patch(f"/api/admin/users/{self.user_id(admin, 'Phó')}", json={"role": ADMIN})
+        self.assertEqual(delete().status_code, 204)
+
     def test_delete_removes_the_account_and_its_data(self):
         user = self.client()
         self.register(user, "Dũng")

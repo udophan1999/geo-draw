@@ -64,3 +64,26 @@ test('đăng ký, đăng xuất rồi đăng nhập lại', async ({ page }, tes
   await page.getByRole('menuitem', { name: 'Đăng xuất' }).click()
   await expect(page).toHaveURL(/\/login$/)
 })
+
+test('xóa tài khoản cần đúng mật khẩu', async ({ page, asUser }) => {
+  const name = await asUser()
+  if (isPhone()) await page.getByRole('button', { name: 'Mở menu' }).click()
+  await page.getByRole('button', { name }).click()
+  await page.getByRole('menuitem', { name: 'Cài đặt' }).click()
+  await page.getByRole('button', { name: 'Xóa…' }).click()
+
+  const dialog = page.getByRole('alertdialog')
+  await dialog.getByLabel('Nhập mật khẩu để xác nhận').fill('sai-mat-khau')
+  await dialog.getByRole('button', { name: 'Xóa vĩnh viễn' }).click()
+  await expect(dialog.getByRole('alert')).toHaveText('Mật khẩu không đúng.')
+
+  await dialog.getByLabel('Nhập mật khẩu để xác nhận').fill('matkhau123')
+  await dialog.getByRole('button', { name: 'Xóa vĩnh viễn' }).click()
+  await expect(page).toHaveURL(/\/login$/)
+
+  // The account is gone: its name and password no longer sign in.
+  await page.getByLabel('Tên đăng nhập').fill(name)
+  await page.getByLabel('Mật khẩu').fill('matkhau123')
+  await page.getByRole('button', { name: 'Đăng nhập' }).click()
+  await expect(page.getByRole('alert')).toHaveText('Sai tên đăng nhập hoặc mật khẩu.')
+})

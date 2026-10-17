@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Markdown from 'react-markdown'
 import { toast } from 'sonner'
 
+import { DeleteAccountDialog } from '@/components/DeleteAccountDialog'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
@@ -30,6 +31,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const help = useHelp()
   // Unsaved edits; null means "show what is saved". Cleared whenever the dialog closes.
   const [edits, setEdits] = useState<Settings | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const aiAvailable = me.data?.ai_available ?? true
   // Without a server key, AI mode cannot run: preselect the parser instead.
   const stored = saved.data && !aiAvailable ? { ...saved.data, mode: 'parser' as const } : saved.data
@@ -132,6 +134,18 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                 <Markdown>{help.data?.markdown ?? ''}</Markdown>
               </CollapsibleContent>
             </Collapsible>
+
+            {me.data?.user && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 px-3 py-2">
+                <span className="grid gap-0.5">
+                  <span className="text-sm font-medium">Xóa tài khoản</span>
+                  <span className="text-xs text-muted-foreground">Xóa vĩnh viễn tài khoản và mọi dữ liệu.</span>
+                </span>
+                <Button variant="outline" size="sm" className="shrink-0 text-destructive" onClick={() => setDeleting(true)}>
+                  Xóa…
+                </Button>
+              </div>
+            )}
           </div>
         )}
         <DialogFooter>
@@ -142,6 +156,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           </Button>
         </DialogFooter>
       </DialogContent>
+      <DeleteAccountDialog open={deleting} onOpenChange={setDeleting} />
     </Dialog>
   )
 }

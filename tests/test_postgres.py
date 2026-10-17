@@ -16,10 +16,11 @@ import uuid
 from pathlib import Path
 from unittest.mock import patch
 
-from geo_draw.accounts import AccountStore
+from geo_draw.accounts import ADMIN, AccountStore
 from geo_draw.ai_codegen import AiSettings
 from geo_draw.conversations import ASSISTANT, CHAT, USER, ConversationStore
 from geo_draw.db import PostgresDatabase
+from geo_draw.devices import SANDBOX, DeviceStore
 
 URL = os.environ.get("GEO_DRAW_TEST_DATABASE_URL")
 
@@ -158,7 +159,10 @@ class MigrationTests(PostgresTestCase):
         users_dir, guest_dir = self.root / "users", self.root / "sessions" / ("a" * 24)
         accounts = AccountStore(users_dir)
         user_id = accounts.create("Tony", "pass2468")
+        accounts.set_role(user_id, ADMIN)
+        accounts.set_daily_limit(user_id, 7)
         token = accounts.start_session(user_id)
+        DeviceStore(self.root).register(user_id, "ab" * 32, environment=SANDBOX)
         mine = ConversationStore(users_dir)
         conversation = mine.create(user_id, "Tam giác ABC")
         image = users_dir / user_id / "conversations" / conversation.id / "m" / "a.png"
@@ -177,11 +181,16 @@ class MigrationTests(PostgresTestCase):
         db = self.database()
         for _ in range(2):  # a second run adds nothing
             counts = migrate(self.root, db)
-        self.assertEqual((counts["users"], counts["conversations"], counts["messages"]), (1, 2, 1))
+        self.assertEqual((counts["users"], counts["conversations"], counts["messages"],
+                          counts["devices"]), (1, 2, 1, 1))
 
         accounts = AccountStore(users_dir, db)
         self.assertEqual(accounts.verify("tony", "pass2468"), user_id)
         self.assertEqual(accounts.session_user(token), user_id)
+        user = accounts.get_user(user_id)
+        self.assertEqual((user.role, user.daily_limit), (ADMIN, 7))  # admins stay admins
+        self.assertEqual([d.token for d in DeviceStore(self.root, db).for_owner(user_id)],
+                         ["ab" * 32])
         store = ConversationStore(users_dir, db)
         [moved] = store.messages(conversation.id)
         self.assertEqual(moved.image_path, image)  # resolved under this data folder
@@ -196,7 +205,8 @@ class PostgresApiTests(PostgresTestCase):
         super().setUp()
         from api.main import create_app
 
-        self.app = create_app(self.root, ai=AiSettings(api_key="test-key"), database_url=self.url)
+        self.app = create_app(self.root, ai=AiSettings(api_key="test-key"), database_url=self.url,
+                              apns=None)
         self.state = self.app.state.geo
         self.addCleanup(self.state.close)
         self.addCleanup(lambda: self.state.jobs.shutdown(wait=True))

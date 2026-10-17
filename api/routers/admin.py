@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import time
 from datetime import date, timedelta
 
@@ -270,10 +269,7 @@ def delete_user(user_id: str, request: Request, admin: Owner = Depends(require_a
     state = app_state(request)
     _target(state, user_id)
     _not_self(admin, user_id, "xóa")
-    state.conversations.delete_owner(user_id)
-    state.accounts.delete_user(user_id)
-    workspace = state.users_dir / user_id  # settings.json and any files left
-    shutil.rmtree(workspace, ignore_errors=True)
+    state.delete_account(user_id)
 
 
 @router.get("/prompts")

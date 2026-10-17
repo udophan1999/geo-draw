@@ -9,6 +9,8 @@ WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY web/ ./
+# web/ imports ../shared (data shared with the iOS app) through the @shared alias.
+COPY shared/ /shared/
 RUN npm run build
 
 # 2. Python packages (pycairo and friends compile against the -dev libraries) --------------

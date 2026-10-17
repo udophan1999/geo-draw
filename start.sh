@@ -59,7 +59,7 @@ if [ "$MODE" = dev ]; then
 else
   # Rebuild only when the web app changed since the last build.
   if [ ! -f web/dist/index.html ] ||
-     [ -n "$(find web/src web/public web/index.html web/package.json web/vite.config.ts \
+     [ -n "$(find web/src web/public web/index.html web/package.json web/vite.config.ts shared \
                -newer web/dist/index.html -print -quit 2>/dev/null)" ]; then
     log "Build giao diện..."
     npm --prefix web run build

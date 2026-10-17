@@ -1,0 +1,385 @@
+[
+  {
+    "id": "basic",
+    "name": "Cơ bản",
+    "items": [
+      {
+        "label": "Phân số",
+        "latex": "\\frac{#@}{#?}"
+      },
+      {
+        "label": "Hỗn số",
+        "latex": "#?\\frac{#?}{#?}"
+      },
+      {
+        "label": "Căn bậc hai",
+        "latex": "\\sqrt{#?}"
+      },
+      {
+        "label": "Căn bậc n",
+        "latex": "\\sqrt[#?]{#?}"
+      },
+      {
+        "label": "Lũy thừa",
+        "latex": "#@^{#?}"
+      },
+      {
+        "label": "Bình phương",
+        "latex": "#@^2"
+      },
+      {
+        "label": "Chỉ số dưới",
+        "latex": "#@_{#?}"
+      },
+      {
+        "label": "Giá trị tuyệt đối",
+        "latex": "\\left|#?\\right|"
+      },
+      {
+        "label": "Ngoặc tròn",
+        "latex": "\\left(#?\\right)"
+      },
+      {
+        "label": "Ngoặc vuông",
+        "latex": "\\left[#?\\right]"
+      },
+      {
+        "label": "Ngoặc nhọn",
+        "latex": "\\left\\{#?\\right\\}"
+      },
+      {
+        "label": "Phần trăm",
+        "latex": "#?\\%"
+      }
+    ]
+  },
+  {
+    "id": "symbols",
+    "name": "Ký hiệu",
+    "items": [
+      {
+        "label": "Nhỏ hơn hoặc bằng",
+        "latex": "\\le"
+      },
+      {
+        "label": "Lớn hơn hoặc bằng",
+        "latex": "\\ge"
+      },
+      {
+        "label": "Khác",
+        "latex": "\\ne"
+      },
+      {
+        "label": "Xấp xỉ",
+        "latex": "\\approx"
+      },
+      {
+        "label": "Cộng trừ",
+        "latex": "\\pm"
+      },
+      {
+        "label": "Nhân",
+        "latex": "\\times"
+      },
+      {
+        "label": "Chia",
+        "latex": "\\div"
+      },
+      {
+        "label": "Chấm nhân",
+        "latex": "\\cdot"
+      },
+      {
+        "label": "Vô cực",
+        "latex": "\\infty"
+      },
+      {
+        "label": "Pi",
+        "latex": "\\pi"
+      },
+      {
+        "label": "Độ",
+        "latex": "^\\circ"
+      },
+      {
+        "label": "Alpha",
+        "latex": "\\alpha"
+      },
+      {
+        "label": "Beta",
+        "latex": "\\beta"
+      },
+      {
+        "label": "Gamma",
+        "latex": "\\gamma"
+      },
+      {
+        "label": "Delta",
+        "latex": "\\Delta"
+      },
+      {
+        "label": "Phi",
+        "latex": "\\varphi"
+      }
+    ]
+  },
+  {
+    "id": "geometry",
+    "name": "Hình học",
+    "items": [
+      {
+        "label": "Góc",
+        "latex": "\\widehat{#?}"
+      },
+      {
+        "label": "Góc (ký hiệu)",
+        "latex": "\\angle #?"
+      },
+      {
+        "label": "Tam giác",
+        "latex": "\\triangle #?"
+      },
+      {
+        "label": "Vuông góc",
+        "latex": "\\perp"
+      },
+      {
+        "label": "Song song",
+        "latex": "\\parallel"
+      },
+      {
+        "label": "Đoạn thẳng",
+        "latex": "\\overline{#?}"
+      },
+      {
+        "label": "Vectơ",
+        "latex": "\\overrightarrow{#?}"
+      },
+      {
+        "label": "Cung",
+        "latex": "\\overset{\\frown}{#?}"
+      },
+      {
+        "label": "Đồng dạng",
+        "latex": "\\backsim"
+      },
+      {
+        "label": "Số đo độ",
+        "latex": "#?^\\circ"
+      },
+      {
+        "label": "Tam giác bằng nhau",
+        "latex": "\\triangle #?=\\triangle #?"
+      },
+      {
+        "label": "Tam giác đồng dạng",
+        "latex": "\\triangle #?\\backsim\\triangle #?"
+      }
+    ]
+  },
+  {
+    "id": "trig",
+    "name": "Lượng giác",
+    "items": [
+      {
+        "label": "sin",
+        "latex": "\\sin #?"
+      },
+      {
+        "label": "cos",
+        "latex": "\\cos #?"
+      },
+      {
+        "label": "tan",
+        "latex": "\\tan #?"
+      },
+      {
+        "label": "cot",
+        "latex": "\\cot #?"
+      },
+      {
+        "label": "sin²",
+        "latex": "\\sin^2 #?"
+      },
+      {
+        "label": "cos²",
+        "latex": "\\cos^2 #?"
+      },
+      {
+        "label": "sin góc",
+        "latex": "\\sin\\widehat{#?}"
+      },
+      {
+        "label": "cos góc",
+        "latex": "\\cos\\widehat{#?}"
+      }
+    ]
+  },
+  {
+    "id": "algebra",
+    "name": "Đại số & giải tích",
+    "items": [
+      {
+        "label": "Hệ 2 phương trình",
+        "latex": "\\begin{cases}#?\\\\#?\\end{cases}"
+      },
+      {
+        "label": "Hệ 3 phương trình",
+        "latex": "\\begin{cases}#?\\\\#?\\\\#?\\end{cases}"
+      },
+      {
+        "label": "Hàm số",
+        "latex": "f(#?)"
+      },
+      {
+        "label": "Đạo hàm",
+        "latex": "f'(#?)"
+      },
+      {
+        "label": "Logarit",
+        "latex": "\\log_{#?}#?"
+      },
+      {
+        "label": "Logarit tự nhiên",
+        "latex": "\\ln #?"
+      },
+      {
+        "label": "Giới hạn",
+        "latex": "\\lim_{#?\\to #?}#?"
+      },
+      {
+        "label": "Tổng",
+        "latex": "\\sum_{#?}^{#?}#?"
+      },
+      {
+        "label": "Tích phân",
+        "latex": "\\int_{#?}^{#?}#?\\,dx"
+      },
+      {
+        "label": "Nghiệm x₁, x₂",
+        "latex": "x_{1,2}"
+      }
+    ]
+  },
+  {
+    "id": "sets",
+    "name": "Tập hợp & logic",
+    "items": [
+      {
+        "label": "Thuộc",
+        "latex": "\\in"
+      },
+      {
+        "label": "Không thuộc",
+        "latex": "\\notin"
+      },
+      {
+        "label": "Tập con",
+        "latex": "\\subset"
+      },
+      {
+        "label": "Hợp",
+        "latex": "\\cup"
+      },
+      {
+        "label": "Giao",
+        "latex": "\\cap"
+      },
+      {
+        "label": "Tập rỗng",
+        "latex": "\\varnothing"
+      },
+      {
+        "label": "Suy ra",
+        "latex": "\\Rightarrow"
+      },
+      {
+        "label": "Tương đương",
+        "latex": "\\Leftrightarrow"
+      },
+      {
+        "label": "Với mọi",
+        "latex": "\\forall"
+      },
+      {
+        "label": "Tồn tại",
+        "latex": "\\exists"
+      },
+      {
+        "label": "Số tự nhiên",
+        "latex": "\\mathbb{N}"
+      },
+      {
+        "label": "Số nguyên",
+        "latex": "\\mathbb{Z}"
+      },
+      {
+        "label": "Số hữu tỉ",
+        "latex": "\\mathbb{Q}"
+      },
+      {
+        "label": "Số thực",
+        "latex": "\\mathbb{R}"
+      },
+      {
+        "label": "Tập hợp",
+        "latex": "\\left\\{#?\\mid #?\\right\\}"
+      }
+    ]
+  },
+  {
+    "id": "formulas",
+    "name": "Công thức mẫu",
+    "wide": true,
+    "items": [
+      {
+        "label": "Định lý Pythagore",
+        "latex": "BC^2=AB^2+AC^2"
+      },
+      {
+        "label": "Hệ thức lượng: đường cao",
+        "latex": "AH^2=BH\\cdot CH"
+      },
+      {
+        "label": "Hệ thức lượng: cạnh góc vuông",
+        "latex": "AB^2=BH\\cdot BC"
+      },
+      {
+        "label": "Bình phương một tổng",
+        "latex": "(a+b)^2=a^2+2ab+b^2"
+      },
+      {
+        "label": "Bình phương một hiệu",
+        "latex": "(a-b)^2=a^2-2ab+b^2"
+      },
+      {
+        "label": "Hiệu hai bình phương",
+        "latex": "a^2-b^2=(a-b)(a+b)"
+      },
+      {
+        "label": "Biệt thức",
+        "latex": "\\Delta=b^2-4ac"
+      },
+      {
+        "label": "Công thức nghiệm",
+        "latex": "x_{1,2}=\\frac{-b\\pm\\sqrt{\\Delta}}{2a}"
+      },
+      {
+        "label": "Hệ thức Vi-ét",
+        "latex": "x_1+x_2=-\\frac{b}{a},\\ x_1x_2=\\frac{c}{a}"
+      },
+      {
+        "label": "Diện tích tam giác",
+        "latex": "S=\\frac{1}{2}ah"
+      },
+      {
+        "label": "Đường tròn",
+        "latex": "C=2\\pi R,\\ S=\\pi R^2"
+      },
+      {
+        "label": "Lượng giác cơ bản",
+        "latex": "\\sin^2x+\\cos^2x=1"
+      }
+    ]
+  }
+]

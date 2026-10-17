@@ -162,6 +162,9 @@ export const api = {
   register: (username: string, password: string) =>
     request<Me>('/auth/register', { method: 'POST', body: json({ username, password }) }),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
+  /** Delete the signed-in account and all its data; the password is asked again. */
+  deleteAccount: (password: string) =>
+    request<void>('/auth/me', { method: 'DELETE', body: json({ password }) }),
 
   settings: () => request<Settings>('/settings'),
   saveSettings: (settings: Settings) =>

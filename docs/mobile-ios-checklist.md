@@ -1,0 +1,256 @@
+# Checklist tiến độ app iOS
+
+Kế hoạch chi tiết nằm ở [mobile-ios-plan.md](mobile-ios-plan.md); các số `§` ở dưới trỏ về file đó. Mỗi việc nên làm xong trong khoảng nửa ngày đến hai ngày. Đánh `[x]` khi xong và ghi mã commit, PR hoặc ngày bên cạnh.
+
+**Ký hiệu:** ⚠️ rủi ro cao · 🍎 cần tài khoản Apple Developer hoặc iPhone thật · 🔁 phải làm cả trên web để giữ ngang bằng
+
+---
+
+## Giai đoạn 0: Backend (§3)
+
+### Xác thực cho app
+- [x] Token Bearer: `login`/`register` trả `token` khi có `X-Client: ios`; `get_owner` và `logout` đọc `Authorization: Bearer` (`ce46382`)
+- [x] Guest id qua header `X-Guest-Id`; server cấp id mới qua header phản hồi, không đặt cookie (`ce46382`)
+- [x] Hạn của session: hết hạn sau 90 ngày không dùng, `last_used` ghi tối đa mỗi giờ một lần (`9154f21`)
+- [ ] Quyết định nhánh đích cho PR: `dev` hay `master`
+
+### Tài khoản
+- [x] `DELETE /api/auth/me`: hỏi lại mật khẩu, tính vào khóa đăng nhập, chặn quản trị viên cuối cùng (`8e6586d`)
+- [x] 🔁 Nút "Xóa tài khoản" trong phần Cài đặt của web (`56921ef`)
+
+### Thông báo đẩy
+- [x] Bảng `devices` + `POST/DELETE /api/devices` (`3b5074f`)
+- [x] `PushNotifier` + `ApnsClient` (HTTP/2, JWT ES256), xóa token chết (`3b5074f`)
+- [x] Gửi push khi job kết thúc mà không ai xem (`watched_at_end`) (`3b5074f`)
+- [x] `migrate_sqlite` chép cả bảng `devices`; sửa luôn lỗi mất `role`/`daily_limit` khi chép (`6c8e0dc`)
+
+### Cấu hình app và dữ liệu dùng chung
+- [x] `GET /api/app-config` trả `{min_ios_build, ios_store_url}`, kèm test (`e283c6b`)
+- [x] Tạo `shared/formula_templates.json` từ `formulaTemplates.ts`; 🔁 web import từ JSON (alias `@shared`)
+- [x] Tạo `shared/symbols.json` từ `SYMBOLS` trong `MathInput.tsx`; 🔁 web import từ JSON
+- [x] Tạo `shared/fixtures/math_cases.json` cho `normalizeMath`, `latexToPlain`, `toMessageText`; 🔁 test web `e2e/shared-fixtures.spec.ts` đọc fixtures này
+- [ ] 🔁 Lỗi: hai chip công thức liền nhau xuất ra `$x$$y$`, dễ bị hiểu thành `$$` (công thức khối). Cần quyết định cách tách (ví dụ thêm khoảng trắng) rồi thêm ca này vào fixtures
+- [ ] `latexToPlain` chưa đổi `\backsim` (mẫu "Tam giác đồng dạng" nên vẫn là chip); thêm vào nếu muốn hiện thành `∽`
+- [x] Cập nhật `CLAUDE.md` (mục `shared/`, `app-config`, hạn session)
+- [ ] Mở PR cho giai đoạn 0
+
+---
+
+## Giai đoạn 1: Spike rủi ro (§6, §7, §8): quyết định làm tiếp hay đổi hướng
+
+- [x] ⚠️ Project thử với SwiftMath, render toàn bộ 7 tab mẫu công thức: 104/104 với fork, xem [mobile-ios-spike.md](mobile-ios-spike.md)
+- [x] ⚠️ Kiểm tra riêng các lệnh: upstream `main` đã có `\overrightarrow`, `\dfrac`, `\varnothing`, `cases`; fork thêm cung và `\backsim`
+- [x] ⚠️ Đo trên câu trả lời thật (local: 51 câu, 134 công thức): 134/134 với upstream `main`
+- [ ] Đo lại với dữ liệu production (từ bản backup, chỉ đọc)
+- [x] ⚠️ Fork SwiftMath (`xuanthinhJB/SwiftMath@mathmate`, `8da9a4e`): cung `\overset{\frown}`, `\backsim`; chọn font TeX Gyre Termes (đủ tiếng Việt)
+- [x] Công thức trong dòng chữ: `Text` + `Image` căn baseline, xuống dòng đúng, trên iOS 17.2 và 26.5 (`mobile/ios/Spikes/UISpike`)
+- [x] `UITextView` + `NSTextAttachment`: chèn chip, Backspace trả lại `$latex$`, xuất `toMessageText`; 3 XCUITest qua trên iOS 17 và 26
+- [x] ⚠️ Con trỏ trong trình soạn công thức: port `MTDisplay+Editing` của kostub/MathEditor vào fork (`f09276c`), chạm đúng chỗ kể cả lồng nhiều cấp
+- [x] SSE bằng `URLSession.bytes`: đọc đủ `delta` với API thật + AI giả
+- [ ] SSE: kết nối lại sau khi app vào nền (làm ở giai đoạn 3, `JobFollower`)
+- [x] **Kết luận spike**: làm tiếp với fork SwiftMath + TeX Gyre Termes; giai đoạn 5 giữ 4–6 tuần (xem [mobile-ios-spike.md](mobile-ios-spike.md))
+
+---
+
+## Giai đoạn 2: Nền tảng (§2, §4, §5)
+
+### Project
+- [x] Tạo `mobile/ios/MathMate.xcodeproj`: iOS 17+, Swift 6, SwiftUI lifecycle, bundle id
+- [x] Thêm SwiftPM: SwiftMath (fork)
+- [ ] Thêm swift-markdown, swift-snapshot-testing (khi cần ở giai đoạn 3/8)
+- [x] Icon app (từ `web/public/logo.svg`), màu chủ đạo, màn hình khởi động
+- [ ] `Localizable.xcstrings` (vi), `PrivacyInfo.xcprivacy`
+- [x] Cấu hình build Debug/Release với `API_BASE_URL` (máy local / production)
+- [x] Cập nhật `.gitignore` cho Xcode (`xcuserdata`, `DerivedData`)
+
+### Design system
+- [x] `mmGlass(in:interactive:)`, `MMGlassContainer`, `mmGlassID`, mỗi cái có phương án dự phòng cho iOS 17
+- [x] Màu (theo `index.css` của web), `Brand` ("MathMate"), haptics
+- [ ] Preview mỗi component ở 4 tổ hợp: iOS 26 / 17 × sáng / tối
+
+### Core
+- [x] `Models.swift`: Codable cho `Me`, `Conversation`, `Message`, `Settings`, `Example`, `Progress`, `APIError` (`detail` + `suggestions`)
+- [x] `APIClient`: async/await, tự gắn `X-Client`, `Authorization`, `X-Guest-Id`; lưu `X-Guest-Id` mới
+- [x] `Keychain`: token và guest id (giữ lại sau khi cài lại app)
+- [x] `SSEParser`, có unit test
+- [ ] `JobFollower` (`AsyncStream<JobEvent>`, kết nối lại) — giai đoạn 3
+- [ ] `ImageLoader` có header auth và cache theo `?v=`
+
+### Kiểm thử giai đoạn 2
+- [x] 13 unit test (Swift Testing, `URLProtocol` giả): header, guest id, token, lỗi tiếng Việt, `SessionStore`, `SSEParser`
+- [x] 5 UI test với `web/e2e/server.py` (API thật, AI giả): dùng thử, sai mật khẩu, đăng ký, tên trùng + gợi ý, xóa tài khoản; qua trên iOS 17.2 và 26.5
+
+### Màn hình
+- [x] `SessionStore` (`@Observable`): `me`, `quota`, trạng thái đăng nhập / khách
+- [x] Đăng nhập: lỗi 401, khóa 429, tài khoản bị khóa 403
+- [x] Đăng ký: gợi ý tên khi trùng (409), chạm gợi ý thì điền vào ô
+- [x] "Dùng thử không cần tài khoản" + nhắc "Đăng nhập để lưu lại lịch sử hỏi đáp"
+- [x] Danh sách cuộc trò chuyện: kéo để làm mới, đổi tên, xóa (vuốt + xác nhận), cuộc mới
+- [x] Bài mẫu khi chat trống (`/api/examples`)
+- [x] Cài đặt: mode/model/quality/animate, quy ước vẽ (`/api/help`), đăng xuất
+- [ ] Đăng xuất gọi `DELETE /api/devices` trước (khi có push, giai đoạn 7)
+- [x] Xóa tài khoản trong Cài đặt (hỏi mật khẩu, xác nhận hai bước)
+- [x] Màn "Cập nhật MathMate" khi build cũ hơn `min_ios_build`
+
+---
+
+## Giai đoạn 3: Chat (§6, §9)
+
+- [x] Kiểm thử: 19 unit test (fixtures dùng chung, `ChatStore` có mất kết nối, `MathBlocks`) + 4 UI test chat (stream, gợi ý sâu hơn, sửa tin, công thức dài, lỗi AI) qua trên iOS 17.2 và 26.5
+- [x] Sửa lỗi iPhone: "Cuộc trò chuyện mới" không mở được (split view cần selection khác nil)
+
+- [x] `MathNormalizer`: port `normalizeMath`, chạy qua `shared/fixtures`
+- [x] `MathMarkdownView`: Markdown + công thức trong dòng + công thức khối cuộn ngang (`MathText`: công thức theo cỡ chữ của kiểu chữ, khối căn giữa)
+- [x] `MathImageCache` theo latex + cỡ chữ + màu + giao diện sáng/tối
+- [x] Phương án dự phòng khi SwiftMath không vẽ được: hiện mã LaTeX bằng font monospace
+- [x] `ChatStore`: `pending` (bong bóng tạm, nhãn tiến độ, `reply` từ `delta`), `figures`, theo dõi `figure_job`
+- [x] `$` và `$$` chưa đóng (đang stream) hiện thành chữ
+- [ ] Stream mượt với câu trả lời dài: giới hạn số lần render, chỉ parse lại đoạn cuối (đo khi có câu trả lời thật dài)
+- [x] Kết nối lại khi app quay lại từ nền: xóa `reply` rồi dựng lại từ đầu (tự theo lại job; unit test mất kết nối giữa chừng)
+- [x] Cuộc trò chuyện mới: chuyển sang cuộc vừa tạo khi job tạo ra nó
+- [x] `TutorBar`: Gợi ý/Lời giải (morph bằng `glassEffectID`), 5 chấm bậc gợi ý, "Gợi ý sâu hơn", "Đã giải xong"
+- [x] Các action `deeper`/`solution`/`hint`
+- [x] Tin lỗi AI (`meta.error`), hết quota (429), máy chủ chưa có khóa AI (503)
+- [ ] Hiển thị quota còn lại ngay trong chat (hiện có trong Cài đặt)
+- [x] Sao chép tin nhắn (giữ `$latex$`) (menu nhấn giữ)
+- [x] ✏️ Sửa tin cuối: 409 khi gia sư đang trả lời; sửa tin đầu thì đổi đề và tên (sheet tự hiện bàn phím; ô chữ thường, chip công thức ở giai đoạn 4)
+- [x] Gửi ảnh: `PhotosPicker`, nén JPEG, giới hạn kích thước (≤ 2048 px, JPEG 0,8)
+- [x] Ảnh trong bong bóng của học sinh (`AuthImage`, tải kèm phiên đăng nhập)
+- [x] `figure_skipped`: báo lý do không vẽ hình
+
+---
+
+## Giai đoạn 4: Composer (§7)
+
+- [x] Kiểm thử: 24 unit test (thêm `latexToPlain` + `toMessageText` theo fixtures dùng chung, nạp tin nhắn thành chip, chèn công thức) + 6 UI test ô soạn tin; toàn bộ 15 UI test qua trên iOS 17.2 và 26.5
+- [ ] 🍎 Thử trên máy thật những gì simulator không thử được: chụp đề bằng VisionKit, dán ảnh, kéo thả trên iPad, Enter/Shift+Enter trên bàn phím rời, gõ Telex/VNI
+
+- [x] `ComposerTextView` (`UIViewRepresentable`), tự giãn chiều cao, có giới hạn tối đa (`MathTextView` + `ComposerField`)
+- [x] `FormulaAttachment`: chip vẽ bằng SwiftMath, căn baseline (vẽ lại khi đổi sáng/tối)
+- [x] `MessageTextCodec`: chuyển qua lại giữa ô soạn và `$latex$`/`\n`, chạy qua `shared/fixtures`
+- [x] Gõ `$…$` đóng lại thì thành chip
+- [x] Dán chữ có `$…$` thì thành chip; dán ảnh thì đính kèm
+- [x] Chạm chip để sửa trong trình soạn công thức (trình soạn tạm: LaTeX + xem trước + thư viện 7 tab; bản trực quan ở giai đoạn 5)
+- [x] Backspace ngay sau chip trả lại `$latex$`
+- [x] Return xuống dòng, nút gửi để gửi; bàn phím vật lý: Enter gửi, Shift+Enter xuống dòng (`UIKeyCommand`) (bỏ qua khi bộ gõ đang ghép chữ)
+- [x] Thanh ký hiệu (từ `shared/symbols.json`) dạng thanh glass trên bàn phím (nút Ω như web)
+- [x] Nút 📎: Chụp đề (VisionKit) / Thư viện ảnh; xem trước và gỡ ảnh
+- [x] Kéo thả ảnh trên iPad
+- [x] Thanh soạn tin nổi dùng glass + `safeAreaInset`, né bàn phím đúng
+- [x] Nút "Vẽ hình" trong composer khi chưa có bảng hình vẽ
+
+---
+
+## Giai đoạn 5: Trình soạn công thức (§8) ⚠️ lớn nhất
+
+Hướng làm khác §8: không tự xây cây cú pháp, mà dùng `MTMathList` của SwiftMath làm mô hình (như MathEditor). Bộ máy soạn thảo nằm trong fork (`MTMathEditor`, `MTMathList+Editing`, `xuanthinhJB/SwiftMath@mathmate`), test được bằng `swift test` trên macOS; app chỉ lo vẽ và bàn phím.
+
+### Mô hình (fork SwiftMath)
+- [x] Mô hình = `MTMathList`; parse và serialize bằng `MTMathListBuilder` (`31863d0`)
+- [x] Chỉ số con trỏ `MTMathListIndex`, thêm nhánh `.innerList` cho accent/overline: góc `\widehat`, đoạn thẳng, vectơ, cung sửa được bên trong
+- [x] `MTMathList+Editing` (port MathEditor): chèn, xóa, tìm atom theo chỉ số lồng nhau
+- [x] Xuất LaTeX đúng cho web: `\widehat` không thành `\hat`, `\overrightarrow` không thành `\vec`, cung thành `\overset{\frown}{…}`; bỏ ô trống khi xuất
+- [x] Mở LaTeX có sẵn rồi xuất ra không đổi (test vòng); `\left(…\right)` thành ngoặc thường để sửa được bên trong; `\dfrac` thành `\frac`
+- [x] `cases`/ma trận không sửa trực quan được: mở ở chế độ "Sửa LaTeX"
+- [ ] Test vòng với mọi mẫu trong `shared/formula_templates.json`
+- [ ] Vùng chọn (chọn nhiều atom) và đi lên/xuống giữa tử và mẫu
+
+### Thao tác
+- [x] Gõ ký tự, lệnh (`\le`, `\pi`…) và ký tự Unicode (≤, ∠, π…)
+- [x] `^` mũ, `_` chỉ số (bấm lại để thoát), `/` phân số (số/chữ đứng trước thành tử), `√`, căn bậc n
+- [x] Chèn mẫu: `#?` thành ô trống, `#@` lấy số hạng ngay trước con trỏ; con trỏ nhảy tới ô trống đầu tiên
+- [x] Backspace theo cấu trúc: đi vào phân số/căn/mũ thay vì xóa cả khối; ở đầu một phần thì lùi lại; khối rỗng mới bị xóa
+- [x] Phím ← →: đi qua mọi phần theo thứ tự đọc
+- [ ] Undo/redo, lắc máy để hoàn tác
+
+### Hiển thị và nhập (app)
+- [x] `FormulaCanvas`: vẽ bằng SwiftMath, con trỏ nhấp nháy (bằng Timer: animation lặp làm UI test chờ mãi), ô trống tại con trỏ tô đen, chạm để đặt con trỏ; bàn phím rời gõ được
+- [x] Bàn phím toán 4 trang `123`, `abc`, `Hình`, `f(x)` + trang `Mẫu` (thư viện 7 tab từ `shared/`); nhãn phím vẽ bằng SwiftMath
+- [x] Chế độ "Sửa LaTeX", xem trước trực tiếp; chuyển qua lại với bàn phím
+- [x] `LatexToPlain`: công thức đơn giản chèn thành chữ Unicode (`BC²`, `∠ABC`) (giai đoạn 4)
+- [x] Nhãn tiếng Việt cho mọi phím (VoiceOver)
+- [ ] Thử trên iPad (bàn phím toán rộng hơn) và Dynamic Type lớn
+
+### Kiểm thử
+- [x] 16 test trong fork (`MathEditorTests`), toàn bộ 597 test của SwiftMath qua
+- [x] 5 UI test trình soạn: phân số, `BC²=AB²`, góc và cung, Backspace theo cấu trúc, "Sửa LaTeX" với `cases`
+
+### Ngang bằng web
+- [ ] Bảng so sánh: cùng thao tác trên web (MathLive) và iOS ra cùng LaTeX, cho mọi mẫu ở 7 tab
+- [x] VoiceOver đọc được công thức (`accessibilityValue` = LaTeX của công thức đang soạn)
+
+---
+
+## Giai đoạn 6: Hình vẽ (§9)
+
+- [x] Thẻ hình vẽ trong chat (ảnh thu nhỏ, đang vẽ, lỗi), đặt sau tin chat cuối trước hình mới nhất; chạm vào mở bảng hình vẽ
+- [x] Bảng hình vẽ là `.inspector`: sheet `.medium`/`.large` trên iPhone, cột bên phải trên iPad (tự mở với bài hình học)
+- [x] Chọn phiên bản hình đang xem; phiên bản mới thì tự hiện và cuộn lên đầu
+- [x] "Yêu cầu chỉnh hình" + "Đã yêu cầu: …"; gửi xong thì đóng bàn phím
+- [x] Nhãn tiến độ khi đang vẽ; báo lỗi + "Vẽ lại"; "Vẽ hình" khi chưa có hình
+- [x] Phóng to / kéo hình, chạm hai lần để zoom, nút −/vừa khung/+ (`ZoomableImage`, `UIScrollView`)
+- [x] Video: tải về bằng phiên đăng nhập rồi phát bằng `AVPlayer`
+- [x] `ShareLink`: chia sẻ / lưu hình (`NSPhotoLibraryAddUsageDescription`)
+- [x] UI test: bài tam giác vẽ thật bằng parser trên server test, chỉnh hình ra phiên bản 2, chuyển phiên bản
+- [ ] Trình chỉnh hình thủ công và mã/nhật ký vẽ (web đang ẩn bằng `SHOW_ADVANCED = false`; làm khi web bật lại)
+- [ ] 🍎 Thử video và "Lưu hình" trên máy thật
+
+---
+
+## Giai đoạn 7: Tính năng native (§9)
+
+### Thông báo đẩy 🍎
+- [ ] Xin quyền thông báo vào lúc hợp lý (sau câu hỏi đầu tiên, không hỏi ngay khi mở app)
+- [ ] Đăng ký token với `POST /api/devices`, gửi đúng `environment` (`#if DEBUG` → sandbox)
+- [ ] Gửi lại token sau khi đăng nhập / đăng xuất / chuyển sang khách
+- [ ] `willPresent`: ẩn banner khi đang mở đúng cuộc trò chuyện đó
+- [ ] Chạm thông báo thì mở `conversation_id`
+- [ ] 🍎 **Checklist APNs trên máy thật** (§3, "Checklist APNs khi chạy trên iPhone thật"):
+  - [ ] Tạo khóa `.p8` và cất kỹ (chỉ tải được một lần)
+  - [ ] App ID bật Push Notifications; Xcode thêm capability Push + Background Modes → Remote notifications
+  - [ ] Điền `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_TOPIC`, `APNS_KEY` vào `.env` local
+  - [ ] Thử trên iPhone với build từ Xcode (sandbox): nhận "MathMate đã trả lời"
+  - [ ] Điền `APNS_*` vào managed config của Jenkins (production)
+  - [ ] Thử lại với build TestFlight (production)
+
+### Khác
+- [ ] Live Activity khi đang vẽ (ActivityKit, Dynamic Island trên iOS 26)
+- [ ] Cache offline bằng SwiftData: đọc lại danh sách và tin nhắn khi không có mạng
+- [ ] Haptics: lên bậc gợi ý, gửi tin, vẽ xong
+- [ ] iPad: `NavigationSplitView` ba cột, phím tắt bàn phím vật lý
+
+---
+
+## Giai đoạn 8: QA và phát hành (§10, §11)
+
+### Kiểm thử
+- [ ] Unit test: `MathNormalizer`, `LatexToPlain`, `MessageTextCodec`, parser/serializer, `SSEParser`, `ChatStore`
+- [ ] Snapshot test: công thức, bong bóng, TutorBar ở 4 tổ hợp iOS 17/26 × sáng/tối
+- [ ] XCUITest chạy với `web/e2e/server.py` (AI giả): đăng nhập, gửi câu hỏi, gợi ý sâu hơn, sửa tin, công thức
+- [ ] CI cho iOS: Xcode Cloud hoặc GitHub Actions macOS + fastlane
+- [ ] Kiểm tra thủ công: Dynamic Type lớn nhất, Reduce Transparency, VoiceOver, iPhone SE (màn nhỏ), iPad
+- [ ] Kiểm tra mạng chập chờn: chuyển Wi-Fi ↔ 4G giữa lúc đang stream
+
+### App Store 🍎
+- [ ] Tài khoản Apple Developer, App ID, chứng chỉ, provisioning
+- [ ] Trang App Store Connect: tên, mô tả tiếng Việt, ảnh chụp màn hình (6.9", 6.5", iPad), từ khóa
+- [ ] Nhãn quyền riêng tư (ảnh, nội dung người dùng, định danh) khớp với `PrivacyInfo.xcprivacy`
+- [ ] Mô tả quyền camera và thư viện ảnh bằng tiếng Việt
+- [ ] Bộ câu hỏi xếp hạng tuổi (học sinh 11–18 tuổi, nội dung do AI tạo)
+- [ ] URL chính sách quyền riêng tư và trang hỗ trợ
+- [ ] Tài khoản demo cho Apple review + ghi chú về chế độ dùng thử
+- [ ] TestFlight nội bộ → TestFlight cho một nhóm học sinh/giáo viên thử
+- [ ] Nộp review → phát hành
+
+---
+
+## Việc lặt vặt
+
+- [ ] Giữ bảng ngang bằng ở §1 của plan; mỗi tính năng mới cho học sinh trên web đều thêm một dòng vào checklist này
+- [ ] Cập nhật `CLAUDE.md` khi có `mobile/ios/` (cách build, cách chạy test, quy ước)
+
+## Sau này: Android (§13)
+
+- [ ] Spike hiển thị toán trên Android (JLaTeXMath-android hoặc thư viện khác) với cùng tập công thức
+- [ ] Thêm `platform: android` + FCM cho `devices` và `PushNotifier`
+- [ ] Port Core (API, Jobs, Math codec) và mô hình FormulaEditor sang Kotlin

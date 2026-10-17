@@ -20,11 +20,16 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), versionFile],
   define: { __BUILD_ID__: JSON.stringify(buildId) },
   resolve: {
-    alias: { '@': path.resolve(import.meta.dirname, './src') },
+    alias: {
+      '@': path.resolve(import.meta.dirname, './src'),
+      // Data shared with the iOS app (formula templates, symbols, test fixtures).
+      '@shared': path.resolve(import.meta.dirname, '../shared'),
+    },
   },
   // The chat page chunk (KaTeX, Markdown, drawing tools) is ~250 kB gzipped and loaded once.
   build: { chunkSizeWarningLimit: 1000 },
   server: {
+    fs: { allow: ['.', '../shared'] },
     // start.sh passes GEO_DRAW_API_PORT when the API runs on another port.
     proxy: { '/api': `http://localhost:${process.env.GEO_DRAW_API_PORT ?? 8000}` },
   },

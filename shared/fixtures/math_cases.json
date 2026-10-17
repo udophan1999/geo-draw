@@ -1,0 +1,181 @@
+{
+  "_comment": "Shared cases for the math text helpers. web: lib/math.ts normalizeMath, lib/plainMath.ts latexToPlain, lib/messageText.ts toMessageText; iOS: MathNormalizer, LatexToPlain, MessageTextCodec. Blocks are paragraphs; inside them, {text}, {math} (an inline formula) and {break} (a line break).",
+  "normalizeMath": [
+    {
+      "input": "Ta có \\[a^2+b^2=c^2\\] nên BC = 5.",
+      "expected": "Ta có \n\n$$\na^2+b^2=c^2\n$$\n\n nên BC = 5."
+    },
+    {
+      "input": "Đặt \\(x = 2\\) rồi thay vào.",
+      "expected": "Đặt $x = 2$ rồi thay vào."
+    },
+    {
+      "input": "Từ $$x + 1 = 3 \\tag{1}$$ suy ra x = 2.",
+      "expected": "Từ \n\n$$\nx + 1 = 3 \\qquad (1)\n$$\n\n suy ra x = 2."
+    },
+    {
+      "input": "Hệ $$\\begin{cases} x+y=3 \\\\ x-y=1 \\end{cases}$$",
+      "expected": "Hệ \n\n$$\n\\begin{cases} x+y=3 \\\\ x-y=1 \\end{cases}\n$$"
+    },
+    {
+      "input": "Mã `$$ không đổi $$` giữ nguyên.",
+      "expected": "Mã `$$ không đổi $$` giữ nguyên."
+    },
+    {
+      "input": "```\n\\[ trong khối mã \\]\n```",
+      "expected": "```\n\\[ trong khối mã \\]\n```"
+    },
+    {
+      "input": "Dòng 1\n\n\n\nDòng 2",
+      "expected": "Dòng 1\n\nDòng 2"
+    },
+    {
+      "input": "Không có công thức.",
+      "expected": "Không có công thức."
+    },
+    {
+      "input": "$x^2$ và $y^2$ giữ nguyên.",
+      "expected": "$x^2$ và $y^2$ giữ nguyên."
+    },
+    {
+      "input": "\\tag*{2} đứng ngoài công thức",
+      "expected": "\\qquad (2) đứng ngoài công thức"
+    }
+  ],
+  "latexToPlain": [
+    {
+      "input": "BC^2=AB^2+AC^2",
+      "expected": "BC²=AB²+AC²"
+    },
+    {
+      "input": "x_1+x_2",
+      "expected": "x₁+x₂"
+    },
+    {
+      "input": "a\\cdot b",
+      "expected": "a·b"
+    },
+    {
+      "input": "\\sqrt{2}",
+      "expected": "√2"
+    },
+    {
+      "input": "\\sqrt{x+1}",
+      "expected": null
+    },
+    {
+      "input": "\\widehat{ABC}",
+      "expected": "∠ABC"
+    },
+    {
+      "input": "60^\\circ",
+      "expected": "60°"
+    },
+    {
+      "input": "\\triangle ABC\\backsim\\triangle DEF",
+      "expected": null
+    },
+    {
+      "input": "AB\\perp CD",
+      "expected": "AB⊥CD"
+    },
+    {
+      "input": "\\frac{1}{2}",
+      "expected": null
+    },
+    {
+      "input": "x^{10}",
+      "expected": "x¹⁰"
+    },
+    {
+      "input": "x^{ab}",
+      "expected": null
+    },
+    {
+      "input": "\\Delta=b^2-4ac",
+      "expected": "Δ=b²-4ac"
+    },
+    {
+      "input": "x\\in\\mathbb{R}",
+      "expected": null
+    },
+    {
+      "input": "\\text{với } x\\ne 0",
+      "expected": "với x≠0"
+    },
+    {
+      "input": "a\\le b\\ge c",
+      "expected": "a≤b≥c"
+    },
+    {
+      "input": "A\\Rightarrow B",
+      "expected": "A⇒B"
+    },
+    {
+      "input": "x_{n}",
+      "expected": "xₙ"
+    },
+    {
+      "input": "\\left(a+b\\right)^2",
+      "expected": "(a+b)²"
+    }
+  ],
+  "toMessageText": [
+    {
+      "blocks": [
+        [
+          {
+            "text": "Cho tam giác ABC có "
+          },
+          {
+            "math": "AB^2+AC^2=BC^2"
+          },
+          {
+            "text": "."
+          }
+        ]
+      ],
+      "expected": "Cho tam giác ABC có $AB^2+AC^2=BC^2$."
+    },
+    {
+      "blocks": [
+        [
+          {
+            "text": "Dòng một"
+          },
+          {
+            "break": true
+          },
+          {
+            "text": "dòng hai"
+          }
+        ]
+      ],
+      "expected": "Dòng một\ndòng hai"
+    },
+    {
+      "blocks": [
+        [
+          {
+            "text": "Đoạn 1"
+          }
+        ],
+        [
+          {
+            "text": "Đoạn 2 có "
+          },
+          {
+            "math": "\\frac{1}{2}"
+          }
+        ]
+      ],
+      "expected": "Đoạn 1\nĐoạn 2 có $\\frac{1}{2}$"
+    },
+    {
+      "blocks": [
+        []
+      ],
+      "expected": ""
+    }
+  ]
+}
