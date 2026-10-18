@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed icons (Android 13+): the triangle and its right angle in one colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="1.55"
+        android:scaleY="1.55"
+        android:translateX="4.4"
+        android:translateY="1.3">
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.2"
+            android:pathData="M13,34a19,19 0,1 0,38 0a19,19 0,1 0,-38 0z" />
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.8"
+            android:strokeLineJoin="round"
+            android:pathData="M13,34 L23.08,17.22 L51,34 Z" />
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.38"
+            android:strokeLineJoin="round"
+            android:strokeLineCap="round"
+            android:pathData="M19.47,23.22 L25.47,26.83 L29.08,20.83" />
+    </group>
+</vector>

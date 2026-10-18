@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- web/public/logo.svg, for the welcome screen and the tutor's avatar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path android:pathData="M15,0h34a15,15 0,0 1,15 15v34a15,15 0,0 1,-15 15h-34a15,15 0,0 1,-15 -15v-34a15,15 0,0 1,15 -15z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="64"
+                android:endY="64"
+                android:startColor="#3B82F6"
+                android:endColor="#1D4ED8" />
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#1AFFFFFF"
+        android:strokeColor="#73FFFFFF"
+        android:strokeWidth="2.2"
+        android:pathData="M13,34a19,19 0,1 0,38 0a19,19 0,1 0,-38 0z" />
+    <path
+        android:fillColor="#29FFFFFF"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.8"
+        android:strokeLineJoin="round"
+        android:pathData="M13,34 L23.08,17.22 L51,34 Z" />
+    <path
+        android:strokeColor="#FBBF24"
+        android:strokeWidth="2.38"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:pathData="M19.47,23.22 L25.47,26.83 L29.08,20.83" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20.38,17.22a2.7,2.7 0,1 0,5.4 0a2.7,2.7 0,1 0,-5.4 0z M10.3,34a2.7,2.7 0,1 0,5.4 0a2.7,2.7 0,1 0,-5.4 0z M48.3,34a2.7,2.7 0,1 0,5.4 0a2.7,2.7 0,1 0,-5.4 0z" />
+</vector>
