@@ -58,6 +58,10 @@ class AppState:
     # "Cập nhật MathMate". Raise it when an API change breaks old builds.
     min_ios_build: int = field(default_factory=lambda: _int_env("GEO_DRAW_MIN_IOS_BUILD", 0))
     ios_store_url: str | None = field(default_factory=lambda: os.environ.get("IOS_APP_STORE_URL") or None)
+    # The same for the Android app (versionCode) and its Google Play page.
+    min_android_build: int = field(default_factory=lambda: _int_env("GEO_DRAW_MIN_ANDROID_BUILD", 0))
+    android_store_url: str | None = field(
+        default_factory=lambda: os.environ.get("ANDROID_PLAY_STORE_URL") or None)
     workers: int = 2
     # APNs credentials (see api/push.py); None: no push notifications.
     apns: ApnsConfig | None = field(default_factory=ApnsConfig.from_env)

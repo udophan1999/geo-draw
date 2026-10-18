@@ -164,9 +164,12 @@ class AppClientTests(ApiTestCase):
 
     def test_app_config_tells_old_builds_to_update(self):
         self.assertEqual(self.client().get("/api/app-config").json(),
-                         {"min_ios_build": 0, "ios_store_url": None})
+                         {"min_ios_build": 0, "ios_store_url": None,
+                          "min_android_build": 0, "android_store_url": None})
         self.state.min_ios_build = 42
-        self.assertEqual(self.client().get("/api/app-config").json()["min_ios_build"], 42)
+        self.state.min_android_build = 7
+        config = self.client().get("/api/app-config").json()
+        self.assertEqual((config["min_ios_build"], config["min_android_build"]), (42, 7))
 
     def test_the_web_never_gets_a_token(self):
         response = self.register(self.client())

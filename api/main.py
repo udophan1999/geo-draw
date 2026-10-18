@@ -79,8 +79,11 @@ def create_app(data_dir: Path | None = None, web_dist: Path | None = ROOT / "web
 
     @api.get("/app-config", tags=["meta"])
     def app_config() -> dict:
-        """What the mobile apps check at launch: builds below ``min_ios_build`` must update."""
-        return {"min_ios_build": state.min_ios_build, "ios_store_url": state.ios_store_url}
+        """What the mobile apps check at launch: builds below ``min_ios_build`` (iOS) or
+        ``min_android_build`` (Android) must update."""
+        return {"min_ios_build": state.min_ios_build, "ios_store_url": state.ios_store_url,
+                "min_android_build": state.min_android_build,
+                "android_store_url": state.android_store_url}
 
     @api.get("/health", tags=["meta"])
     def health() -> dict:
