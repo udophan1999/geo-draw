@@ -1,6 +1,7 @@
-// Typing math without knowing LaTeX: a bar of common symbols (inserted as Unicode) and a
-// visual formula editor (MathLive). The composer inserts its formula as plain Unicode when
-// possible (lib/plainMath.ts), else as $LaTeX$ with a rendered preview.
+// Typing math without knowing LaTeX: a bar of common symbols (inserted as Unicode; the roots
+// open the formula editor instead) and a visual formula editor (MathLive). The composer inserts
+// its formula as plain Unicode when possible (lib/plainMath.ts), else as $LaTeX$ with a
+// rendered preview.
 import katex from 'katex'
 import { Loader2 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -16,13 +17,18 @@ import { MATHLIVE_VI } from '@/components/chat/mathliveVi'
 import symbols from '@shared/symbols.json'
 import { cn } from '@/lib/utils'
 
-// Shared with the iOS app (shared/symbols.json).
-const SYMBOLS: [string, string][] = symbols.map(({ symbol, name }) => [symbol, name])
+// Shared with the iOS and Android apps (shared/symbols.json). A symbol with a `template`
+// (the roots) opens the formula editor on it, so the radicand is clear (√x+1 is not).
+type SymbolItem = { symbol: string; name: string; template?: string }
+const SYMBOLS: SymbolItem[] = symbols
 
-export function SymbolBar({ onInsert }: { onInsert: (text: string) => void }) {
+export function SymbolBar({ onInsert, onTemplate }: {
+  onInsert: (text: string) => void
+  onTemplate: (template: string) => void
+}) {
   return (
     <div className="flex flex-wrap gap-1 px-3 pt-2" role="toolbar" aria-label="Ký hiệu toán">
-      {SYMBOLS.map(([symbol, name]) => (
+      {SYMBOLS.map(({ symbol, name, template }) => (
         <Tooltip key={symbol}>
           <TooltipTrigger asChild>
             <button
@@ -30,7 +36,7 @@ export function SymbolBar({ onInsert }: { onInsert: (text: string) => void }) {
               aria-label={name}
               // Keep the caret in the textarea while clicking.
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => onInsert(symbol)}
+              onClick={() => (template ? onTemplate(template) : onInsert(symbol))}
               className="flex h-7 min-w-7 items-center justify-center rounded-md border bg-background px-1.5 text-sm transition hover:border-primary/50 hover:bg-primary/5"
             >
               {symbol}
@@ -74,18 +80,22 @@ function TemplatePreview({ latex, large = false }: { latex: string; large?: bool
 }
 
 /** Visual formula editor with a Word-like gallery; ``onInsert`` receives the formula's LaTeX. */
-export function FormulaDialog({ open, onOpenChange, onInsert, initialLatex = '', editingExisting = false }: {
+export function FormulaDialog({ open, onOpenChange, onInsert, initialLatex = '', initialTemplate, editingExisting = false }: {
   open: boolean; onOpenChange: (open: boolean) => void; onInsert: (latex: string) => void
   /** The formula to start from (a chip of the message box being edited). */
   initialLatex?: string
+  /** A template to insert at once, the caret in its first slot (√ in the symbol bar). */
+  initialTemplate?: string
   editingExisting?: boolean
 }) {
   const host = useRef<HTMLDivElement>(null)
   const field = useRef<MathField | null>(null)
   // Read when the dialog opens, so typing does not restart the editor.
   const initial = useRef(initialLatex)
+  const initialSlot = useRef(initialTemplate)
   useLayoutEffect(() => {
     initial.current = initialLatex
+    initialSlot.current = initialTemplate
   })
   const [ready, setReady] = useState(false)
   // Height of MathLive's on-screen keyboard while it is shown: the dialog moves up above it,
@@ -130,6 +140,7 @@ export function FormulaDialog({ open, onOpenChange, onInsert, initialLatex = '',
       keyboard?.addEventListener('virtual-keyboard-toggle', onGeometry)
       setReady(true)
       if (initial.current) element.value = initial.current
+      if (initialSlot.current) element.insert(initialSlot.current, { selectionMode: 'placeholder' })
       requestAnimationFrame(() => {
         element.focus()
         // Open the math keyboard on every screen, so students see it exists (touch screens

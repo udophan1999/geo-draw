@@ -217,3 +217,26 @@ test('menu của ô công thức bằng tiếng Việt', async ({ page }) => {
   await expect(page.getByText('Insert Matrix')).toHaveCount(0)
   await expect(page.getByText('Select All')).toHaveCount(0)
 })
+
+test('nút căn trên thanh ký hiệu mở hộp công thức với căn có sẵn ô trống', async ({ page }) => {
+  desktopOnly()
+  const box = composer(page)
+  await box.fill('Tính')
+  await page.getByRole('button', { name: 'Ký hiệu toán' }).click()
+  const symbols = page.getByRole('toolbar', { name: 'Ký hiệu toán' })
+  await symbols.getByRole('button', { name: 'Căn bậc hai' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Nhập công thức' })
+  await expect(dialog.locator('math-field')).toBeFocused()
+  await page.keyboard.type('2') // into the root's slot
+  await dialog.getByRole('button', { name: 'Chèn vào tin nhắn' }).click()
+  // A root stays a formula, drawn with its bar (as text, √123 would not show where it ends).
+  await expect(formulaChips(page)).toHaveCount(1)
+  await expect(formulaChips(page)).toHaveAttribute('data-latex', /^\\sqrt\{?2\}?$/) // MathLive may write \sqrt2
+
+  await symbols.getByRole('button', { name: 'Căn bậc ba' }).click()
+  await expect(dialog.locator('math-field')).toBeFocused()
+  await page.keyboard.type('8')
+  await dialog.getByRole('button', { name: 'Chèn vào tin nhắn' }).click()
+  await expect(formulaChips(page)).toHaveCount(2)
+  await expect(formulaChips(page).last()).toHaveAttribute('data-latex', '\\sqrt[3]{8}')
+})

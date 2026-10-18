@@ -24,7 +24,6 @@ enum LatexToPlain {
     private static let spacing = regex(#"\\(?:,|;|:|!|\s)"#)
     private static let degree = regex(#"\^\{?\\circ\}?"#)
     private static let textCommand = regex(#"\\(?:text|mathrm)\{([^{}]*)\}"#)
-    private static let shortRoot = regex(#"\\sqrt\{([A-Za-z0-9]{1,3})\}"#)
     private static let angle = regex(#"\\widehat\{([A-Za-z]{1,3})\}"#)
     private static let command = regex(#"\\([A-Za-z]+) ?"#)
     private static let script = regex(#"([\^_])(?:\{([^{}]*)\}|(.))"#)
@@ -34,8 +33,7 @@ enum LatexToPlain {
         var text = replace(spacing, in: latex) { _ in " " }
         text = replace(degree, in: text) { _ in "°" }
         text = replace(textCommand, in: text) { $0[1] ?? "" }
-        // \sqrt{x} with a short plain body: √x (√(…) for longer ones would read ambiguously).
-        text = replace(shortRoot, in: text) { "√" + ($0[1] ?? "") }
+        // Roots stay formulas: as text, √123 or √x+1 does not show where the root ends.
         text = replace(angle, in: text) { "∠" + ($0[1] ?? "") }  // "góc A"
         // A space after a command only ends its name in LaTeX ("\perp BC"): drop it.
         text = replace(command, in: text) { groups in commands[groups[1] ?? ""] ?? groups[0]! }

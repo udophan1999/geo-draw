@@ -9,8 +9,9 @@ import kotlinx.serialization.json.Json
  * `syncSharedData`): the symbol bar and the formula gallery. Change them there, never here.
  */
 object SharedData {
+    /** A symbol of the bar; one with a `template` (the roots) opens the formula editor on it. */
     @Serializable
-    data class Symbol(val symbol: String, val name: String)
+    data class Symbol(val symbol: String, val name: String, val template: String? = null)
 
     @Serializable
     data class Template(

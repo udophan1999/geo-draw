@@ -4,7 +4,7 @@ import VisionKit
 
 /// Common symbols as Unicode, one tap each (web: chat/MathInput.tsx SymbolBar).
 struct SymbolBar: View {
-    let onInsert: (String) -> Void
+    let onInsert: (SharedData.Symbol) -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -12,7 +12,7 @@ struct SymbolBar: View {
                 ForEach(SharedData.symbols, id: \.self) { symbol in
                     Button {
                         Haptics.selection()
-                        onInsert(symbol.symbol)
+                        onInsert(symbol)
                     } label: {
                         Text(symbol.symbol)
                             .font(.body)

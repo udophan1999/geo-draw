@@ -89,8 +89,8 @@ class ComposerController {
     }
 }
 
-/** A formula being written: new (`position` null) or a chip being edited. */
-private data class FormulaEdit(val latex: String, val position: Int?)
+/** A formula being written: new (`position` null), maybe from a template, or a chip being edited. */
+private data class FormulaEdit(val latex: String, val position: Int?, val template: String? = null)
 
 /** The message box in Compose: grows with its text up to `maxHeight`, then scrolls. */
 @Composable
@@ -187,7 +187,13 @@ fun Composer(
     ) {
         Column(Modifier.padding(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)) {
             image?.let { attached -> Attachment(attached) { image = null } }
-            AnimatedVisibility(symbols) { SymbolBar { controller.insert(it) } }
+            AnimatedVisibility(symbols) {
+                SymbolBar { symbol ->
+                    // A root opens the editor with its slot ready: √x+1 would not say where it ends.
+                    val template = symbol.template
+                    if (template != null) formula = FormulaEdit("", null, template) else controller.insert(symbol.symbol)
+                }
+            }
             ComposerField(
                 controller, placeholder,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
@@ -260,6 +266,7 @@ fun Composer(
     formula?.let { edit ->
         FormulaSheet(
             initialLatex = edit.latex,
+            initialTemplate = edit.template,
             editingExisting = edit.position != null,
             onDismiss = { formula = null },
             onDone = { latex ->
@@ -290,7 +297,7 @@ private fun Attachment(image: PreparedImage, onRemove: () -> Unit) {
 
 /** Common symbols as Unicode, one tap each (web: chat/MathInput.tsx SymbolBar; shared/symbols.json). */
 @Composable
-fun SymbolBar(onInsert: (String) -> Unit) {
+fun SymbolBar(onInsert: (SharedData.Symbol) -> Unit) {
     val context = LocalContext.current
     Row(
         Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 4.dp).testTag("symbolBar"),
@@ -300,7 +307,7 @@ fun SymbolBar(onInsert: (String) -> Unit) {
             Surface(
                 onClick = {
                     Haptics.tick(context)
-                    onInsert(symbol.symbol)
+                    onInsert(symbol)
                 },
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,

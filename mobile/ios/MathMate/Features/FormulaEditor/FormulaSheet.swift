@@ -6,6 +6,8 @@ import SwiftUI
 struct FormulaSheet: View {
     @Environment(\.dismiss) private var dismiss
     let initialLatex: String
+    /// A template inserted at once, the caret in its first slot (the roots of the symbol bar).
+    var initialTemplate: String? = nil
     let editingExisting: Bool
     let onDone: (String) -> Void
 
@@ -65,6 +67,7 @@ struct FormulaSheet: View {
             loaded = true
             latex = initialLatex
             model = FormulaEditorModel(latex: initialLatex)
+            if let initialTemplate { model?.template(initialTemplate) }
             rawMode = model == nil  // a table (cases…) opens as LaTeX
         }
     }

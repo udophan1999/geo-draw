@@ -54,8 +54,17 @@ import com.tvcsoft.mathmate.ui.math.MathRenderer
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FormulaSheet(initialLatex: String, editingExisting: Boolean, onDismiss: () -> Unit, onDone: (String) -> Unit) {
-    var model by remember { mutableStateOf(FormulaEditorModel.create(initialLatex)) }
+fun FormulaSheet(
+    initialLatex: String,
+    editingExisting: Boolean,
+    onDismiss: () -> Unit,
+    /** A template inserted at once, the caret in its first slot (the roots of the symbol bar). */
+    initialTemplate: String? = null,
+    onDone: (String) -> Unit,
+) {
+    var model by remember {
+        mutableStateOf(FormulaEditorModel.create(initialLatex)?.also { model -> initialTemplate?.let(model::template) })
+    }
     var latex by remember { mutableStateOf(initialLatex) }
     // A table (cases…) opens as LaTeX.
     var rawMode by remember { mutableStateOf(model == null) }

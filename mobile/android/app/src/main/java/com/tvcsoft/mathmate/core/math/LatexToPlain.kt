@@ -27,7 +27,6 @@ object LatexToPlain {
     private val spacing = Regex("""\\(?:,|;|:|!|\s)""")
     private val degree = Regex("""\^\{?\\circ\}?""")
     private val textCommand = Regex("""\\(?:text|mathrm)\{([^{}]*)\}""")
-    private val shortRoot = Regex("""\\sqrt\{([A-Za-z0-9]{1,3})\}""")
     private val angle = Regex("""\\widehat\{([A-Za-z]{1,3})\}""")
     private val command = Regex("""\\([A-Za-z]+) ?""")
     private val script = Regex("""([\^_])(?:\{([^{}]*)\}|(.))""")
@@ -38,8 +37,7 @@ object LatexToPlain {
         var text = spacing.replace(latex) { " " }
         text = degree.replace(text) { "°" }
         text = textCommand.replace(text) { it.groupValues[1] }
-        // \sqrt{x} with a short plain body: √x (√(…) for longer ones would read ambiguously).
-        text = shortRoot.replace(text) { "√" + it.groupValues[1] }
+        // Roots stay formulas: as text, √123 or √x+1 does not show where the root ends.
         text = angle.replace(text) { "∠" + it.groupValues[1] } // "góc A"
         // A space after a command only ends its name in LaTeX ("\perp BC"): drop it.
         text = command.replace(text) { commands[it.groupValues[1]] ?: it.value }

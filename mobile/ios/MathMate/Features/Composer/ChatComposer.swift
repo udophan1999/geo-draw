@@ -1,11 +1,12 @@
 import PhotosUI
 import SwiftUI
 
-/// A formula being written: new (`range` nil) or a chip being edited.
+/// A formula being written: new (`range` nil), maybe from a template, or a chip being edited.
 private struct FormulaEdit: Identifiable {
     let id = UUID()
     let latex: String
     let range: NSRange?
+    var template: String?
 }
 
 /// The message box with its tools (web: chat/Composer.tsx): formula chips, the symbol bar,
@@ -34,7 +35,16 @@ struct ChatComposer: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let image { attachment(image.preview) }
-            if showingSymbols { SymbolBar { controller.insert($0) } }
+            if showingSymbols {
+                SymbolBar { symbol in
+                    // A root opens the editor with its slot ready: √x+1 would not say where it ends.
+                    if let template = symbol.template {
+                        formula = FormulaEdit(latex: "", range: nil, template: template)
+                    } else {
+                        controller.insert(symbol.symbol)
+                    }
+                }
+            }
             ComposerField(controller: controller, placeholder: placeholder,
                           onSubmit: { Task { await submit() } },
                           onImage: { data in image = ImagePrep.prepare(data) },
@@ -65,7 +75,8 @@ struct ChatComposer: View {
             .ignoresSafeArea()
         }
         .sheet(item: $formula) { edit in
-            FormulaSheet(initialLatex: edit.latex, editingExisting: edit.range != nil) { latex in
+            FormulaSheet(initialLatex: edit.latex, initialTemplate: edit.template,
+                         editingExisting: edit.range != nil) { latex in
                 if let range = edit.range {
                     controller.replaceFormula(at: range, with: latex)
                 } else {

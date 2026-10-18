@@ -60,6 +60,7 @@ Kế hoạch ở [mobile-android-plan.md](mobile-android-plan.md); app iOS là b
 - [x] Gõ `$…$` thành chip, Backspace ngay sau trả lại `$latex$`, dán `$…$` thành chip (2026-10-17)
 - [x] Chạm chip để sửa trong trình soạn công thức (2026-10-17)
 - [x] Thanh ký hiệu (`shared/symbols.json`) (2026-10-17)
+- [x] 🔁 Nút √ và ∛ của thanh ký hiệu mở trình soạn công thức với căn có sẵn ô trống (`template` trong `shared/symbols.json`); căn luôn là chip công thức (không thành chữ √123 vì không thấy căn đến đâu); web và iOS làm giống (2026-10-18)
 - [x] Ảnh: Photo Picker, camera (`TakePicture`), dán ảnh; nén JPEG ≤ 2048 px (2026-10-17)
 - [ ] ML Kit Document Scanner (cắt và làm phẳng trang như VisionKit)
 - [x] Bàn phím rời: Enter gửi, Shift+Enter xuống dòng (bỏ qua khi bộ gõ đang ghép chữ) (2026-10-17)

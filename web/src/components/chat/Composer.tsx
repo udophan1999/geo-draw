@@ -25,7 +25,7 @@ export function Composer({ image, onImage, onSend, busy, placeholder, header, ac
   const [submitting, setSubmitting] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const [showSymbols, setShowSymbols] = useState(false)
-  const { editor, empty, insertText, openFormula, formulaDialog } = useMathEditor({
+  const { editor, empty, insertText, openFormula, openTemplate, formulaDialog } = useMathEditor({
     label: 'Tin nhắn',
     placeholder,
     className: 'block max-h-[200px] min-h-[2.25rem] w-full overflow-y-auto px-4 pt-3 pb-1 text-sm outline-none',
@@ -72,7 +72,7 @@ export function Composer({ image, onImage, onSend, busy, placeholder, header, ac
             </div>
           </div>
         )}
-        {showSymbols && <SymbolBar onInsert={insertText} />}
+        {showSymbols && <SymbolBar onInsert={insertText} onTemplate={openTemplate} />}
         <EditorContent editor={editor} />
         <div className="flex items-center justify-between px-2 pb-2">
           <div className="flex items-center gap-0.5">

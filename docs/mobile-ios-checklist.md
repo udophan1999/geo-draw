@@ -134,6 +134,7 @@ Kế hoạch chi tiết nằm ở [mobile-ios-plan.md](mobile-ios-plan.md); các
 - [x] Backspace ngay sau chip trả lại `$latex$`
 - [x] Return xuống dòng, nút gửi để gửi; bàn phím vật lý: Enter gửi, Shift+Enter xuống dòng (`UIKeyCommand`) (bỏ qua khi bộ gõ đang ghép chữ)
 - [x] Thanh ký hiệu (từ `shared/symbols.json`) dạng thanh glass trên bàn phím (nút Ω như web)
+- [x] 🔁 Nút √ và ∛ mở trình soạn công thức với căn có sẵn ô trống (`template` trong `shared/symbols.json`); căn luôn là chip công thức, `latexToPlain` không đổi căn thành chữ nữa; giống web và Android (2026-10-18)
 - [x] Nút 📎: Chụp đề (VisionKit) / Thư viện ảnh; xem trước và gỡ ảnh
 - [x] Kéo thả ảnh trên iPad
 - [x] Thanh soạn tin nổi dùng glass + `safeAreaInset`, né bàn phím đúng

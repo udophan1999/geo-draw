@@ -28,7 +28,7 @@ const MESSAGE_FORMULA = /\$\$([^$]+?)\$\$|\$([^$\n]+?)\$/g
 const placeholders = new WeakMap<object, string>()
 
 /** A formula opened in the dialog; ``pos`` is null for a new one. */
-type Editing = { latex: string; pos: number | null }
+type Editing = { latex: string; pos: number | null; template?: string }
 
 /** A message (text with $latex$) as editor content, formulas as chips. */
 export function fromMessageText(text: string): JSONContent {
@@ -179,11 +179,17 @@ export function useMathEditor({ label, placeholder, className, initialText, onSu
     <FormulaDialog
       open={editing !== null}
       initialLatex={editing?.latex ?? ''}
+      initialTemplate={editing?.template}
       editingExisting={editing?.pos != null}
       onOpenChange={(open) => !open && setEditing(null)}
       onInsert={insertFormula}
     />
   )
 
-  return { editor, empty, insertText, openFormula: () => setEditing({ latex: '', pos: null }), formulaDialog }
+  return {
+    editor, empty, insertText, formulaDialog,
+    openFormula: () => setEditing({ latex: '', pos: null }),
+    /** The formula editor with a template in it (the roots of the symbol bar). */
+    openTemplate: (template: string) => setEditing({ latex: '', pos: null, template }),
+  }
 }

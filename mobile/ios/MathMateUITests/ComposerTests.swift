@@ -76,6 +76,23 @@ final class ComposerTests: XCTestCase {
 
     private func page(_ name: String) { app.buttons["page-\(name)"].tap() }
 
+    func testTheRootsOfTheSymbolBarOpenTheEditorWithTheirSlot() {
+        app.buttons["toggleSymbols"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["symbolBar"].waitForExistence(timeout: 5))
+        app.buttons["Căn bậc hai"].tap()
+        XCTAssertTrue(editorElement.waitForExistence(timeout: 5))
+        keys("2")  // into the root's slot
+        XCTAssertEqual(formula, "\\sqrt{2}")
+        app.buttons["insertFormula"].tap()
+        XCTAssertEqual(message, "$\\sqrt{2}$ ", "a root stays a formula: √123 as text would not show where it ends")
+
+        app.buttons["Căn bậc ba"].tap()
+        XCTAssertTrue(editorElement.waitForExistence(timeout: 5))
+        keys("8")
+        app.buttons["insertFormula"].tap()
+        XCTAssertEqual(message, "$\\sqrt{2}$ $\\sqrt[3]{8}$ ")
+    }
+
     func testAFractionFromTheKeyboardBecomesAChip() {
         type("Tính")
         openFormula()

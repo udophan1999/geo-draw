@@ -3,7 +3,8 @@ import Foundation
 /// Data the web app reads too, bundled from shared/ (project.yml): the symbol bar and the
 /// formula gallery. Change them there, never here.
 enum SharedData {
-    struct Symbol: Decodable, Hashable { let symbol: String; let name: String }
+    /// A symbol of the bar; one with a `template` (the roots) opens the formula editor on it.
+    struct Symbol: Decodable, Hashable { let symbol: String; let name: String; var template: String? = nil }
 
     struct Template: Decodable, Hashable {
         let label: String

@@ -9,11 +9,13 @@
   },
   {
     "symbol": "√",
-    "name": "Căn bậc hai"
+    "name": "Căn bậc hai",
+    "template": "\\sqrt{#?}"
   },
   {
     "symbol": "∛",
-    "name": "Căn bậc ba"
+    "name": "Căn bậc ba",
+    "template": "\\sqrt[3]{#?}"
   },
   {
     "symbol": "π",

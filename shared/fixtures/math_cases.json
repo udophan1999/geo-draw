@@ -57,10 +57,22 @@
     },
     {
       "input": "\\sqrt{2}",
-      "expected": "√2"
+      "expected": null
     },
     {
       "input": "\\sqrt{x+1}",
+      "expected": null
+    },
+    {
+      "input": "\\sqrt2",
+      "expected": null
+    },
+    {
+      "input": "\\sqrt x+1",
+      "expected": null
+    },
+    {
+      "input": "\\sqrt[3]{8}",
       "expected": null
     },
     {

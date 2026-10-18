@@ -29,8 +29,7 @@ export function latexToPlain(latex: string): string | null {
     .replace(/\\(?:,|;|:|!|\s)/g, ' ') // spacing commands
     .replace(/\^\{?\\circ\}?/g, '°')
     .replace(/\\(?:text|mathrm)\{([^{}]*)\}/g, '$1')
-  // \sqrt{x} with a short plain body: √x (√(…) for longer ones would read ambiguously).
-  text = text.replace(/\\sqrt\{([A-Za-z0-9]{1,3})\}/g, '√$1')
+  // Roots stay formulas: as text, √123 or √x+1 does not show where the root ends.
   text = text.replace(/\\widehat\{([A-Za-z]{1,3})\}/g, '∠$1') // "góc A"
   // A space after a command only ends its name in LaTeX ("\perp BC"): drop it.
   text = text.replace(/\\([A-Za-z]+) ?/g, (whole, name: string) =>

@@ -178,6 +178,30 @@ class AppTest {
     }
 
     @Test
+    fun theRootsOfTheSymbolBarOpenTheEditorWithTheirSlot() {
+        startAsGuest()
+        compose.onNodeWithTag("newConversation").performClick()
+        waitFor("toggleSymbols")
+        compose.onNodeWithTag("toggleSymbols").performClick()
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Căn bậc hai"))).performClick()
+        waitFor("formulaEditor")
+        compose.onNodeWithTag("key-2").performClick() // into the root's slot
+        compose.onNodeWithTag("insertFormula").performClick()
+        // A root stays a formula, drawn with its bar (as text, √123 would not show where it ends).
+        composerText { text -> assertTrue("a chip: $text", text.contains(CHIP)) }
+
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Căn bậc ba"))).performClick()
+        waitFor("formulaEditor")
+        compose.onNodeWithTag("key-8").performClick()
+        compose.onNodeWithTag("insertFormula").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("composer").fetchSemanticsNodes().any { node ->
+                node.config.getOrNull(SemanticsProperties.ContentDescription)?.any { it == "\$\\sqrt{2}\$ \$\\sqrt[3]{8}\$ " } == true
+            }
+        }
+    }
+
+    @Test
     fun typedDollarsBecomeAChipAndBackspaceGivesTheSourceBack() {
         startAsGuest()
         compose.onNodeWithTag("newConversation").performClick()
