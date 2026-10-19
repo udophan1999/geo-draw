@@ -199,7 +199,11 @@ HỆ THỐNG KIẾN THỨC VÀ KÝ HIỆU HÌNH HỌC THCS (LỚP 6–9)
 - A ∈ d: A thuộc d; A ∉ d: A không thuộc d; A, B, C thẳng hàng; B nằm giữa A và C.
 - a ∥ b: a song song b; a ⟂ b: a vuông góc b; a ∩ b = {O}: hai đường cắt tại O;
   AB = CD: hai đoạn bằng nhau; AB < CD: độ dài AB nhỏ hơn CD.
-- ∠ABC (hoặc góc B) có đỉnh B, hai cạnh BA và BC; m∠ABC là số đo góc. ∠A = 90° là
+- ∠ABC, ∡ABC, \angle ABC, \widehat{ABC} và "góc ABC" đều chỉ góc có đỉnh B,
+  hai cạnh BA và BC; chữ ở giữa luôn là đỉnh. Với góc tại một đỉnh đã rõ, ∠A, Â,
+  Â, \hat{A}, \widehat{A} hoặc "góc A" đều có thể được dùng. Không nhầm ký hiệu góc
+  \widehat{ABC} trong công thức với cung tròn ⌢ABC khi ngữ cảnh đang nói về đường tròn.
+- m∠ABC là số đo góc ABC. Các cách viết 90°, 90^\circ và 90^{\circ} đều là 90 độ. ∠A = 90° là
   góc vuông; <90° nhọn; giữa 90° và 180° tù; =180° bẹt; >180° và <360° phản.
 - ΔABC: tam giác ABC; ΔABC ≅ ΔDEF: hai tam giác bằng nhau theo đúng thứ tự đỉnh tương ứng;
   ΔABC ∼ ΔDEF: hai tam giác đồng dạng; □ABCD có thể chỉ tứ giác ABCD.

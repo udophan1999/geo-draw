@@ -6,6 +6,7 @@ from geo_draw.ai_codegen import (
     SYSTEM_PROMPT,
     _drawing_facts_text,
     _ensure_light_theme,
+    _normalize_geometry_notation,
     _ordinary_polygons,
     extract_problem_from_image,
     extract_python,
@@ -50,6 +51,26 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("E = np.array([-2.00000000", result.code)
         self.assertEqual(result.code.count("degrees=90"), 3)
         self.assertNotIn("ordinary_polygon_check", result.code)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_right_trapezoid_mathjax_angle_notation_is_built_without_ai(self, request_chat):
+        problem = (
+            r"Cho hình thang ABCD (AD \parallel BC) có AD = 16 cm, BC = 4 cm và "
+            r"\widehat{A} = \hat{B} = \angle ACD = 90^{\circ}. "
+            r"Kẻ đường cao CE của tam giác ACD."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("altitude_segment(C, E, A, D)", result.code)
+        self.assertEqual(result.code.count("degrees=90"), 3)
+
+    def test_geometry_notation_normalizes_common_angle_spellings(self):
+        source = r"∠ABC = \widehat{DEF} = \hat G = \measuredangle HIJ = 90^\circ"
+        self.assertEqual(
+            _normalize_geometry_notation(source),
+            "ABC = DEF = G = HIJ = 90°",
+        )
 
     def test_multiline_proof_goals_are_not_drawing_facts(self):
         problem = (

@@ -237,14 +237,46 @@ class AiResult:
     detail: str = ""  # the technical cause, for the drawing log only
 
 
+def _normalize_geometry_notation(text: str) -> str:
+    """Flatten textbook/MathJax geometry notation for deterministic parsing."""
+    normalized = unicodedata.normalize("NFC", text or "")
+    normalized = normalized.replace("\\(", " ").replace("\\)", " ")
+    normalized = normalized.replace("\\[", " ").replace("\\]", " ").replace("$", " ")
+    normalized = re.sub(
+        r"\\(?:widehat|hat|measuredangle|angle)\s*\{\s*([A-Za-z]{1,3})\s*\}",
+        r"\1",
+        normalized,
+        flags=re.I,
+    )
+    normalized = re.sub(
+        r"\\(?:widehat|hat|measuredangle|angle)\s+([A-Za-z]{1,3})",
+        r"\1",
+        normalized,
+        flags=re.I,
+    )
+    normalized = re.sub(r"(?<![A-Za-z])(?:∠|∡)\s*([A-Za-z]{1,3})", r"\1", normalized)
+    normalized = re.sub(r"\^\s*\{?\s*\\circ\s*\}?", "°", normalized, flags=re.I)
+    normalized = re.sub(r"\\(?:degree|circ)\b", "°", normalized, flags=re.I)
+    normalized = re.sub(r"\\parallel\b", "∥", normalized, flags=re.I)
+    normalized = re.sub(r"\\perp\b", "⊥", normalized, flags=re.I)
+    normalized = re.sub(r"\\(?:quad|qquad)\b|\\[,;!]", " ", normalized)
+    normalized = normalized.replace("{", "").replace("}", "")
+    return normalized
+
+
+def _fold_geometry_notation(text: str) -> str:
+    """Return accent-free uppercase notation after MathJax normalization."""
+    return "".join(
+        char for char in unicodedata.normalize("NFD", _normalize_geometry_notation(text).upper())
+        if unicodedata.category(char) != "Mn"
+    ).replace("Đ", "D")
+
+
 def _right_trapezoid_with_perpendicular_diagonal_scene(
     problem: str, animate: bool,
 ) -> str | None:
     """Build the exact AD-parallel-BC right trapezoid used by textbook problems."""
-    folded = "".join(
-        char for char in unicodedata.normalize("NFD", problem.upper())
-        if unicodedata.category(char) != "Mn"
-    ).replace("Đ", "D")
+    folded = _fold_geometry_notation(problem)
     compact = re.sub(r"\s+", "", folded).replace("∥", "//")
     has_shape = "HINHTHANGABCD" in compact
     has_parallel = "AD//BC" in compact or "BC//AD" in compact
@@ -262,7 +294,7 @@ def _right_trapezoid_with_perpendicular_diagonal_scene(
     def length(segment: str) -> float | None:
         match = re.search(
             rf"\b{segment}\s*=\s*(\d+(?:[.,]\d+)?)\s*(?:CM)?\b",
-            problem.upper(),
+            _normalize_geometry_notation(problem).upper(),
         )
         return float(match.group(1).replace(",", ".")) if match else None
 
@@ -973,10 +1005,7 @@ def validate_code(code: str, problem: str | None = None) -> None:
         # Textbooks commonly compress equal numeric angles as
         # "Â = B̂ = ACD = 90°".  OCR may preserve the circumflex as a
         # combining mark, so fold accents before parsing the equality chain.
-        folded_angles = "".join(
-            char for char in unicodedata.normalize("NFD", problem.upper())
-            if unicodedata.category(char) != "Mn"
-        ).replace("Đ", "D")
+        folded_angles = _fold_geometry_notation(problem)
         folded_angles = re.sub(r"\s+", " ", folded_angles)
         for match in re.finditer(
             r"(?<![A-Z])((?:[A-Z]{1,3})(?:\s*=\s*(?:[A-Z]{1,3}))*)"
@@ -1449,7 +1478,7 @@ def _explicit_parallel_relations(problem: str | None) -> list[tuple[str, str]]:
     """Return segment pairs that the givens explicitly state are parallel."""
     if not problem:
         return []
-    facts = _drawing_facts_text(problem)
+    facts = _normalize_geometry_notation(_drawing_facts_text(problem))
     patterns = (
         r"\b([A-Z]{2})\s*(?://|∥|\\parallel)\s*([A-Z]{2})\b",
         r"\b([A-Z]{2})\s+song\s+song(?:\s+với)?\s+([A-Z]{2})\b",
@@ -1573,10 +1602,7 @@ def _ordinary_polygons(problem: str | None) -> list[str]:
     if not problem:
         return []
     facts = _drawing_facts_text(problem)
-    folded = "".join(
-        char for char in unicodedata.normalize("NFD", facts.upper())
-        if unicodedata.category(char) != "Mn"
-    ).replace("Đ", "D")
+    folded = _fold_geometry_notation(facts)
     explicit_angle_names: set[str] = set()
     for match in re.finditer(
         r"(?<![A-Z])((?:[A-Z]{1,3})(?:\s*=\s*(?:[A-Z]{1,3}))*)"
