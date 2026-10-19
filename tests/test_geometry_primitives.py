@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 import numpy as np
-from manim import BLACK, WHITE, Dot, Line, Scene
+from manim import BLACK, WHITE, Dot, Line, RightAngle, Scene
 
 from geo_draw.geometry_primitives import (
     _NAMED_POINTS,
@@ -170,6 +170,16 @@ class GeometryPrimitiveTests(unittest.TestCase):
         two_arcs = interior_angle_marker(self.vertices, 1, degrees=120, mark_count=2)
         self.assertEqual(len(one_arc[0]), 1)
         self.assertEqual(len(two_arcs[0]), 2)
+
+    def test_ninety_degree_angle_uses_square_without_numeric_label(self):
+        vertices = (
+            np.array([0.0, 0.0, 0.0]),
+            np.array([2.0, 0.0, 0.0]),
+            np.array([2.0, 2.0, 0.0]),
+            np.array([0.0, 2.0, 0.0]),
+        )
+        marker = interior_angle_marker(vertices, 0, degrees=90)
+        self.assertIs(type(marker), RightAngle)
 
     def test_rejects_marking_unequal_bases_as_equal(self):
         with self.assertRaisesRegex(ValueError, "độ dài khác nhau"):

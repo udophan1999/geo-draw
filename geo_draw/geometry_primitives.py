@@ -126,7 +126,7 @@ def interior_angle_marker(
     font_size: int = 26,
     tolerance: float = 0.75,
 ):
-    """Return distinct concentric interior arcs and one optional degree label."""
+    """Return an interior-angle mark; right angles use only the standard square."""
     points = [_point(value) for value in vertices]
     count = len(points)
     vertex_index %= count
@@ -141,6 +141,18 @@ def interior_angle_marker(
     actual_angle = small_angle if convex else 360.0 - small_angle
     if degrees is not None:
         _assert_close(actual_angle, float(degrees), tolerance, "Số đo góc trong không đúng")
+
+    # In school geometry the square is itself the complete 90-degree notation.
+    # Adding an arc and a numeric ``90°`` label is redundant and makes dense
+    # diagrams harder to read.
+    if degrees is not None and abs(float(degrees) - 90.0) <= tolerance:
+        return RightAngle(
+            Line(vertex, previous),
+            Line(vertex, following),
+            length=min(float(radius) * 0.48, 0.24),
+            quadrant=(1, 1),
+            color=color,
+        )
 
     if not isinstance(mark_count, int) or not 1 <= mark_count <= 3:
         raise ValueError("Số cung ký hiệu góc phải từ 1 đến 3.")

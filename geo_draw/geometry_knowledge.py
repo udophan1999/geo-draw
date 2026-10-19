@@ -13,6 +13,7 @@ GEOMETRY_HELP_VI = """
 - Nếu đường cao từ đỉnh góc vuông xuống cạnh huyền chia cạnh huyền thành hai hình chiếu,
   phải dựng chân đường cao bằng phép chiếu vuông góc chính xác, không đặt điểm bằng mắt.
 - Ký hiệu góc luôn được đặt theo nhánh trong của đa giác.
+- Góc 90° chỉ dùng một ô vuông nhỏ ở đỉnh; không vẽ cung và không ghi thêm số đo 90°.
 - Bộ nhớ chống lặp lỗi luôn kiểm tra: đủ điểm và đường, nét liền, nhãn thoáng, hình không tràn khung,
   đúng nhóm đoạn bằng nhau, đúng số ký hiệu góc và đúng số ô vuông tại mỗi quan hệ vuông góc.
 """
@@ -38,7 +39,8 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   supplementary angle (for example 30 degrees into 150 degrees).
 - Draw a right-angle square only for a perpendicular relation stated in the givens. One stated
   relation gets exactly one right-angle square at its intersection; distinct stated relations get separate
-  squares. A conclusion to prove (for example, EFGH is a rectangle) gets no right-angle square.
+  squares. The square is the complete notation: never add a curved angle arc or a numeric 90-degree
+  label beside it. A conclusion to prove (for example, EFGH is a rectangle) gets no right-angle square.
 - All explicitly equal segments share one tick style and one equality group. Unrelated or unequal
   segments never share a tick style. Do not infer visible side ticks from a standard shape name.
 - Every stated midpoint gets its own midpoint_marker covering both halves. Midpoints of equal parent
@@ -204,7 +206,8 @@ HỆ THỐNG KIẾN THỨC VÀ KÝ HIỆU HÌNH HỌC THCS (LỚP 6–9)
   Â, \hat{A}, \widehat{A} hoặc "góc A" đều có thể được dùng. Không nhầm ký hiệu góc
   \widehat{ABC} trong công thức với cung tròn ⌢ABC khi ngữ cảnh đang nói về đường tròn.
 - m∠ABC là số đo góc ABC. Các cách viết 90°, 90^\circ và 90^{\circ} đều là 90 độ. ∠A = 90° là
-  góc vuông; <90° nhọn; giữa 90° và 180° tù; =180° bẹt; >180° và <360° phản.
+  góc vuông. Trên hình, góc vuông chỉ được đánh dấu bằng một ô vuông nhỏ, không kèm cung góc và
+  không ghi thêm "90°". Góc <90° nhọn; giữa 90° và 180° tù; =180° bẹt; >180° và <360° phản.
 - ΔABC: tam giác ABC; ΔABC ≅ ΔDEF: hai tam giác bằng nhau theo đúng thứ tự đỉnh tương ứng;
   ΔABC ∼ ΔDEF: hai tam giác đồng dạng; □ABCD có thể chỉ tứ giác ABCD.
 - (O;R): đường tròn tâm O bán kính R; R là bán kính, d=2R là đường kính; cung AB viết ⌢AB;
