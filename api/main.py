@@ -84,7 +84,7 @@ def create_app(data_dir: Path | None = None, web_dist: Path | None = ROOT / "web
 
     @api.get("/health", tags=["meta"])
     def health() -> dict:
-        return {"ok": True}
+        return {"ok": True, "build": os.environ.get("MATHMATE_BUILD", "dev")}
 
     app.include_router(api)
     if web_dist is not None and (web_dist / "index.html").is_file():

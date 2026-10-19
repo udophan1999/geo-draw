@@ -17,6 +17,8 @@ services:
     build:
       context: .
       target: runtime
+      args:
+        MATHMATE_BUILD: ${IMAGE:-dev}
     image: ${IMAGE:-mathmate:latest}
     restart: unless-stopped
     env_file:
