@@ -28,6 +28,24 @@ class GeoScene(Scene):
 
 
 class AiCodegenTests(unittest.TestCase):
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_right_trapezoid_textbook_case_is_built_without_ai(self, request_chat):
+        problem = (
+            "Cho hình thang ABCD (AD // BC) có AD = 16 cm, BC = 4 cm và "
+            "Â = B̂ = ACD = 90°. Kẻ đường cao CE của tam giác ACD. "
+            "Chứng minh ADC = ACE và suy ra AC² = AE . AD. Từ đó tính AC."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("altitude_segment(C, E, A, D)", result.code)
+        self.assertIn("parallel_segment_marks((A, D), (B, C)", result.code)
+        self.assertIn('Text("16 cm"', result.code)
+        self.assertIn('Text("4 cm"', result.code)
+        self.assertIn("E = np.array([-2.00000000", result.code)
+        self.assertEqual(result.code.count("degrees=90"), 3)
+        self.assertNotIn("ordinary_polygon_check", result.code)
+
     def test_multiline_proof_goals_are_not_drawing_facts(self):
         problem = (
             "Trong Hình 12, cho biết ABCD là một hình vuông. Chứng minh rằng:\n"
@@ -248,6 +266,15 @@ class GeoScene(Scene):
         for term in ("Isosceles trapezoid", "Parallelogram", "Rectangle", "Rhombus", "Square"):
             self.assertIn(term, MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("signed area", SYSTEM_PROMPT)
+        for grade_nine_relation in (
+            "GRADE 9 RIGHT-TRIANGLE",
+            "a^2+b^2=c^2",
+            "h^2=p*q",
+            "sin(alpha)=opposite/hypotenuse",
+            "h^2=l*(L-l)",
+            "AC^2=AE*AD",
+        ):
+            self.assertIn(grade_nine_relation, MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("white canvas with black geometry", SYSTEM_PROMPT)
         self.assertIn(DRAWING_ERROR_MEMORY, SYSTEM_PROMPT)
         for remembered_rule in (

@@ -8,6 +8,10 @@ GEOMETRY_HELP_VI = """
 - Hình thoi: hình bình hành có bốn cạnh bằng nhau.
 - Hình vuông: bốn cạnh bằng nhau và bốn góc vuông.
 - Đa giác đều: các cạnh bằng nhau và các góc bằng nhau.
+- Tam giác vuông lớp 9: dùng định lý Pythagore, các hệ thức cạnh–đường cao–hình chiếu
+  và các tỉ số lượng giác sin, cos, tan để giải tọa độ trước khi vẽ.
+- Nếu đường cao từ đỉnh góc vuông xuống cạnh huyền chia cạnh huyền thành hai hình chiếu,
+  phải dựng chân đường cao bằng phép chiếu vuông góc chính xác, không đặt điểm bằng mắt.
 - Ký hiệu góc luôn được đặt theo nhánh trong của đa giác.
 - Bộ nhớ chống lặp lỗi luôn kiểm tra: đủ điểm và đường, nét liền, nhãn thoáng, hình không tràn khung,
   đúng nhóm đoạn bằng nhau, đúng số ký hiệu góc và đúng số ô vuông tại mỗi quan hệ vuông góc.
@@ -117,6 +121,26 @@ TRIANGLES
   equilateral_triangle_check before rendering; the check does not add visible side ticks.
   Right: one 90-degree angle. Acute: all angles <90 degrees.
   Obtuse: exactly one angle >90 degrees.
+
+GRADE 9 RIGHT-TRIANGLE METRIC RELATIONS AND TRIGONOMETRY
+- In a right triangle with legs a,b and hypotenuse c, enforce a^2+b^2=c^2 numerically.
+- If altitude h from the right-angle vertex meets the hypotenuse and divides it into projections
+  p and q, enforce c=p+q, a^2=c*p, b^2=c*q, h^2=p*q, and a*b=c*h.  These relations determine
+  coordinates; they are not optional proof decorations.
+- The altitude to the hypotenuse creates three pairwise similar right triangles.  Preserve the
+  corresponding acute angles geometrically, but do not draw equal-angle arcs when similarity is
+  only a conclusion the student must prove.
+- For an acute angle alpha in a right triangle, sin(alpha)=opposite/hypotenuse,
+  cos(alpha)=adjacent/hypotenuse, tan(alpha)=opposite/adjacent, and
+  cot(alpha)=adjacent/opposite.  Use these ratios to solve coordinates and verify angle values.
+- Complementary acute angles sum to 90 degrees.  Use inverse trigonometric functions only after
+  constructing exact side ratios; never estimate an angle from the appearance of the drawing.
+- For a right trapezoid ABCD with AD parallel BC, right angles at A and B, AD=L, BC=l<L,
+  choose A=(0,0), B=(0,h), C=(l,h), D=(L,0).  If angle ACD is 90 degrees, then the dot product
+  (A-C).(D-C)=0 gives h^2=l*(L-l).  The altitude from C to AD has foot E=(l,0), so AE=l,
+  ED=L-l, AC^2=AE*AD, and triangles ACD, ACE, CED carry the expected similarity relations.
+- Always keep the named parallel bases from the problem.  Do not silently rotate vertex order to
+  the more familiar AB parallel CD convention, and do not replace the requested altitude foot.
 
 QUADRILATERALS
 - A quadrilateral has four vertices in boundary order; its interior angles sum to 360 degrees.
