@@ -14,7 +14,12 @@ from geo_draw.ai_codegen import (
     sanitize_code,
     validate_code,
 )
-from geo_draw.geometry_knowledge import DRAWING_ERROR_MEMORY, MIDDLE_SCHOOL_GEOMETRY_RULES
+from geo_draw.geometry_knowledge import (
+    DRAWING_ERROR_MEMORY,
+    GEOMETRY_HELP_VI,
+    MIDDLE_SCHOOL_GEOMETRY_RULES,
+    THCS_GEOMETRY_CURRICULUM_VI,
+)
 
 
 SAFE_CODE = """from manim import *
@@ -285,6 +290,38 @@ class GeoScene(Scene):
             "Define, dot, label, and connect every named point",
         ):
             self.assertIn(remembered_rule, DRAWING_ERROR_MEMORY)
+
+    def test_complete_thcs_geometry_curriculum_is_shared_by_prompt_and_help(self):
+        required_units = (
+            "KÝ HIỆU VÀ CÁCH ĐỌC",
+            "ĐIỂM, ĐƯỜNG THẲNG, ĐOẠN THẲNG, TIA VÀ GÓC",
+            "TAM GIÁC",
+            "ĐỊNH LÝ THALÈS, ĐỒNG DẠNG VÀ PHÂN GIÁC",
+            "HỆ THỨC LƯỢNG VÀ LƯỢNG GIÁC",
+            "TỨ GIÁC VÀ ĐA GIÁC",
+            "ĐƯỜNG TRÒN",
+            "ĐỐI XỨNG, PHÉP BIẾN HÌNH VÀ TỌA ĐỘ",
+            "CHU VI, DIỆN TÍCH VÀ HÌNH KHÔNG GIAN",
+            "QUY TẮC SUY LUẬN VÀ DỰNG HÌNH",
+        )
+        required_symbols = (
+            "A ∈ d", "A ∉ d", "a ∥ b", "a ⟂ b", "ΔABC ≅ ΔDEF",
+            "ΔABC ∼ ΔDEF", "(O;R)", "⌢AB", "Sxq", "Stp",
+        )
+        for item in required_units + required_symbols:
+            self.assertIn(item, THCS_GEOMETRY_CURRICULUM_VI)
+            self.assertIn(item, MIDDLE_SCHOOL_GEOMETRY_RULES)
+            self.assertIn(item, GEOMETRY_HELP_VI)
+            self.assertIn(item, SYSTEM_PROMPT)
+        for incidence_rule in (
+            "A, B, C ∈ d",
+            "AM+MB=AB",
+            "M ∈ tia Ax",
+            "A ∈ (O;R)",
+            "tham số t∈[0,1]",
+            "điểm trên tia có t≥0",
+        ):
+            self.assertIn(incidence_rule, THCS_GEOMETRY_CURRICULUM_VI)
 
     def test_isosceles_trapezoid_requires_verified_markers(self):
         problem = "Vẽ hình thang cân ABCD, AB // CD, góc A bằng 120 độ"
