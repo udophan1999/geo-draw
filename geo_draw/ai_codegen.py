@@ -345,6 +345,72 @@ class GeoScene(Scene):
 '''
 
 
+def _midradius_perpendicular_chord_tangent_scene(
+    problem: str, animate: bool,
+) -> str | None:
+    """Build the OA-midpoint chord and the explicitly requested tangent at B."""
+    folded = _fold_geometry_notation(problem)
+    compact = re.sub(r"\s+", "", folded).replace("⊥", "VUONGGOCVOI")
+    has_circle = "DUONGTRONTAMO" in compact
+    has_radius = "BANKINHOA=R" in compact or "OA=R" in compact
+    has_chord = "DAYBCVUONGGOCVOIOA" in compact
+    has_midpoint = "TRUNGDIEMMCUAOA" in compact
+    has_tangent = (
+        "TIEPTUYEN" in compact
+        and "TAIB" in compact
+        and "DUONGTHANGOA" in compact
+        and "TAIE" in compact
+    )
+    if not (has_circle and has_radius and has_chord and has_midpoint and has_tangent):
+        return None
+
+    # Use R=3 drawing units.  Relative to O, M=(R/2, 0), so the
+    # perpendicular chord endpoints are (R/2, ±sqrt(3)R/2).  The tangent at
+    # B meets OA at x=2R.  These coordinates encode only stated constructions;
+    # no requested classification or computed BE length is annotated.
+    radius = 3.0
+    ox = -2.5
+    chord_x = ox + radius / 2
+    chord_half = (3.0 ** 0.5) * radius / 2
+    ex = ox + 2 * radius
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, line_through_intersection, midpoint_marker, perpendicular_intersection_marker, safe_point_label, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        O = np.array([{ox:.8f}, 0.0, 0.0])
+        A = np.array([{ox + radius:.8f}, 0.0, 0.0])
+        M = np.array([{chord_x:.8f}, 0.0, 0.0])
+        B = np.array([{chord_x:.8f}, {chord_half:.8f}, 0.0])
+        C = np.array([{chord_x:.8f}, {-chord_half:.8f}, 0.0])
+        E = np.array([{ex:.8f}, 0.0, 0.0])
+        OA_line = line_through_intersection(O, A, E)
+        chord = Line(B, C)
+        tangent = Line(B, E)
+        self.add(
+            Circle(radius={radius:.8f}, color=BLACK).move_to(O),
+            OA_line, chord,
+            Line(O, C), Line(C, A), Line(A, B), Line(B, O),
+            tangent,
+            midpoint_marker(M, O, A, other_points=(B, C, E)),
+            perpendicular_intersection_marker((B, C), (O, A), M),
+            Text("R", font_size=26).next_to(Line(O, M), DOWN, buff=0.24),
+            Dot(O), Dot(A), Dot(M), Dot(B), Dot(C), Dot(E),
+            safe_point_label(O, "O", A, B, C),
+            safe_point_label(A, "A", O, B, C, E),
+            safe_point_label(M, "M", O, A, B, C, distance=0.38),
+            safe_point_label(B, "B", M, O, A, E),
+            safe_point_label(C, "C", M, O, A),
+            safe_point_label(E, "E", A, B),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
 def _right_trapezoid_with_perpendicular_diagonal_scene(
     problem: str, animate: bool,
 ) -> str | None:
@@ -2043,7 +2109,8 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
-        _radius_chord_external_point_scene(problem, animate)
+        _midradius_perpendicular_chord_tangent_scene(problem, animate)
+        or _radius_chord_external_point_scene(problem, animate)
         or _right_trapezoid_with_perpendicular_diagonal_scene(problem, animate)
     )
     if deterministic is not None:

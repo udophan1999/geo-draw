@@ -35,6 +35,29 @@ class GeoScene(Scene):
 
 class AiCodegenTests(unittest.TestCase):
     @patch("geo_draw.ai_codegen._request_chat")
+    def test_midradius_chord_and_tangent_problem_is_built_without_ai(self, request_chat):
+        problem = (
+            "Cho đường tròn tâm O có bán kính OA = R, dây BC vuông góc với OA "
+            "tại trung điểm M của OA. "
+            "a) Tứ giác OCAB là hình gì? Vì sao? "
+            "b) Kẻ tiếp tuyến với đường tròn tại B, cắt đường thẳng OA tại E. "
+            "Tính độ dài BE theo R."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("Circle(radius=3.00000000", result.code)
+        self.assertIn("midpoint_marker(M, O, A", result.code)
+        self.assertIn("perpendicular_intersection_marker((B, C), (O, A), M)", result.code)
+        self.assertIn("tangent = Line(B, E)", result.code)
+        self.assertNotIn("equal_segment_marks", result.code)
+        self.assertNotIn("BE =", result.code)
+        facts = _drawing_facts_text(problem)
+        self.assertNotIn("là hình gì", facts.casefold())
+        self.assertNotIn("tính độ dài", facts.casefold())
+        self.assertIn("Kẻ tiếp tuyến", facts)
+
+    @patch("geo_draw.ai_codegen._request_chat")
     def test_circle_5_12_13_problem_is_built_without_showing_conclusions(self, request_chat):
         problem = (
             "Cho đường tròn tâm O có bán kính bằng 5 cm và điểm B cách O một khoảng 13 cm. "
