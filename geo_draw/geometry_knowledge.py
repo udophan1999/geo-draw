@@ -26,6 +26,10 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
 - Preserve every stated object and condition when later auxiliary objects are added.
 - Treat every a/b/c item after "Chứng minh" as a conclusion, even across line breaks. Never
   put equality ticks on HE and HG merely because the exercise asks students to prove HE=HG.
+- A proof goal never authorizes a new object or relationship mark. If the goal says that points
+  are concyclic or a quadrilateral is cyclic, do not draw the claimed circle. Likewise do not
+  add equality ticks, equal-angle arcs, parallel marks, right-angle squares, tangency marks, or
+  incidence marks that occur only in the conclusion. Draw them only when stated in the givens.
 - If a problem refers to a numbered figure but only the text is available, do not invent the
   positions of unnamed-in-givens points such as E, F, G, H. Ask for the actual figure or its
   precise point/line relations before generating geometry.

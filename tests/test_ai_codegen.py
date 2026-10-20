@@ -129,6 +129,54 @@ class GeoScene(Scene):
         with self.assertRaisesRegex(ValueError, "Không tự đánh dấu cạnh bằng nhau"):
             validate_code(code, problem=problem)
 
+    def test_proof_only_concyclic_circle_is_rejected_before_render(self):
+        problem = (
+            "Cho tam giác cân ABC (AB = AC), P thuộc BC. Kẻ PE // AB, PD // AC "
+            "với E thuộc AC, D thuộc AB. Gọi Q là điểm đối xứng với P qua DE. "
+            "Chứng minh bốn điểm Q, A, B, C cùng thuộc một đường tròn."
+        )
+        templates = (
+            "circle = Circle(radius=3)",
+            "circle = Circle.from_three_points(A, B, C)",
+        )
+        for construction in templates:
+            with self.subTest(construction=construction):
+                code = f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 2.0, 0.0])
+        B = np.array([-2.0, 0.0, 0.0])
+        C = np.array([2.0, 0.0, 0.0])
+        P = np.array([0.3, 0.0, 0.0])
+        D = np.array([-0.8, 1.2, 0.0])
+        E = np.array([1.0, 1.0, 0.0])
+        Q = np.array([-0.3, 2.4, 0.0])
+        {construction}
+        self.add(circle)
+        fit_scene_to_frame(self)
+'''
+                with self.assertRaisesRegex(ValueError, "phần cần chứng minh"):
+                    validate_code(code, problem=problem)
+
+    def test_circle_stated_in_givens_is_allowed(self):
+        code = """from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        O = np.array([0.0, 0.0, 0.0])
+        A = np.array([2.0, 0.0, 0.0])
+        self.add(Circle(radius=2.0), Dot(O), Dot(A), Text("O"), Text("A"))
+        fit_scene_to_frame(self)
+"""
+        validate_code(code, problem="Cho đường tròn (O; 2 cm) và điểm A thuộc đường tròn.")
+
     def test_rejects_oversized_raw_line_with_arithmetic_endpoints(self):
         code = SAFE_CODE.replace(
             "        self.add(Dot(a), Text(\"A\").next_to(a, UP))",

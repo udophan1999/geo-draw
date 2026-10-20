@@ -153,6 +153,10 @@ Exact construction requirements:
 - Treat text after "chứng minh"/"prove" as a proof goal, not as given construction data. Draw the
   named segments needed by the goal, but never add equality ticks, equal-angle arcs, or right-angle
   squares for a conclusion such as "Chứng minh IB = ID" or "Chứng minh EFGH là hình chữ nhật".
+  Never draw a circle merely because the goal asks to prove that points are concyclic or that a
+  quadrilateral is cyclic. A Circle is allowed only when a circle is part of the givens or an
+  explicit construction before the proof goal. Apply the same rule to every conclusion-only
+  object, incidence, parallel/perpendicular mark, equal-length tick, and equal-angle arc.
 - Resolve explicitly given segment equalities transitively before drawing ticks. Put every segment
   in one stated equality class into one `equal_segment_marks(...)` call with one shared count.
   Never mark the same segment in two calls, never mix unrelated segments in a call, and give
@@ -474,6 +478,7 @@ def validate_code(code: str, problem: str | None = None) -> None:
     angle_bisector_calls = []
     perpendicular_intersection_calls = []
     equilateral_triangle_calls = []
+    circle_calls = []
     for node in ast.walk(tree):
         if isinstance(node, BLOCKED_NODES):
             raise ValueError(f"Mã AI chứa cấu trúc không được phép: {type(node).__name__}")
@@ -516,6 +521,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 "chỉ dùng một perpendicular_intersection_marker hoặc helper đường phụ phù hợp."
             )
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id == "Circle":
+                circle_calls.append(node)
             if node.func.id == "Arc":
                 direct_arc_calls += 1
             elif node.func.id == "interior_angle_marker":
@@ -614,6 +621,13 @@ def validate_code(code: str, problem: str | None = None) -> None:
                     raise ValueError("Không được giảm khoảng cách tối thiểu giữa các điểm phụ.")
                 if numeric_keywords.get("maximum_aspect_ratio", 2.0) > 2.0:
                     raise ValueError("Không được nới tỷ lệ rộng/cao tối đa của bố cục quá 2.0.")
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "Circle"
+        ):
+            circle_calls.append(node)
         if isinstance(node, ast.ClassDef):
             scene_classes.append(node)
         if isinstance(node, ast.Lambda):
@@ -731,6 +745,16 @@ def validate_code(code: str, problem: str | None = None) -> None:
         request = problem.casefold()
         drawing_facts = _drawing_facts_text(problem)
         drawing_request = drawing_facts.casefold()
+        circle_is_given = bool(re.search(
+            r"\b(?:đường\s+tròn|circle|nội\s+tiếp|ngoại\s+tiếp)\b",
+            drawing_facts,
+            re.I,
+        ))
+        if circle_calls and not circle_is_given:
+            raise ValueError(
+                "Không được vẽ đường tròn chỉ xuất hiện trong phần cần chứng minh; "
+                "chỉ vẽ đường tròn khi nó thuộc giả thiết hoặc phép dựng của đề."
+            )
         point_tokens = re.findall(r"(?<![A-Z])([A-Z]{2,6})(?![A-Z])", problem)
         point_tokens += re.findall(
             r"(?:góc|điểm|tâm|tại|gọi|lấy)\s+([A-Z])\b", problem, re.I
@@ -1959,7 +1983,15 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
         )
     mode = ("Use self.play animations and finish with self.wait(0.5)." if animate else
             "Do not use self.play. Add all mobjects with self.add(...) and finish with self.wait(0.1).")
-    user = f"Animation mode: {mode}\n\nGeometry problem:\n{problem.strip()}"
+    drawing_facts = _drawing_facts_text(problem)
+    user = (
+        f"Animation mode: {mode}\n\nGeometry problem:\n{problem.strip()}\n\n"
+        "Authoritative drawing facts (the only objects and relationship marks permitted in "
+        f"the diagram):\n{drawing_facts}\n\n"
+        "Everything after a proof command is context for which named segments may be useful, "
+        "but its claimed circle, incidence, equality, parallelism, perpendicularity, special "
+        "shape, or angle relation must not be shown as already true."
+    )
     if previous_code:
         # Chat follow-ups: the problem now ends with "Yêu cầu bổ sung"; update the last drawing.
         user += ("\n\nThe current drawing was made for an earlier version of this problem. "
