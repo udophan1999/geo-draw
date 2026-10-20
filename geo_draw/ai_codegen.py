@@ -276,6 +276,75 @@ def _fold_geometry_notation(text: str) -> str:
     ).replace("Đ", "D")
 
 
+def _radius_chord_external_point_scene(problem: str, animate: bool) -> str | None:
+    """Build O-A-B from OA=r, AB=a, OB=d without displaying proof conclusions."""
+    normalized = _normalize_geometry_notation(problem)
+    folded = _fold_geometry_notation(problem)
+    compact = re.sub(r"\s+", "", folded)
+    if not (
+        "DUONGTRONTAMO" in compact
+        and re.search(r"A\s*(?:THUOC|∈)\s*\(O\)", folded)
+        and "AB" in compact
+        and "B" in compact
+    ):
+        return None
+
+    def number(patterns: tuple[str, ...]) -> float | None:
+        for pattern in patterns:
+            match = re.search(pattern, normalized, re.I)
+            if match:
+                return float(match.group(1).replace(",", "."))
+        return None
+
+    radius = number((
+        r"bán\s+kính(?:\s+bằng|\s+là)?\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?",
+        r"\bOA\s*=\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?",
+    ))
+    ob = number((
+        r"\bB\s+cách\s+O(?:\s+một\s+khoảng)?\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?",
+        r"\bOB\s*=\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?",
+    ))
+    ab = number((r"\bAB\s*=\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?",))
+    if radius is None or ob is None or ab is None or min(radius, ob, ab) <= 0:
+        return None
+    if abs(radius * radius + ab * ab - ob * ob) > 0.01 * max(ob * ob, 1.0):
+        return None
+
+    scale = min(0.5, 3.0 / radius, 6.0 / ab)
+    radius_draw = radius * scale
+    ab_draw = ab * scale
+    origin_x = -(ab_draw - radius_draw) / 2
+    origin_y = -radius_draw / 2
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, safe_point_label, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        O = np.array([{origin_x:.8f}, {origin_y:.8f}, 0.0])
+        A = np.array([{origin_x:.8f}, {origin_y + radius_draw:.8f}, 0.0])
+        B = np.array([{origin_x + ab_draw:.8f}, {origin_y + radius_draw:.8f}, 0.0])
+        OA = Line(O, A)
+        AB = Line(A, B)
+        OB = Line(O, B)
+        self.add(
+            Circle(radius={radius_draw:.8f}, color=BLACK).move_to(O),
+            OA, AB, OB,
+            Text("{radius:g} cm", font_size=24).next_to(OA, LEFT, buff=0.18),
+            Text("{ab:g} cm", font_size=24).next_to(AB, UP, buff=0.18),
+            Text("{ob:g} cm", font_size=24).next_to(OB, DOWN + RIGHT, buff=0.16),
+            Dot(O), Dot(A), Dot(B),
+            safe_point_label(O, "O", A, B),
+            safe_point_label(A, "A", O, B),
+            safe_point_label(B, "B", A, O),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
 def _right_trapezoid_with_perpendicular_diagonal_scene(
     problem: str, animate: bool,
 ) -> str | None:
@@ -391,9 +460,19 @@ def _drawing_facts_text(problem: str) -> str:
     facts = []
     in_proof = False
     in_figure_description = False
-    for clause in re.split(r"[.;\n]+", problem):
+    for clause in re.split(r"[.;?\n]+", problem):
         clause = clause.strip()
         if not clause:
+            continue
+        task_text = re.sub(r"^[a-z0-9]+\s*[)\].:/-]\s*", "", clause, flags=re.I)
+        if re.search(r"\blà\s+[^.]{0,80}\bgì\s*$", task_text, re.I) or re.match(
+            r"^(?:tính|tìm|xác\s+định|so\s+sánh|suy\s+ra|kết\s+luận)\b",
+            task_text,
+            re.I,
+        ):
+            # Questions and requested conclusions are not construction facts.  In
+            # particular, "Tam giác OAB là tam giác gì?" must not turn OAB into
+            # an ordinary-triangle constraint before the student proves it is right.
             continue
         parts = re.split(
             r"\b(?:chứng\s+minh|prove|show\s+that)\b",
@@ -1963,7 +2042,10 @@ DRAWING_INCOMPLETE = (f"{APP_NAME} chưa dựng được hình khớp với mọ
 def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
-    deterministic = _right_trapezoid_with_perpendicular_diagonal_scene(problem, animate)
+    deterministic = (
+        _radius_chord_external_point_scene(problem, animate)
+        or _right_trapezoid_with_perpendicular_diagonal_scene(problem, animate)
+    )
     if deterministic is not None:
         try:
             code = sanitize_code(deterministic, animate=animate, problem=problem)

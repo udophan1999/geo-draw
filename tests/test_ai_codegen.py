@@ -35,6 +35,28 @@ class GeoScene(Scene):
 
 class AiCodegenTests(unittest.TestCase):
     @patch("geo_draw.ai_codegen._request_chat")
+    def test_circle_5_12_13_problem_is_built_without_showing_conclusions(self, request_chat):
+        problem = (
+            "Cho đường tròn tâm O có bán kính bằng 5 cm và điểm B cách O một khoảng 13 cm. "
+            "Lấy điểm A thuộc (O) sao cho AB = 12 cm. "
+            "a) Tam giác OAB là tam giác gì? "
+            "b) Chứng minh đường thẳng BA tiếp xúc với (O)."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("Circle(radius=2.50000000", result.code)
+        self.assertIn('Text("5 cm"', result.code)
+        self.assertIn('Text("12 cm"', result.code)
+        self.assertIn('Text("13 cm"', result.code)
+        self.assertNotIn("RightAngle", result.code)
+        self.assertNotIn("perpendicular_intersection_marker", result.code)
+        self.assertNotIn("tangent", result.code.lower())
+        facts = _drawing_facts_text(problem)
+        self.assertNotIn("tam giác gì", facts.casefold())
+        self.assertNotIn("tiếp xúc", facts.casefold())
+
+    @patch("geo_draw.ai_codegen._request_chat")
     def test_right_trapezoid_textbook_case_is_built_without_ai(self, request_chat):
         problem = (
             "Cho hình thang ABCD (AD // BC) có AD = 16 cm, BC = 4 cm và "
