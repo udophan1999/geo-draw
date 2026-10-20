@@ -6,6 +6,7 @@ from geo_draw.ai_codegen import (
     SYSTEM_PROMPT,
     _drawing_facts_text,
     _ensure_light_theme,
+    _normalize_geometry_notation,
     _ordinary_polygons,
     extract_problem_from_image,
     extract_python,
@@ -14,7 +15,12 @@ from geo_draw.ai_codegen import (
     sanitize_code,
     validate_code,
 )
-from geo_draw.geometry_knowledge import DRAWING_ERROR_MEMORY, MIDDLE_SCHOOL_GEOMETRY_RULES
+from geo_draw.geometry_knowledge import (
+    DRAWING_ERROR_MEMORY,
+    GEOMETRY_HELP_VI,
+    MIDDLE_SCHOOL_GEOMETRY_RULES,
+    THCS_GEOMETRY_CURRICULUM_VI,
+)
 
 
 SAFE_CODE = """from manim import *
@@ -28,6 +34,44 @@ class GeoScene(Scene):
 
 
 class AiCodegenTests(unittest.TestCase):
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_right_trapezoid_textbook_case_is_built_without_ai(self, request_chat):
+        problem = (
+            "Cho hình thang ABCD (AD // BC) có AD = 16 cm, BC = 4 cm và "
+            "Â = B̂ = ACD = 90°. Kẻ đường cao CE của tam giác ACD. "
+            "Chứng minh ADC = ACE và suy ra AC² = AE . AD. Từ đó tính AC."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("altitude_segment(C, E, A, D)", result.code)
+        self.assertIn("parallel_segment_marks((A, D), (B, C)", result.code)
+        self.assertIn('Text("16 cm"', result.code)
+        self.assertIn('Text("4 cm"', result.code)
+        self.assertIn("E = np.array([-2.00000000", result.code)
+        self.assertEqual(result.code.count("degrees=90"), 3)
+        self.assertNotIn("ordinary_polygon_check", result.code)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_right_trapezoid_mathjax_angle_notation_is_built_without_ai(self, request_chat):
+        problem = (
+            r"Cho hình thang ABCD (AD \parallel BC) có AD = 16 cm, BC = 4 cm và "
+            r"\widehat{A} = \hat{B} = \angle ACD = 90^{\circ}. "
+            r"Kẻ đường cao CE của tam giác ACD."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("altitude_segment(C, E, A, D)", result.code)
+        self.assertEqual(result.code.count("degrees=90"), 3)
+
+    def test_geometry_notation_normalizes_common_angle_spellings(self):
+        source = r"∠ABC = \widehat{DEF} = \hat G = \measuredangle HIJ = 90^\circ"
+        self.assertEqual(
+            _normalize_geometry_notation(source),
+            "ABC = DEF = G = HIJ = 90°",
+        )
+
     def test_multiline_proof_goals_are_not_drawing_facts(self):
         problem = (
             "Trong Hình 12, cho biết ABCD là một hình vuông. Chứng minh rằng:\n"
@@ -248,6 +292,15 @@ class GeoScene(Scene):
         for term in ("Isosceles trapezoid", "Parallelogram", "Rectangle", "Rhombus", "Square"):
             self.assertIn(term, MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("signed area", SYSTEM_PROMPT)
+        for grade_nine_relation in (
+            "GRADE 9 RIGHT-TRIANGLE",
+            "a^2+b^2=c^2",
+            "h^2=p*q",
+            "sin(alpha)=opposite/hypotenuse",
+            "h^2=l*(L-l)",
+            "AC^2=AE*AD",
+        ):
+            self.assertIn(grade_nine_relation, MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("white canvas with black geometry", SYSTEM_PROMPT)
         self.assertIn(DRAWING_ERROR_MEMORY, SYSTEM_PROMPT)
         for remembered_rule in (
@@ -258,6 +311,38 @@ class GeoScene(Scene):
             "Define, dot, label, and connect every named point",
         ):
             self.assertIn(remembered_rule, DRAWING_ERROR_MEMORY)
+
+    def test_complete_thcs_geometry_curriculum_is_shared_by_prompt_and_help(self):
+        required_units = (
+            "KÝ HIỆU VÀ CÁCH ĐỌC",
+            "ĐIỂM, ĐƯỜNG THẲNG, ĐOẠN THẲNG, TIA VÀ GÓC",
+            "TAM GIÁC",
+            "ĐỊNH LÝ THALÈS, ĐỒNG DẠNG VÀ PHÂN GIÁC",
+            "HỆ THỨC LƯỢNG VÀ LƯỢNG GIÁC",
+            "TỨ GIÁC VÀ ĐA GIÁC",
+            "ĐƯỜNG TRÒN",
+            "ĐỐI XỨNG, PHÉP BIẾN HÌNH VÀ TỌA ĐỘ",
+            "CHU VI, DIỆN TÍCH VÀ HÌNH KHÔNG GIAN",
+            "QUY TẮC SUY LUẬN VÀ DỰNG HÌNH",
+        )
+        required_symbols = (
+            "A ∈ d", "A ∉ d", "a ∥ b", "a ⟂ b", "ΔABC ≅ ΔDEF",
+            "ΔABC ∼ ΔDEF", "(O;R)", "⌢AB", "Sxq", "Stp",
+        )
+        for item in required_units + required_symbols:
+            self.assertIn(item, THCS_GEOMETRY_CURRICULUM_VI)
+            self.assertIn(item, MIDDLE_SCHOOL_GEOMETRY_RULES)
+            self.assertIn(item, GEOMETRY_HELP_VI)
+            self.assertIn(item, SYSTEM_PROMPT)
+        for incidence_rule in (
+            "A, B, C ∈ d",
+            "AM+MB=AB",
+            "M ∈ tia Ax",
+            "A ∈ (O;R)",
+            "tham số t∈[0,1]",
+            "điểm trên tia có t≥0",
+        ):
+            self.assertIn(incidence_rule, THCS_GEOMETRY_CURRICULUM_VI)
 
     def test_isosceles_trapezoid_requires_verified_markers(self):
         problem = "Vẽ hình thang cân ABCD, AB // CD, góc A bằng 120 độ"

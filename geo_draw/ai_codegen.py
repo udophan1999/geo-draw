@@ -7,6 +7,7 @@ import base64
 import json
 import os
 import re
+import unicodedata
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
@@ -234,6 +235,111 @@ class AiResult:
     ok: bool
     error: str = ""  # shown to the student (Vietnamese, no technical terms)
     detail: str = ""  # the technical cause, for the drawing log only
+
+
+def _normalize_geometry_notation(text: str) -> str:
+    """Flatten textbook/MathJax geometry notation for deterministic parsing."""
+    normalized = unicodedata.normalize("NFC", text or "")
+    normalized = normalized.replace("\\(", " ").replace("\\)", " ")
+    normalized = normalized.replace("\\[", " ").replace("\\]", " ").replace("$", " ")
+    normalized = re.sub(
+        r"\\(?:widehat|hat|measuredangle|angle)\s*\{\s*([A-Za-z]{1,3})\s*\}",
+        r"\1",
+        normalized,
+        flags=re.I,
+    )
+    normalized = re.sub(
+        r"\\(?:widehat|hat|measuredangle|angle)\s+([A-Za-z]{1,3})",
+        r"\1",
+        normalized,
+        flags=re.I,
+    )
+    normalized = re.sub(r"(?<![A-Za-z])(?:∠|∡)\s*([A-Za-z]{1,3})", r"\1", normalized)
+    normalized = re.sub(r"\^\s*\{?\s*\\circ\s*\}?", "°", normalized, flags=re.I)
+    normalized = re.sub(r"\\(?:degree|circ)\b", "°", normalized, flags=re.I)
+    normalized = re.sub(r"\\parallel\b", "∥", normalized, flags=re.I)
+    normalized = re.sub(r"\\perp\b", "⊥", normalized, flags=re.I)
+    normalized = re.sub(r"\\(?:quad|qquad)\b|\\[,;!]", " ", normalized)
+    normalized = normalized.replace("{", "").replace("}", "")
+    return normalized
+
+
+def _fold_geometry_notation(text: str) -> str:
+    """Return accent-free uppercase notation after MathJax normalization."""
+    return "".join(
+        char for char in unicodedata.normalize("NFD", _normalize_geometry_notation(text).upper())
+        if unicodedata.category(char) != "Mn"
+    ).replace("Đ", "D")
+
+
+def _right_trapezoid_with_perpendicular_diagonal_scene(
+    problem: str, animate: bool,
+) -> str | None:
+    """Build the exact AD-parallel-BC right trapezoid used by textbook problems."""
+    folded = _fold_geometry_notation(problem)
+    compact = re.sub(r"\s+", "", folded).replace("∥", "//")
+    has_shape = "HINHTHANGABCD" in compact
+    has_parallel = "AD//BC" in compact or "BC//AD" in compact
+    right_names: set[str] = set()
+    for match in re.finditer(r"((?:A|B|ACD)(?:=(?:A|B|ACD))*)=90(?:°|DO)?", compact):
+        right_names.update(match.group(1).split("="))
+    has_right_a = "A" in right_names
+    has_right_b = "B" in right_names
+    has_right_acd = "ACD" in right_names
+    wants_altitude = "DUONGCAOCE" in compact
+    if not (has_shape and has_parallel and has_right_a and has_right_b
+            and has_right_acd and wants_altitude):
+        return None
+
+    def length(segment: str) -> float | None:
+        match = re.search(
+            rf"\b{segment}\s*=\s*(\d+(?:[.,]\d+)?)\s*(?:CM)?\b",
+            _normalize_geometry_notation(problem).upper(),
+        )
+        return float(match.group(1).replace(",", ".")) if match else None
+
+    ad, bc = length("AD"), length("BC")
+    if ad is None or bc is None or ad <= bc or bc <= 0:
+        return None
+
+    # A=(0,0), B=(0,h), C=(BC,h), D=(AD,0).  ACD=90° gives
+    # h²=BC(AD-BC), and the altitude foot is exactly E=(BC,0).
+    scale = 8.0 / ad
+    ad_draw = ad * scale
+    bc_draw = bc * scale
+    height = (bc * (ad - bc)) ** 0.5 * scale
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, altitude_segment, interior_angle_marker, parallel_segment_marks, safe_point_label, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-4.0, {-height / 2:.8f}, 0.0])
+        B = np.array([-4.0, {height / 2:.8f}, 0.0])
+        C = np.array([{-4.0 + bc_draw:.8f}, {height / 2:.8f}, 0.0])
+        D = np.array([{ad_draw - 4.0:.8f}, {-height / 2:.8f}, 0.0])
+        E = np.array([{-4.0 + bc_draw:.8f}, {-height / 2:.8f}, 0.0])
+        self.add(
+            Line(A, B), Line(B, C), Line(C, D), Line(D, A), Line(A, C),
+            altitude_segment(C, E, A, D),
+            interior_angle_marker([A, B, C, D], 0, degrees=90, mark_count=1),
+            interior_angle_marker([A, B, C, D], 1, degrees=90, mark_count=1),
+            interior_angle_marker([A, C, D], 1, degrees=90, mark_count=1),
+            parallel_segment_marks((A, D), (B, C), count=1),
+            Text("{ad:g} cm", font_size=24).next_to(Line(A, D), DOWN, buff=0.18),
+            Text("{bc:g} cm", font_size=24).next_to(Line(B, C), UP, buff=0.18),
+            Dot(A), Dot(B), Dot(C), Dot(D), Dot(E),
+            safe_point_label(A, "A", B, D, C),
+            safe_point_label(B, "B", A, C),
+            safe_point_label(C, "C", B, D, A, E),
+            safe_point_label(D, "D", A, C),
+            safe_point_label(E, "E", C, A, D, distance=0.36),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
 
 
 def load_dotenv(path: Path) -> None:
@@ -896,10 +1002,25 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 re.I,
             )
         }
+        # Textbooks commonly compress equal numeric angles as
+        # "Â = B̂ = ACD = 90°".  OCR may preserve the circumflex as a
+        # combining mark, so fold accents before parsing the equality chain.
+        folded_angles = _fold_geometry_notation(problem)
+        folded_angles = re.sub(r"\s+", " ", folded_angles)
+        for match in re.finditer(
+            r"(?<![A-Z])((?:[A-Z]{1,3})(?:\s*=\s*(?:[A-Z]{1,3}))*)"
+            r"\s*=\s*\d+(?:[.,]\d+)?\s*(?:°|DO)",
+            folded_angles,
+        ):
+            explicit_angles.update(re.split(r"\s*=\s*", match.group(1)))
         if explicit_angles and any(word in request for word in polygon_words):
             if (
                 "tam giác" in request
                 and len(explicit_angles) >= 2
+                and not any(shape in request for shape in (
+                    "tứ giác", "hình thang", "hình bình hành", "hình chữ nhật",
+                    "hình thoi", "hình vuông", "hình diều",
+                ))
                 and "ray_intersection" not in called_names
             ):
                 raise ValueError(
@@ -1357,7 +1478,7 @@ def _explicit_parallel_relations(problem: str | None) -> list[tuple[str, str]]:
     """Return segment pairs that the givens explicitly state are parallel."""
     if not problem:
         return []
-    facts = _drawing_facts_text(problem)
+    facts = _normalize_geometry_notation(_drawing_facts_text(problem))
     patterns = (
         r"\b([A-Z]{2})\s*(?://|∥|\\parallel)\s*([A-Z]{2})\b",
         r"\b([A-Z]{2})\s+song\s+song(?:\s+với)?\s+([A-Z]{2})\b",
@@ -1481,12 +1602,25 @@ def _ordinary_polygons(problem: str | None) -> list[str]:
     if not problem:
         return []
     facts = _drawing_facts_text(problem)
+    folded = _fold_geometry_notation(facts)
+    explicit_angle_names: set[str] = set()
+    for match in re.finditer(
+        r"(?<![A-Z])((?:[A-Z]{1,3})(?:\s*=\s*(?:[A-Z]{1,3}))*)"
+        r"\s*=\s*\d+(?:[.,]\d+)?\s*(?:°|DO)",
+        folded,
+    ):
+        explicit_angle_names.update(re.split(r"\s*=\s*", match.group(1)))
     found = []
     for kind, size in (("tam\\s+giác", 3), ("tứ\\s+giác", 4)):
         pattern = rf"\b{kind}\s+(?:\\?\(\s*)?([A-Z]{{{size}}})(?![A-Z])"
         for match in re.finditer(pattern, facts, re.I):
             names = match.group(1).upper()
             if len(set(names)) != size or names in found:
+                continue
+            if size == 3 and any(
+                len(angle) == 3 and set(angle) == set(names)
+                for angle in explicit_angle_names
+            ):
                 continue
             if size == 3:
                 special = (
@@ -1805,6 +1939,14 @@ DRAWING_INCOMPLETE = (f"{APP_NAME} chưa dựng được hình khớp với mọ
 def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
+    deterministic = _right_trapezoid_with_perpendicular_diagonal_scene(problem, animate)
+    if deterministic is not None:
+        try:
+            code = sanitize_code(deterministic, animate=animate, problem=problem)
+        except ValueError as exc:
+            return AiResult(code="", raw=deterministic, ok=False, error=str(exc))
+        return AiResult(code=code, raw=deterministic, ok=True)
+
     missing_points = missing_reference_figure_points(problem)
     if missing_points:
         return AiResult(

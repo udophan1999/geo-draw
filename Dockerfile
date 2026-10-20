@@ -26,6 +26,7 @@ RUN grep -vE '^(streamlit|httpx2)' /tmp/requirements.txt > /tmp/requirements-pro
 
 # 3. Runtime -------------------------------------------------------------------------------
 FROM python:3.12-slim-bookworm AS runtime
+ARG MATHMATE_BUILD=dev
 # Manim renders through Cairo/Pango, draws labels with system fonts, and needs FFmpeg for
 # videos. No LaTeX: every label is Text.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -36,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # PYTHONPATH: the Manim render subprocess imports geo_draw from the generated scene.
 ENV PATH="/opt/venv/bin:$PATH" \
+    MATHMATE_BUILD="$MATHMATE_BUILD" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     GEO_DRAW_DATA_DIR=/data \
