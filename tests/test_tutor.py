@@ -45,11 +45,14 @@ class PromptTests(unittest.TestCase):
     def test_hint_prompt_has_the_level_and_the_guardrail(self):
         prompt = build_system_prompt(TRIANGLE, HINT, 2)
         self.assertIn(TRIANGLE, prompt)
-        self.assertIn("BẬC GỢI Ý HIỆN TẠI: 2/5 (Nhớ kiến thức)", prompt)
+        self.assertIn("BẬC GỢI Ý HIỆN TẠI: 2/5 (Chọn kiến thức và kế hoạch)", prompt)
         self.assertIn(GUARDRAIL, prompt)
         self.assertIn(ACCESSIBLE_QUESTION_RULE, prompt)
-        self.assertIn("Chỉ giao MỘT nhiệm vụ nhận thức nhỏ", prompt)
-        self.assertIn("điền một chỗ trống", prompt)
+        self.assertIn("2–4 chặng", prompt)
+        self.assertIn("**Cách trình bày:**", prompt)
+        self.assertIn("Mỗi lượt chỉ đặt đúng MỘT câu hỏi", prompt)
+        self.assertIn("không tách một bước thành hàng loạt câu hỏi", prompt)
+        self.assertIn("dữ kiện hoặc kết quả trước → định lý/tính chất → kết luận mới", prompt)
         self.assertIn("[[bac:N]]", prompt)  # the tutor reports progress
         self.assertNotIn("[[bac:N]]", build_system_prompt(TRIANGLE, SOLUTION, 2))
 
