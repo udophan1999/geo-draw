@@ -572,6 +572,7 @@ class GeoScene(Scene):
             "All explicitly equal segments share one tick style",
             "Use only solid strokes",
             "Define, dot, label, and connect every named point",
+            "each carrier may be drawn as one whole segment or as the two visible halves",
         ):
             self.assertIn(remembered_rule, DRAWING_ERROR_MEMORY)
 
@@ -1014,6 +1015,43 @@ class GeoScene(Scene):
             "self.add(line_through_intersection(A, B, E), Line(C, E))",
         )
         validate_code(complete, problem=problem)
+
+    def test_internal_intersection_accepts_split_carriers_and_median_helper(self):
+        code = """from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import median_segment, midpoint_marker, equal_segment_marks, safe_point_label, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        A = np.array([-3.0, 2.0, 0.0])
+        B = np.array([-3.0, -2.0, 0.0])
+        C = np.array([3.0, -1.0, 0.0])
+        M = (B + C) / 2
+        D = A + (B - A) / 3
+        E = A + 2 * (B - A) / 3
+        I = (A + M) / 2
+        self.add(Line(A, B), Line(B, C), Line(C, A))
+        self.add(Line(D, I), Line(I, C), median_segment(A, M, B, C))
+        self.add(Line(E, M))
+        self.add(midpoint_marker(M, B, C, other_points=(A, D, E, I)))
+        self.add(equal_segment_marks((A, D), (D, E), (E, B)))
+        self.add(*[Dot(point) for point in (A, B, C, D, E, M, I)])
+        self.add(*[safe_point_label(point, name) for point, name in (
+            (A, "A"), (B, "B"), (C, "C"), (D, "D"), (E, "E"),
+            (M, "M"), (I, "I"),
+        )])
+        fit_scene_to_frame(self)
+"""
+        problem = (
+            "Cho tam giác ABC có trung tuyến AM. Lấy D và E trên AB sao cho "
+            "AD = DE = EB và D nằm giữa A, E. a) Chứng minh DC // EM. "
+            "b) DC cắt AM tại I. Chứng minh I là trung điểm của AM."
+        )
+        validate_code(code, problem=problem)
+
+        missing_half = code.replace("Line(D, I), Line(I, C)", "Line(D, I)")
+        with self.assertRaisesRegex(ValueError, "đầy đủ đoạn DC"):
+            validate_code(missing_half, problem=problem)
 
     def test_angle_bisector_does_not_require_whole_angle_marker(self):
         bisected = """from manim import *

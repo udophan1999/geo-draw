@@ -1696,6 +1696,7 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 )
 
         def carrier_is_drawn(carrier: str, intersection: str) -> bool:
+            drawn_line_pairs = set()
             for assignment in ast.walk(construct):
                 if not isinstance(assignment, ast.Assign):
                     continue
@@ -1705,7 +1706,6 @@ def validate_code(code: str, problem: str | None = None) -> None:
                     and assignment.value.func.id in {"Line", "line_through_intersection"}
                     and len(assignment.value.args) >= 2
                     and all(isinstance(value, ast.Name) for value in assignment.value.args[:2])
-                    and {assignment.value.args[0].id, assignment.value.args[1].id} == set(carrier)
                 ):
                     continue
                 assigned_names = {
@@ -1714,8 +1714,13 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 if not assigned_names & added_names:
                     continue
                 if assignment.value.func.id == "Line":
-                    return True
-                if (len(assignment.value.args) >= 3
+                    drawn_line_pairs.add(tuple(sorted((
+                        assignment.value.args[0].id,
+                        assignment.value.args[1].id,
+                    ))))
+                    continue
+                if ({assignment.value.args[0].id, assignment.value.args[1].id} == set(carrier)
+                        and len(assignment.value.args) >= 3
                         and isinstance(assignment.value.args[2], ast.Name)
                         and assignment.value.args[2].id == intersection):
                     return True
@@ -1736,14 +1741,38 @@ def validate_code(code: str, problem: str | None = None) -> None:
                             and child.func.id in {"Line", "line_through_intersection"}
                             and len(child.args) >= 2
                             and all(isinstance(value, ast.Name) for value in child.args[:2])
-                            and {child.args[0].id, child.args[1].id} == set(carrier)
                         ):
                             continue
                         if child.func.id == "Line":
-                            return True
-                        if (len(child.args) >= 3 and isinstance(child.args[2], ast.Name)
+                            drawn_line_pairs.add(tuple(sorted((
+                                child.args[0].id,
+                                child.args[1].id,
+                            ))))
+                            continue
+                        if ({child.args[0].id, child.args[1].id} == set(carrier)
+                                and len(child.args) >= 3 and isinstance(child.args[2], ast.Name)
                                 and child.args[2].id == intersection):
                             return True
+            full_carrier = tuple(sorted(carrier))
+            if full_carrier in drawn_line_pairs:
+                return True
+            first_half = tuple(sorted((carrier[0], intersection)))
+            second_half = tuple(sorted((intersection, carrier[1])))
+            if first_half in drawn_line_pairs and second_half in drawn_line_pairs:
+                return True
+            for node in ast.walk(construct):
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id in {"median_segment", "altitude_segment"}
+                    and len(node.args) >= 2
+                    and all(isinstance(argument, ast.Name) for argument in node.args[:2])
+                    and {node.args[0].id, node.args[1].id} == set(carrier)
+                ):
+                    continue
+                assigned_name = assigned_visible_helpers.get(id(node))
+                if id(node) in added_call_ids or assigned_name in added_names:
+                    return True
             return False
 
         for left, right, intersection in paired_intersections:
