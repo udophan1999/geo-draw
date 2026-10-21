@@ -46,6 +46,13 @@ Rules:
   have clear negative space. Avoid skinny, excessively wide, or excessively tall shapes and
   near-coincident construction points. Aim for a main-figure bounding-box aspect ratio between
   about 1.2 and 1.8 (never above 2.0), normally 7-9 Manim units wide and 4.5-6.5 units high.
+- Keep the main figure upright in the conventional textbook orientation; never rotate the whole
+  diagram arbitrarily. Every named triangle or quadrilateral must have at least one boundary side
+  exactly horizontal. Normally draw triangle base BC horizontally with A above it. For a right
+  triangle, a horizontal leg and a vertical leg are also preferred. Draw trapezoid bases,
+  rectangle/square top and bottom sides, chords described as horizontal, and principal baselines
+  exactly horizontal. Compute every auxiliary point only after fixing this orientation, and call
+  `upright_polygon_check([A, B, C], names="ABC")` (or four vertices) before rendering.
 - When three or more important auxiliary points form the focus of the exercise, call
   `layout_spacing_check(E, I, F, all_points=(A, B, C, D), maximum_aspect_ratio=2.0)` after
   computing them. For a symmetric
@@ -165,7 +172,7 @@ Exact construction requirements:
 - For all mathematical markers and special lines, use the verified helpers from
   `geo_draw.geometry_primitives`: apply_light_theme, interior_angle_marker, equal_segment_marks,
   parallel_segment_marks, midpoint_marker, median_segment, altitude_segment,
-  equilateral_triangle_check,
+  equilateral_triangle_check, triangle_shape_check, upright_polygon_check,
   perpendicular_intersection_marker,
   angle_bisector_segment, perpendicular_bisector, perpendicular_through_point,
   opposite_ray_point, ray_intersection, ray, infinite_line,
@@ -195,6 +202,8 @@ Exact construction requirements:
   `E = opposite_ray_point(B, C)`;
   `line_through_intersection(A, B, E)`;
   `layout_spacing_check(E, I, F, all_points=(A, B, C, D), maximum_aspect_ratio=2.0)`;
+  `triangle_shape_check(A, B, C, names="ABC", isosceles_apex="A", right_vertex="A")`;
+  `upright_polygon_check([A, B, C], names="ABC")`;
   `safe_point_label(E, "E", B, avoid_points=(A, C, D),`
   `avoid_segments=((A, B), (B, C)))`; `fit_scene_to_frame(self)`.
   Never pass a Manim Line object to these helpers.
@@ -405,6 +414,114 @@ class GeoScene(Scene):
             safe_point_label(B, "B", M, O, A, E),
             safe_point_label(C, "C", M, O, A),
             safe_point_label(E, "E", A, B),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
+def _right_isosceles_altitude_midpoints_scene(
+    problem: str, animate: bool,
+) -> str | None:
+    """Build the right-isosceles ABC configuration with H, O, D and E exactly."""
+    compact = re.sub(r"\s+", "", _fold_geometry_notation(problem))
+    if not (
+        "TAMGIACABCVUONGCANTAIA" in compact
+        and "DUONGCAOAH" in compact
+        and ("OTRUNGDIEMCUAAC" in compact or "OLATRUNGDIEMCUAAC" in compact)
+        and "TIADOICUATIAOB" in compact
+        and "OD=OB" in compact
+        and ("ETRUNGDIEMCUAAB" in compact or "ELATRUNGDIEMCUAAB" in compact)
+    ):
+        return None
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, altitude_segment, equal_segment_marks, fit_scene_to_frame, interior_angle_marker, midpoint_marker, opposite_ray_point, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 1.5, 0.0])
+        B = np.array([3.6, 1.5, 0.0])
+        C = np.array([0.0, -2.1, 0.0])
+        O = (A + C) / 2
+        E = (A + B) / 2
+        H = B + np.dot(A - B, C - B) / np.dot(C - B, C - B) * (C - B)
+        D = opposite_ray_point(O, B)
+        self.add(
+            Line(A, B), Line(B, C), Line(C, D), Line(D, A),
+            Line(A, C), Line(B, D),
+            altitude_segment(A, H, B, C), Line(O, H), Line(H, E),
+            interior_angle_marker([A, B, C], 0, degrees=90, mark_count=1),
+            equal_segment_marks((A, B), (A, C), count=3),
+            equal_segment_marks((O, B), (O, D), count=1),
+            midpoint_marker(O, A, C, other_points=(B, D, E, H), count=2),
+            midpoint_marker(E, A, B, other_points=(C, D, O, H), count=2),
+            Dot(A), Dot(B), Dot(C), Dot(D), Dot(E), Dot(H), Dot(O),
+            safe_point_label(A, "A", B, C, D, H, E, O),
+            safe_point_label(B, "B", A, C, D, E, O),
+            safe_point_label(C, "C", A, B, D, O, H),
+            safe_point_label(D, "D", A, B, C, O),
+            safe_point_label(E, "E", A, B, H, distance=0.38),
+            safe_point_label(H, "H", A, B, C, E, O, distance=0.38),
+            safe_point_label(O, "O", A, B, C, D, H, distance=0.38),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
+def _triangle_point_with_two_parallels_scene(
+    problem: str, animate: bool,
+) -> str | None:
+    """Build ABC with D on BC and the two parallels through D exactly.
+
+    This common grade-7 configuration is simple enough to construct locally.  Keeping it
+    deterministic prevents repeated AI repair attempts from preserving a globally tilted
+    triangle after the upright-layout validator rejects it.
+    """
+    compact = re.sub(r"[^A-Z0-9]+", "", _fold_geometry_notation(problem))
+    if not (
+        "TAMGIACABC" in compact
+        and ("DNAMGIUABVAC" in compact or "DLA1DIEMNAMGIUABVAC" in compact
+             or "DLAMOTDIEMNAMGIUABVAC" in compact)
+        and "QUAD" in compact
+        and ("SONGSONGVOIABAC" in compact
+             or ("SONGSONGVOIAB" in compact and "SONGSONGVOIAC" in compact))
+        and "CATCACCANHACABLANLUOTTAIEF" in compact
+    ):
+        return None
+
+    # A deliberately scalene triangle with horizontal BC.  D is an interior point of BC.
+    # Affine interpolation then guarantees DE || AB and DF || AC exactly.
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, parallel_segment_marks, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-1.0, 3.2, 0.0])
+        B = np.array([-4.0, 0.0, 0.0])
+        C = np.array([4.5, 0.0, 0.0])
+        t = 0.56
+        D = B + t * (C - B)
+        E = A + t * (C - A)
+        F = A + (1.0 - t) * (B - A)
+        self.add(
+            Line(A, B), Line(B, C), Line(C, A),
+            Line(D, E), Line(D, F),
+            parallel_segment_marks((D, E), (A, B), count=1),
+            parallel_segment_marks((D, F), (A, C), count=2),
+            Dot(A), Dot(B), Dot(C), Dot(D), Dot(E), Dot(F),
+            safe_point_label(A, "A", B, C, E, F),
+            safe_point_label(B, "B", A, C, D, F),
+            safe_point_label(C, "C", A, B, D, E),
+            safe_point_label(D, "D", B, C, E, F),
+            safe_point_label(E, "E", A, C, D),
+            safe_point_label(F, "F", A, B, D),
         )
         fit_scene_to_frame(self)
         {wait}
@@ -999,7 +1116,7 @@ def validate_code(code: str, problem: str | None = None) -> None:
         given_equal_pairs = list(stated_equalities)
         parent_equalities = {frozenset((left, right)) for left, right in stated_equalities}
         for match in re.finditer(
-            r"tam\s+giác\s+([A-Z]{3})\s+cân\s+tại\s+([A-Z])",
+            r"tam\s+giác\s+([A-Z]{3})\s+(?:vuông\s+)?cân\s+tại\s+([A-Z])",
             drawing_facts,
             re.I,
         ):
@@ -1182,6 +1299,11 @@ def validate_code(code: str, problem: str | None = None) -> None:
             folded_angles,
         ):
             explicit_angles.update(re.split(r"\s*=\s*", match.group(1)))
+        # A stated right triangle carries an explicit 90-degree angle even when
+        # the textbook writes only "vuông tại A" / "vuông cân tại A".
+        for _names, _isosceles_apex, right_vertex in _stated_triangle_conditions(problem):
+            if right_vertex:
+                explicit_angles.add(right_vertex)
         if explicit_angles and any(word in request for word in polygon_words):
             if (
                 "tam giác" in request
@@ -1806,6 +1928,352 @@ def _ordinary_polygons(problem: str | None) -> list[str]:
     return found
 
 
+def _stated_triangle_conditions(problem: str | None) -> list[tuple[str, str | None, str | None]]:
+    """Return (triangle names, isosceles apex, right vertex) from stated givens."""
+    if not problem:
+        return []
+    facts = _fold_geometry_notation(_drawing_facts_text(problem))
+    conditions: list[tuple[str, str | None, str | None]] = []
+    patterns = (
+        r"TAM\s+GIAC\s+([A-Z]{3})\s+VUONG\s+CAN\s+TAI\s+([A-Z])",
+        r"TAM\s+GIAC\s+VUONG\s+CAN\s+([A-Z]{3})\s+TAI\s+([A-Z])",
+    )
+    for pattern in patterns:
+        for match in re.finditer(pattern, facts):
+            item = (match.group(1), match.group(2), match.group(2))
+            if item not in conditions:
+                conditions.append(item)
+    triangle_names = {
+        match.group(1)
+        for match in re.finditer(r"TAM\s+GIAC\s+([A-Z]{3})(?![A-Z])", facts)
+    }
+    for names in triangle_names:
+        isosceles = re.search(
+            rf"TAM\s+GIAC\s+{names}\s+(?:LA\s+)?CAN\s+TAI\s+([A-Z])", facts,
+        )
+        right = re.search(
+            rf"TAM\s+GIAC\s+{names}\s+(?:LA\s+)?VUONG\s+TAI\s+([A-Z])", facts,
+        )
+        if isosceles or right:
+            item = (
+                names,
+                isosceles.group(1) if isosceles else None,
+                right.group(1) if right else None,
+            )
+            if item not in conditions:
+                conditions.append(item)
+    return conditions
+
+
+def _ensure_triangle_shape_checks(code: str, problem: str | None) -> str:
+    """Inject trusted numerical checks for every stated right/isosceles triangle."""
+    conditions = _stated_triangle_conditions(problem)
+    if not conditions:
+        return code
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    scene_class = next(
+        (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GeoScene"),
+        None,
+    )
+    construct = next(
+        (node for node in (scene_class.body if scene_class else [])
+         if isinstance(node, ast.FunctionDef) and node.name == "construct"),
+        None,
+    )
+    if construct is None:
+        return code
+    fit_call = next(
+        (node for node in ast.walk(construct)
+         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+         and node.func.id == "fit_scene_to_frame"),
+        None,
+    )
+    if fit_call is None:
+        return code
+    defined = {
+        target.id
+        for node in ast.walk(construct)
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(target, ast.Name) and re.fullmatch(r"[A-Z]", target.id)
+    }
+    existing = {
+        keyword.value.value
+        for node in ast.walk(construct)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "triangle_shape_check"
+        for keyword in node.keywords
+        if keyword.arg == "names" and isinstance(keyword.value, ast.Constant)
+    }
+    checks = []
+    for names, apex, right in conditions:
+        if not set(names) <= defined or names in existing:
+            continue
+        args = ", ".join(names)
+        checks.append(
+            f"triangle_shape_check({args}, names={names!r}, "
+            f"isosceles_apex={apex!r}, right_vertex={right!r})"
+        )
+    if not checks:
+        return code
+    lines = code.rstrip().splitlines()
+    insertion_index = fit_call.lineno - 1
+    indent = re.match(r"\s*", lines[insertion_index]).group(0)
+    lines[insertion_index:insertion_index] = [f"{indent}{check}" for check in checks]
+    imports_helper = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "geo_draw.geometry_primitives"
+        and any(alias.name in {"triangle_shape_check", "*"} for alias in node.names)
+        for node in tree.body
+    )
+    if not imports_helper:
+        import_nodes = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+        import_index = max(node.end_lineno or node.lineno for node in import_nodes)
+        lines.insert(import_index, "from geo_draw.geometry_primitives import triangle_shape_check")
+    return "\n".join(lines) + "\n"
+
+
+def _ensure_stated_right_angle_markers(code: str, problem: str | None) -> str:
+    """Add a visible square for every right-triangle vertex stated in the givens."""
+    conditions = _stated_triangle_conditions(problem)
+    required = [(names, right) for names, _apex, right in conditions if right]
+    if not required:
+        return code
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    scene_class = next(
+        (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GeoScene"),
+        None,
+    )
+    construct = next(
+        (node for node in (scene_class.body if scene_class else [])
+         if isinstance(node, ast.FunctionDef) and node.name == "construct"),
+        None,
+    )
+    if construct is None:
+        return code
+    fit_call = next(
+        (node for node in ast.walk(construct)
+         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+         and node.func.id == "fit_scene_to_frame"),
+        None,
+    )
+    if fit_call is None:
+        return code
+    defined = {
+        target.id
+        for node in ast.walk(construct)
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(target, ast.Name) and re.fullmatch(r"[A-Z]", target.id)
+    }
+    existing_vertices: set[str] = set()
+    for node in ast.walk(construct):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "interior_angle_marker" and len(node.args) >= 2):
+            continue
+        points, index = node.args[0], node.args[1]
+        if isinstance(points, (ast.List, ast.Tuple)) and isinstance(index, ast.Constant):
+            names = [item.id for item in points.elts if isinstance(item, ast.Name)]
+            if isinstance(index.value, int) and 0 <= index.value < len(names):
+                existing_vertices.add(names[index.value])
+    additions = []
+    for names, right in required:
+        if set(names) <= defined and right not in existing_vertices:
+            additions.append(
+                f"self.add(interior_angle_marker([{', '.join(names)}], {names.index(right)}, "
+                "degrees=90, mark_count=1))"
+            )
+            existing_vertices.add(right)
+    if not additions:
+        return code
+    lines = code.rstrip().splitlines()
+    insertion_index = fit_call.lineno - 1
+    indent = re.match(r"\s*", lines[insertion_index]).group(0)
+    lines[insertion_index:insertion_index] = [f"{indent}{line}" for line in additions]
+    imports_helper = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "geo_draw.geometry_primitives"
+        and any(alias.name in {"interior_angle_marker", "*"} for alias in node.names)
+        for node in tree.body
+    )
+    if not imports_helper:
+        import_nodes = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+        import_index = max(node.end_lineno or node.lineno for node in import_nodes)
+        lines.insert(import_index, "from geo_draw.geometry_primitives import interior_angle_marker")
+    return "\n".join(lines) + "\n"
+
+
+def _classification_shapes(problem: str | None) -> list[str]:
+    """Return polygons explicitly named in a 'what shape is ...?' proof goal."""
+    if not problem:
+        return []
+    folded = _fold_geometry_notation(problem)
+    found: list[str] = []
+    patterns = (
+        r"TU\s+GIAC\s+([A-Z]{4})\s+(?:LA\s+)?HINH\s+GI",
+        r"TAM\s+GIAC\s+([A-Z]{3})\s+(?:LA\s+)?(?:TAM\s+GIAC|HINH)\s+GI",
+    )
+    for pattern in patterns:
+        for match in re.finditer(pattern, folded):
+            names = match.group(1)
+            if len(set(names)) == len(names) and names not in found:
+                found.append(names)
+    return found
+
+
+def _stated_polygons(problem: str | None) -> list[str]:
+    """Return every triangle/quadrilateral introduced in the problem givens."""
+    if not problem:
+        return []
+    facts = _fold_geometry_notation(_drawing_facts_text(problem))
+    found: list[str] = []
+    for size, word in ((3, r"TAM\s+GIAC"), (4, r"TU\s+GIAC")):
+        for match in re.finditer(rf"\b{word}\s+([A-Z]{{{size}}})(?![A-Z])", facts):
+            names = match.group(1)
+            if len(set(names)) == size and names not in found:
+                found.append(names)
+    return found
+
+
+def _ensure_upright_polygon_checks(code: str, problem: str | None) -> str:
+    """Inject an invisible check that rejects globally tilted main figures."""
+    polygons = _stated_polygons(problem)
+    if not polygons:
+        return code
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    scene_class = next(
+        (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GeoScene"),
+        None,
+    )
+    construct = next(
+        (node for node in (scene_class.body if scene_class else [])
+         if isinstance(node, ast.FunctionDef) and node.name == "construct"),
+        None,
+    )
+    if construct is None:
+        return code
+    fit_call = next(
+        (node for node in ast.walk(construct)
+         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+         and node.func.id == "fit_scene_to_frame"),
+        None,
+    )
+    if fit_call is None:
+        return code
+    defined = {
+        target.id
+        for node in ast.walk(construct)
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(target, ast.Name) and re.fullmatch(r"[A-Z]", target.id)
+    }
+    existing = {
+        keyword.value.value
+        for node in ast.walk(construct)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "upright_polygon_check"
+        for keyword in node.keywords
+        if keyword.arg == "names" and isinstance(keyword.value, ast.Constant)
+    }
+    additions = [
+        f"upright_polygon_check([{', '.join(names)}], names={names!r})"
+        for names in polygons if set(names) <= defined and names not in existing
+    ]
+    if not additions:
+        return code
+    lines = code.rstrip().splitlines()
+    insertion_index = fit_call.lineno - 1
+    indent = re.match(r"\s*", lines[insertion_index]).group(0)
+    lines[insertion_index:insertion_index] = [f"{indent}{line}" for line in additions]
+    imports_helper = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "geo_draw.geometry_primitives"
+        and any(alias.name in {"upright_polygon_check", "*"} for alias in node.names)
+        for node in tree.body
+    )
+    if not imports_helper:
+        import_nodes = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+        import_index = max(node.end_lineno or node.lineno for node in import_nodes)
+        lines.insert(import_index, "from geo_draw.geometry_primitives import upright_polygon_check")
+    return "\n".join(lines) + "\n"
+
+
+def _ensure_classification_shape_edges(code: str, problem: str | None) -> str:
+    """Draw every boundary edge of a polygon whose type students must identify."""
+    shapes = _classification_shapes(problem)
+    if not shapes:
+        return code
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    scene_class = next(
+        (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GeoScene"),
+        None,
+    )
+    construct = next(
+        (node for node in (scene_class.body if scene_class else [])
+         if isinstance(node, ast.FunctionDef) and node.name == "construct"),
+        None,
+    )
+    if construct is None:
+        return code
+    fit_call = next(
+        (node for node in ast.walk(construct)
+         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+         and node.func.id == "fit_scene_to_frame"),
+        None,
+    )
+    if fit_call is None:
+        return code
+    defined = {
+        target.id
+        for node in ast.walk(construct)
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(target, ast.Name) and re.fullmatch(r"[A-Z]", target.id)
+    }
+    existing_edges: set[frozenset[str]] = set()
+    for node in ast.walk(construct):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+            continue
+        if node.func.id == "Line" and len(node.args) >= 2:
+            if all(isinstance(arg, ast.Name) for arg in node.args[:2]):
+                existing_edges.add(frozenset((node.args[0].id, node.args[1].id)))
+        elif node.func.id == "Polygon":
+            vertices = [arg.id for arg in node.args if isinstance(arg, ast.Name)]
+            if len(vertices) >= 3:
+                for index, first in enumerate(vertices):
+                    existing_edges.add(frozenset((first, vertices[(index + 1) % len(vertices)])))
+    missing: list[tuple[str, str]] = []
+    for names in shapes:
+        if not set(names) <= defined:
+            continue
+        for index, first in enumerate(names):
+            second = names[(index + 1) % len(names)]
+            edge = frozenset((first, second))
+            if edge not in existing_edges:
+                missing.append((first, second))
+                existing_edges.add(edge)
+    if not missing:
+        return code
+    lines = code.rstrip().splitlines()
+    insertion_index = fit_call.lineno - 1
+    indent = re.match(r"\s*", lines[insertion_index]).group(0)
+    edge_calls = ", ".join(f"Line({first}, {second})" for first, second in missing)
+    lines.insert(insertion_index, f"{indent}self.add({edge_calls})")
+    return "\n".join(lines) + "\n"
+
+
 def _ensure_ordinary_polygon_checks(code: str, problem: str | None) -> str:
     """Insert trusted numerical checks for ordinary base polygons, not proof goals."""
     polygons = _ordinary_polygons(problem)
@@ -1938,7 +2406,11 @@ def sanitize_code(code: str, animate: bool, problem: str | None = None) -> str:
     del animate
     code = code.strip() + "\n"
     code = _ensure_explicit_parallel_verifiers(code, problem)
+    code = _ensure_classification_shape_edges(code, problem)
     code = _ensure_ordinary_polygon_checks(code, problem)
+    code = _ensure_triangle_shape_checks(code, problem)
+    code = _ensure_stated_right_angle_markers(code, problem)
+    code = _ensure_upright_polygon_checks(code, problem)
     validate_code(code, problem=problem)
     return code
 
@@ -2109,7 +2581,9 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
-        _midradius_perpendicular_chord_tangent_scene(problem, animate)
+        _right_isosceles_altitude_midpoints_scene(problem, animate)
+        or _triangle_point_with_two_parallels_scene(problem, animate)
+        or _midradius_perpendicular_chord_tangent_scene(problem, animate)
         or _radius_chord_external_point_scene(problem, animate)
         or _right_trapezoid_with_perpendicular_diagonal_scene(problem, animate)
     )

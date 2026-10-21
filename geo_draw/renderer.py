@@ -64,11 +64,28 @@ def render_scene(scene_file: Path, media_dir: Path, quality: str = "l", animate:
     log = (proc.stdout or "") + "\n" + (proc.stderr or "")
     image = _newest(run_media_dir, "*.png")
     video = _newest(run_media_dir, "*.mp4")
-    expected_output = video if animate else image
+    still_returncode = 0
+    # An animated Manim render normally creates only MP4.  The web UI always
+    # needs a PNG preview as well, so render the final frame separately instead
+    # of reporting a successful video as a failed drawing.
+    if animate and proc.returncode == 0 and video is not None and image is None:
+        still_proc = subprocess.run(
+            [*cmd, "-s"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=render_env,
+        )
+        still_returncode = still_proc.returncode
+        log += (still_proc.stdout or "") + "\n" + (still_proc.stderr or "")
+        image = _newest(run_media_dir, "*.png")
+
+    expected_output = image is not None and (not animate or video is not None)
 
     return RenderResult(
         image_path=image,
         video_path=video if animate else None,
         log=log,
-        ok=proc.returncode == 0 and expected_output is not None,
+        ok=proc.returncode == 0 and still_returncode == 0 and expected_output,
     )

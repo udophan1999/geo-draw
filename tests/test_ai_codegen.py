@@ -35,6 +35,146 @@ class GeoScene(Scene):
 
 class AiCodegenTests(unittest.TestCase):
     @patch("geo_draw.ai_codegen._request_chat")
+    def test_triangle_point_with_two_parallels_is_built_upright_without_ai(self, request_chat):
+        problem = (
+            "Cho tam giác ABC, D là một điểm nằm giữa B và C. Qua D kẻ các đường thẳng "
+            "song song với AB, AC, chúng cắt các cạnh AC, AB lần lượt tại E, F."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("B = np.array([-4.0, 0.0", result.code)
+        self.assertIn("C = np.array([4.5, 0.0", result.code)
+        self.assertIn("D = B + t * (C - B)", result.code)
+        self.assertIn("E = A + t * (C - A)", result.code)
+        self.assertIn("F = A + (1.0 - t) * (B - A)", result.code)
+        self.assertIn("parallel_segment_marks((D, E), (A, B), count=1)", result.code)
+        self.assertIn("parallel_segment_marks((D, F), (A, C), count=2)", result.code)
+        self.assertIn("upright_polygon_check([A, B, C], names='ABC')", result.code)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_right_isosceles_altitude_midpoints_problem_is_built_exactly(self, request_chat):
+        problem = (
+            "Cho tam giác ABC vuông cân tại A có đường cao AH. Gọi O là trung điểm của AC, "
+            "trên tia đối của tia OB lấy điểm D sao cho OD = OB. "
+            "a) Tứ giác ABCD là hình gì? Vì sao? "
+            "b) Gọi E là trung điểm của AB. Tứ giác AOHE là hình gì? Vì sao?"
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("B = np.array([3.6, 1.5", result.code)
+        self.assertIn("C = np.array([0.0, -2.1", result.code)
+        self.assertIn("altitude_segment(A, H, B, C)", result.code)
+        self.assertIn("D = opposite_ray_point(O, B)", result.code)
+        self.assertIn("equal_segment_marks((A, B), (A, C)", result.code)
+        self.assertIn("triangle_shape_check(A, B, C, names='ABC'", result.code)
+
+    def test_sanitizer_injects_positive_right_isosceles_check(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, interior_angle_marker
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 0.0, 0.0])
+        B = np.array([4.0, 0.0, 0.0])
+        C = np.array([0.0, 2.0, 0.0])
+        self.add(Line(A, B), Line(B, C), Line(C, A),
+                 interior_angle_marker([A, B, C], 0, degrees=90, mark_count=1),
+                 Dot(A), Dot(B), Dot(C),
+                 Text("A"), Text("B"), Text("C"))
+        fit_scene_to_frame(self)
+'''
+        sanitized = sanitize_code(code, animate=False,
+                                  problem="Cho tam giác ABC vuông cân tại A.")
+        self.assertIn(
+            "triangle_shape_check(A, B, C, names='ABC', "
+            "isosceles_apex='A', right_vertex='A')",
+            sanitized,
+        )
+
+    def test_sanitizer_adds_missing_stated_right_angle_marker(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 0.0, 0.0])
+        B = np.array([3.0, 0.0, 0.0])
+        C = np.array([0.0, 4.0, 0.0])
+        self.add(Line(A, B), Line(B, C), Line(C, A),
+                 Text("A"), Text("B"), Text("C"))
+        fit_scene_to_frame(self)
+'''
+        sanitized = sanitize_code(
+            code, animate=False,
+            problem="Cho tam giác ABC vuông tại A, AB = 3, AC = 4.",
+        )
+        self.assertIn(
+            "self.add(interior_angle_marker([A, B, C], 0, degrees=90, mark_count=1))",
+            sanitized,
+        )
+
+    def test_sanitizer_requires_stated_triangle_to_be_upright(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-1.0, 2.0, 0.0])
+        B = np.array([-2.0, -1.0, 0.0])
+        C = np.array([3.0, -0.4, 0.0])
+        self.add(Line(A, B), Line(B, C), Line(C, A),
+                 Dot(A), Dot(B), Dot(C), Text("A"), Text("B"), Text("C"))
+        fit_scene_to_frame(self)
+'''
+        sanitized = sanitize_code(code, animate=False, problem="Cho tam giác ABC.")
+        self.assertIn(
+            "upright_polygon_check([A, B, C], names='ABC')",
+            sanitized,
+        )
+        self.assertIn(
+            "from geo_draw.geometry_primitives import upright_polygon_check",
+            sanitized,
+        )
+
+    def test_sanitizer_connects_every_edge_of_shapes_to_identify(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 0.0, 0.0])
+        B = np.array([0.0, 2.0, 0.0])
+        C = np.array([2.0, 2.0, 0.0])
+        D = np.array([2.0, 0.0, 0.0])
+        O = np.array([0.5, 0.5, 0.0])
+        H = np.array([1.0, 1.0, 0.0])
+        E = np.array([0.5, 1.5, 0.0])
+        self.add(Line(A, B), Line(B, C), Line(A, O), Line(H, E),
+                 Text("A"), Text("B"), Text("C"), Text("D"),
+                 Text("O"), Text("H"), Text("E"))
+        fit_scene_to_frame(self)
+'''
+        sanitized = sanitize_code(
+            code,
+            animate=False,
+            problem="a) Tứ giác ABCD là hình gì? b) Tứ giác AOHE là hình gì?",
+        )
+        self.assertIn("Line(C, D)", sanitized)
+        self.assertIn("Line(D, A)", sanitized)
+        self.assertIn("Line(O, H)", sanitized)
+        self.assertIn("Line(E, A)", sanitized)
+
+    @patch("geo_draw.ai_codegen._request_chat")
     def test_midradius_chord_and_tangent_problem_is_built_without_ai(self, request_chat):
         problem = (
             "Cho đường tròn tâm O có bán kính OA = R, dây BC vuông góc với OA "
@@ -395,6 +535,8 @@ class GeoScene(Scene):
         ):
             self.assertIn(grade_nine_relation, MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("white canvas with black geometry", SYSTEM_PROMPT)
+        self.assertIn("upright_polygon_check", SYSTEM_PROMPT)
+        self.assertIn("exactly horizontal", SYSTEM_PROMPT)
         self.assertIn(DRAWING_ERROR_MEMORY, SYSTEM_PROMPT)
         for remembered_rule in (
             "exactly one right-angle square",

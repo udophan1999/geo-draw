@@ -25,10 +25,49 @@ from geo_draw.geometry_primitives import (
     polygon_signed_area,
     ray_intersection,
     safe_point_label,
+    triangle_shape_check,
+    upright_polygon_check,
 )
 
 
 class GeometryPrimitiveTests(unittest.TestCase):
+    def test_upright_polygon_check_requires_a_horizontal_boundary_side(self):
+        self.assertTrue(upright_polygon_check(
+            (
+                np.array([0.0, 2.0, 0.0]),
+                np.array([-2.0, 0.0, 0.0]),
+                np.array([3.0, 0.0, 0.0]),
+            ),
+            names="ABC",
+        ))
+        with self.assertRaisesRegex(ValueError, "GEOMETRY_FIGURE_TILTED"):
+            upright_polygon_check(
+                (
+                    np.array([-1.0, 2.0, 0.0]),
+                    np.array([-2.0, -1.0, 0.0]),
+                    np.array([3.0, -0.4, 0.0]),
+                ),
+                names="ABC",
+            )
+
+    def test_triangle_shape_check_enforces_right_isosceles_conditions(self):
+        A = np.array([0.0, 0.0, 0.0])
+        B = np.array([3.0, 0.0, 0.0])
+        C = np.array([0.0, 3.0, 0.0])
+        self.assertTrue(triangle_shape_check(
+            A, B, C, names="ABC", isosceles_apex="A", right_vertex="A",
+        ))
+        with self.assertRaisesRegex(ValueError, "GEOMETRY_ISOSCELES_MISMATCH"):
+            triangle_shape_check(
+                A, B, np.array([0.0, 2.0, 0.0]), names="ABC",
+                isosceles_apex="A", right_vertex="A",
+            )
+        with self.assertRaisesRegex(ValueError, "GEOMETRY_RIGHT_MISMATCH"):
+            triangle_shape_check(
+                A, B, np.array([1.0, 3.0, 0.0]), names="ABC",
+                isosceles_apex=None, right_vertex="A",
+            )
+
     def _manual_triangle_scene(self):
         scene = Scene()
         apply_light_theme(scene)
