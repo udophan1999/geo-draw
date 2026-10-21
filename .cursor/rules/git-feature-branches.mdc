@@ -1,0 +1,12 @@
+---
+description: Require branch-based development for new GeoDraw features
+alwaysApply: true
+---
+
+# Git Branch Workflow
+
+- Before implementing any new feature, update from `master` and create a dedicated branch from `master`.
+- Never implement a new feature directly on `master`.
+- Use a short descriptive branch name such as `feature/upright-layout`.
+- Keep `master` for reviewed or explicitly integrated work.
+- For fixes and maintenance, prefer a dedicated `fix/...` branch as well.
