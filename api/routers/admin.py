@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 from geo_draw.accounts import (
     ADMIN, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, ROLES, UserInfo,
 )
-from geo_draw.tutor_prompts import EDITABLE_PROMPTS, GUARDRAIL, MAX_PROMPT_LENGTH, PROGRESS_RULE
+from geo_draw.tutor_prompts import (
+    ACCESSIBLE_QUESTION_RULE, EDITABLE_PROMPTS, GUARDRAIL, MAX_PROMPT_LENGTH, PROGRESS_RULE,
+)
 
 from ..deps import Owner, app_state, require_admin
 from ..state import AppState
@@ -284,7 +286,8 @@ def list_prompts(request: Request) -> dict:
             for key, (label, description, default) in EDITABLE_PROMPTS.items()
         ],
         # Always appended in hint mode; shown read-only on the admin page.
-        "fixed": [{"label": "Rào chắn không đưa đáp án", "text": GUARDRAIL},
+        "fixed": [{"label": "Câu hỏi dễ tiếp cận", "text": ACCESSIBLE_QUESTION_RULE},
+                  {"label": "Rào chắn không đưa đáp án", "text": GUARDRAIL},
                   {"label": "Báo tiến độ (ứng dụng tự đọc)", "text": PROGRESS_RULE}],
     }
 

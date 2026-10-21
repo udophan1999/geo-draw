@@ -16,7 +16,8 @@ from geo_draw.tutor import (
     record_canned_reply, run_tutor_turn, suggest_title,
 )
 from geo_draw.tutor_prompts import (
-    FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN, GUARDRAIL, MAX_HINT_LEVEL, build_system_prompt,
+    ACCESSIBLE_QUESTION_RULE, FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN, GUARDRAIL,
+    MAX_HINT_LEVEL, build_system_prompt,
 )
 
 AI = AiSettings(api_key="test-key")
@@ -46,6 +47,9 @@ class PromptTests(unittest.TestCase):
         self.assertIn(TRIANGLE, prompt)
         self.assertIn("BẬC GỢI Ý HIỆN TẠI: 2/5 (Nhớ kiến thức)", prompt)
         self.assertIn(GUARDRAIL, prompt)
+        self.assertIn(ACCESSIBLE_QUESTION_RULE, prompt)
+        self.assertIn("Chỉ giao MỘT nhiệm vụ nhận thức nhỏ", prompt)
+        self.assertIn("điền một chỗ trống", prompt)
         self.assertIn("[[bac:N]]", prompt)  # the tutor reports progress
         self.assertNotIn("[[bac:N]]", build_system_prompt(TRIANGLE, SOLUTION, 2))
 
@@ -63,6 +67,7 @@ class PromptTests(unittest.TestCase):
         prompt = build_system_prompt(TRIANGLE, SOLUTION, 3)
         self.assertIn("**Kết luận:**", prompt)
         self.assertNotIn("KHÔNG THỂ GHI ĐÈ", prompt)
+        self.assertNotIn(ACCESSIBLE_QUESTION_RULE, prompt)
 
 
 class StreamChatTests(unittest.TestCase):

@@ -1,5 +1,7 @@
 """Middle-school Euclidean geometry conventions supplied to the code generator."""
 
+from .math_symbols import THCS_MATH_SYMBOLS_VI
+
 GEOMETRY_HELP_VI = """
 - Tên các đỉnh được hiểu theo thứ tự đi quanh biên đa giác.
 - Hình thang cân: hai đáy song song, hai cạnh bên bằng nhau, các góc kề mỗi đáy bằng nhau.
@@ -26,6 +28,10 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
 - Preserve every stated object and condition when later auxiliary objects are added.
 - Treat every a/b/c item after "Chứng minh" as a conclusion, even across line breaks. Never
   put equality ticks on HE and HG merely because the exercise asks students to prove HE=HG.
+- A proof goal never authorizes a new object or relationship mark. If the goal says that points
+  are concyclic or a quadrilateral is cyclic, do not draw the claimed circle. Likewise do not
+  add equality ticks, equal-angle arcs, parallel marks, right-angle squares, tangency marks, or
+  incidence marks that occur only in the conclusion. Draw them only when stated in the givens.
 - If a problem refers to a numbered figure but only the text is available, do not invent the
   positions of unnamed-in-givens points such as E, F, G, H. Ask for the actual figure or its
   precise point/line relations before generating geometry.
@@ -212,7 +218,8 @@ HỆ THỐNG KIẾN THỨC VÀ KÝ HIỆU HÌNH HỌC THCS (LỚP 6–9)
   ΔABC ∼ ΔDEF: hai tam giác đồng dạng; □ABCD có thể chỉ tứ giác ABCD.
 - (O;R): đường tròn tâm O bán kính R; R là bán kính, d=2R là đường kính; cung AB viết ⌢AB;
   dây AB, tiếp tuyến d tại A, cát tuyến d cắt đường tròn tại hai điểm.
-- P, S lần lượt là chu vi và diện tích; V là thể tích; Sxq, Stp là diện tích xung quanh và toàn phần.
+- C, S lần lượt là chu vi và diện tích; V là thể tích; Sxq, Stp là diện tích xung quanh và toàn phần.
+  Một số tài liệu có thể dùng P cho chu vi; nếu đề đã quy ước P thì giữ nguyên ký hiệu của đề.
 - Ký hiệu trên hình: ô vuông nhỏ biểu thị vuông góc; các vạch giống nhau biểu thị các đoạn bằng
   nhau; các cung giống nhau biểu thị các góc bằng nhau. Mỗi nhóm quan hệ độc lập dùng số vạch/cung khác.
 
@@ -320,7 +327,7 @@ HỆ THỐNG KIẾN THỨC VÀ KÝ HIỆU HÌNH HỌC THCS (LỚP 6–9)
 - Tam giác: S=1/2·a·hₐ. Tam giác vuông: S=1/2 tích hai cạnh góc vuông. Hình chữ nhật: S=ab;
   hình vuông: S=a²; hình bình hành: S=a·h; hình thoi: S=1/2·d₁·d₂;
   hình thang: S=1/2·(a+b)·h; đa giác: chia thành các hình cơ bản không chồng lấn.
-- Lăng trụ đứng: V=Sđáy·h, Sxq=Pđáy·h. Hình hộp chữ nhật: V=abc; Stp=2(ab+bc+ca).
+- Lăng trụ đứng: V=Sđáy·h, Sxq=Cđáy·h. Hình hộp chữ nhật: V=abc; Stp=2(ab+bc+ca).
 - Hình chóp: V=1/3·Sđáy·h. Hình trụ: V=πR²h, Sxq=2πRh, Stp=2πRh+2πR².
 - Hình nón: V=1/3·πR²h, đường sinh l=√(R²+h²), Sxq=πRl, Stp=πRl+πR².
 - Hình cầu: S=4πR², V=4/3·πR³. Trong hình không gian, nét khuất có thể dùng nét đứt theo quy ước;
@@ -339,3 +346,5 @@ HỆ THỐNG KIẾN THỨC VÀ KÝ HIỆU HÌNH HỌC THCS (LỚP 6–9)
 # Streamlit settings panel, so linked clients cannot drift to different rules.
 MIDDLE_SCHOOL_GEOMETRY_RULES += THCS_GEOMETRY_CURRICULUM_VI
 GEOMETRY_HELP_VI += THCS_GEOMETRY_CURRICULUM_VI
+MIDDLE_SCHOOL_GEOMETRY_RULES += "\n\n" + THCS_MATH_SYMBOLS_VI
+GEOMETRY_HELP_VI += "\n\n" + THCS_MATH_SYMBOLS_VI

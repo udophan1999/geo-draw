@@ -35,6 +35,51 @@ class GeoScene(Scene):
 
 class AiCodegenTests(unittest.TestCase):
     @patch("geo_draw.ai_codegen._request_chat")
+    def test_midradius_chord_and_tangent_problem_is_built_without_ai(self, request_chat):
+        problem = (
+            "Cho đường tròn tâm O có bán kính OA = R, dây BC vuông góc với OA "
+            "tại trung điểm M của OA. "
+            "a) Tứ giác OCAB là hình gì? Vì sao? "
+            "b) Kẻ tiếp tuyến với đường tròn tại B, cắt đường thẳng OA tại E. "
+            "Tính độ dài BE theo R."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("Circle(radius=3.00000000", result.code)
+        self.assertIn("midpoint_marker(M, O, A", result.code)
+        self.assertIn("perpendicular_intersection_marker((B, C), (O, A), M)", result.code)
+        self.assertIn("tangent = Line(B, E)", result.code)
+        self.assertNotIn("equal_segment_marks", result.code)
+        self.assertNotIn("BE =", result.code)
+        facts = _drawing_facts_text(problem)
+        self.assertNotIn("là hình gì", facts.casefold())
+        self.assertNotIn("tính độ dài", facts.casefold())
+        self.assertIn("Kẻ tiếp tuyến", facts)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_circle_5_12_13_problem_is_built_without_showing_conclusions(self, request_chat):
+        problem = (
+            "Cho đường tròn tâm O có bán kính bằng 5 cm và điểm B cách O một khoảng 13 cm. "
+            "Lấy điểm A thuộc (O) sao cho AB = 12 cm. "
+            "a) Tam giác OAB là tam giác gì? "
+            "b) Chứng minh đường thẳng BA tiếp xúc với (O)."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("Circle(radius=2.50000000", result.code)
+        self.assertIn('Text("5 cm"', result.code)
+        self.assertIn('Text("12 cm"', result.code)
+        self.assertIn('Text("13 cm"', result.code)
+        self.assertNotIn("RightAngle", result.code)
+        self.assertNotIn("perpendicular_intersection_marker", result.code)
+        self.assertNotIn("tangent", result.code.lower())
+        facts = _drawing_facts_text(problem)
+        self.assertNotIn("tam giác gì", facts.casefold())
+        self.assertNotIn("tiếp xúc", facts.casefold())
+
+    @patch("geo_draw.ai_codegen._request_chat")
     def test_right_trapezoid_textbook_case_is_built_without_ai(self, request_chat):
         problem = (
             "Cho hình thang ABCD (AD // BC) có AD = 16 cm, BC = 4 cm và "
@@ -128,6 +173,54 @@ class GeoScene(Scene):
 """
         with self.assertRaisesRegex(ValueError, "Không tự đánh dấu cạnh bằng nhau"):
             validate_code(code, problem=problem)
+
+    def test_proof_only_concyclic_circle_is_rejected_before_render(self):
+        problem = (
+            "Cho tam giác cân ABC (AB = AC), P thuộc BC. Kẻ PE // AB, PD // AC "
+            "với E thuộc AC, D thuộc AB. Gọi Q là điểm đối xứng với P qua DE. "
+            "Chứng minh bốn điểm Q, A, B, C cùng thuộc một đường tròn."
+        )
+        templates = (
+            "circle = Circle(radius=3)",
+            "circle = Circle.from_three_points(A, B, C)",
+        )
+        for construction in templates:
+            with self.subTest(construction=construction):
+                code = f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 2.0, 0.0])
+        B = np.array([-2.0, 0.0, 0.0])
+        C = np.array([2.0, 0.0, 0.0])
+        P = np.array([0.3, 0.0, 0.0])
+        D = np.array([-0.8, 1.2, 0.0])
+        E = np.array([1.0, 1.0, 0.0])
+        Q = np.array([-0.3, 2.4, 0.0])
+        {construction}
+        self.add(circle)
+        fit_scene_to_frame(self)
+'''
+                with self.assertRaisesRegex(ValueError, "phần cần chứng minh"):
+                    validate_code(code, problem=problem)
+
+    def test_circle_stated_in_givens_is_allowed(self):
+        code = """from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        O = np.array([0.0, 0.0, 0.0])
+        A = np.array([2.0, 0.0, 0.0])
+        self.add(Circle(radius=2.0), Dot(O), Dot(A), Text("O"), Text("A"))
+        fit_scene_to_frame(self)
+"""
+        validate_code(code, problem="Cho đường tròn (O; 2 cm) và điểm A thuộc đường tròn.")
 
     def test_rejects_oversized_raw_line_with_arithmetic_endpoints(self):
         code = SAFE_CODE.replace(

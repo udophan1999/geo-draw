@@ -153,6 +153,10 @@ Exact construction requirements:
 - Treat text after "chứng minh"/"prove" as a proof goal, not as given construction data. Draw the
   named segments needed by the goal, but never add equality ticks, equal-angle arcs, or right-angle
   squares for a conclusion such as "Chứng minh IB = ID" or "Chứng minh EFGH là hình chữ nhật".
+  Never draw a circle merely because the goal asks to prove that points are concyclic or that a
+  quadrilateral is cyclic. A Circle is allowed only when a circle is part of the givens or an
+  explicit construction before the proof goal. Apply the same rule to every conclusion-only
+  object, incidence, parallel/perpendicular mark, equal-length tick, and equal-angle arc.
 - Resolve explicitly given segment equalities transitively before drawing ticks. Put every segment
   in one stated equality class into one `equal_segment_marks(...)` call with one shared count.
   Never mark the same segment in two calls, never mix unrelated segments in a call, and give
@@ -272,6 +276,141 @@ def _fold_geometry_notation(text: str) -> str:
     ).replace("Đ", "D")
 
 
+def _radius_chord_external_point_scene(problem: str, animate: bool) -> str | None:
+    """Build O-A-B from OA=r, AB=a, OB=d without displaying proof conclusions."""
+    normalized = _normalize_geometry_notation(problem)
+    folded = _fold_geometry_notation(problem)
+    compact = re.sub(r"\s+", "", folded)
+    if not (
+        "DUONGTRONTAMO" in compact
+        and re.search(r"A\s*(?:THUOC|∈)\s*\(O\)", folded)
+        and "AB" in compact
+        and "B" in compact
+    ):
+        return None
+
+    def number(patterns: tuple[str, ...]) -> float | None:
+        for pattern in patterns:
+            match = re.search(pattern, normalized, re.I)
+            if match:
+                return float(match.group(1).replace(",", "."))
+        return None
+
+    radius = number((
+        r"bán\s+kính(?:\s+bằng|\s+là)?\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?",
+        r"\bOA\s*=\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?",
+    ))
+    ob = number((
+        r"\bB\s+cách\s+O(?:\s+một\s+khoảng)?\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?",
+        r"\bOB\s*=\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?",
+    ))
+    ab = number((r"\bAB\s*=\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?",))
+    if radius is None or ob is None or ab is None or min(radius, ob, ab) <= 0:
+        return None
+    if abs(radius * radius + ab * ab - ob * ob) > 0.01 * max(ob * ob, 1.0):
+        return None
+
+    scale = min(0.5, 3.0 / radius, 6.0 / ab)
+    radius_draw = radius * scale
+    ab_draw = ab * scale
+    origin_x = -(ab_draw - radius_draw) / 2
+    origin_y = -radius_draw / 2
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, safe_point_label, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        O = np.array([{origin_x:.8f}, {origin_y:.8f}, 0.0])
+        A = np.array([{origin_x:.8f}, {origin_y + radius_draw:.8f}, 0.0])
+        B = np.array([{origin_x + ab_draw:.8f}, {origin_y + radius_draw:.8f}, 0.0])
+        OA = Line(O, A)
+        AB = Line(A, B)
+        OB = Line(O, B)
+        self.add(
+            Circle(radius={radius_draw:.8f}, color=BLACK).move_to(O),
+            OA, AB, OB,
+            Text("{radius:g} cm", font_size=24).next_to(OA, LEFT, buff=0.18),
+            Text("{ab:g} cm", font_size=24).next_to(AB, UP, buff=0.18),
+            Text("{ob:g} cm", font_size=24).next_to(OB, DOWN + RIGHT, buff=0.16),
+            Dot(O), Dot(A), Dot(B),
+            safe_point_label(O, "O", A, B),
+            safe_point_label(A, "A", O, B),
+            safe_point_label(B, "B", A, O),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
+def _midradius_perpendicular_chord_tangent_scene(
+    problem: str, animate: bool,
+) -> str | None:
+    """Build the OA-midpoint chord and the explicitly requested tangent at B."""
+    folded = _fold_geometry_notation(problem)
+    compact = re.sub(r"\s+", "", folded).replace("⊥", "VUONGGOCVOI")
+    has_circle = "DUONGTRONTAMO" in compact
+    has_radius = "BANKINHOA=R" in compact or "OA=R" in compact
+    has_chord = "DAYBCVUONGGOCVOIOA" in compact
+    has_midpoint = "TRUNGDIEMMCUAOA" in compact
+    has_tangent = (
+        "TIEPTUYEN" in compact
+        and "TAIB" in compact
+        and "DUONGTHANGOA" in compact
+        and "TAIE" in compact
+    )
+    if not (has_circle and has_radius and has_chord and has_midpoint and has_tangent):
+        return None
+
+    # Use R=3 drawing units.  Relative to O, M=(R/2, 0), so the
+    # perpendicular chord endpoints are (R/2, ±sqrt(3)R/2).  The tangent at
+    # B meets OA at x=2R.  These coordinates encode only stated constructions;
+    # no requested classification or computed BE length is annotated.
+    radius = 3.0
+    ox = -2.5
+    chord_x = ox + radius / 2
+    chord_half = (3.0 ** 0.5) * radius / 2
+    ex = ox + 2 * radius
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, line_through_intersection, midpoint_marker, perpendicular_intersection_marker, safe_point_label, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        O = np.array([{ox:.8f}, 0.0, 0.0])
+        A = np.array([{ox + radius:.8f}, 0.0, 0.0])
+        M = np.array([{chord_x:.8f}, 0.0, 0.0])
+        B = np.array([{chord_x:.8f}, {chord_half:.8f}, 0.0])
+        C = np.array([{chord_x:.8f}, {-chord_half:.8f}, 0.0])
+        E = np.array([{ex:.8f}, 0.0, 0.0])
+        OA_line = line_through_intersection(O, A, E)
+        chord = Line(B, C)
+        tangent = Line(B, E)
+        self.add(
+            Circle(radius={radius:.8f}, color=BLACK).move_to(O),
+            OA_line, chord,
+            Line(O, C), Line(C, A), Line(A, B), Line(B, O),
+            tangent,
+            midpoint_marker(M, O, A, other_points=(B, C, E)),
+            perpendicular_intersection_marker((B, C), (O, A), M),
+            Text("R", font_size=26).next_to(Line(O, M), DOWN, buff=0.24),
+            Dot(O), Dot(A), Dot(M), Dot(B), Dot(C), Dot(E),
+            safe_point_label(O, "O", A, B, C),
+            safe_point_label(A, "A", O, B, C, E),
+            safe_point_label(M, "M", O, A, B, C, distance=0.38),
+            safe_point_label(B, "B", M, O, A, E),
+            safe_point_label(C, "C", M, O, A),
+            safe_point_label(E, "E", A, B),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
 def _right_trapezoid_with_perpendicular_diagonal_scene(
     problem: str, animate: bool,
 ) -> str | None:
@@ -387,9 +526,19 @@ def _drawing_facts_text(problem: str) -> str:
     facts = []
     in_proof = False
     in_figure_description = False
-    for clause in re.split(r"[.;\n]+", problem):
+    for clause in re.split(r"[.;?\n]+", problem):
         clause = clause.strip()
         if not clause:
+            continue
+        task_text = re.sub(r"^[a-z0-9]+\s*[)\].:/-]\s*", "", clause, flags=re.I)
+        if re.search(r"\blà\s+[^.]{0,80}\bgì\s*$", task_text, re.I) or re.match(
+            r"^(?:tính|tìm|xác\s+định|so\s+sánh|suy\s+ra|kết\s+luận)\b",
+            task_text,
+            re.I,
+        ):
+            # Questions and requested conclusions are not construction facts.  In
+            # particular, "Tam giác OAB là tam giác gì?" must not turn OAB into
+            # an ordinary-triangle constraint before the student proves it is right.
             continue
         parts = re.split(
             r"\b(?:chứng\s+minh|prove|show\s+that)\b",
@@ -474,6 +623,7 @@ def validate_code(code: str, problem: str | None = None) -> None:
     angle_bisector_calls = []
     perpendicular_intersection_calls = []
     equilateral_triangle_calls = []
+    circle_calls = []
     for node in ast.walk(tree):
         if isinstance(node, BLOCKED_NODES):
             raise ValueError(f"Mã AI chứa cấu trúc không được phép: {type(node).__name__}")
@@ -516,6 +666,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 "chỉ dùng một perpendicular_intersection_marker hoặc helper đường phụ phù hợp."
             )
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id == "Circle":
+                circle_calls.append(node)
             if node.func.id == "Arc":
                 direct_arc_calls += 1
             elif node.func.id == "interior_angle_marker":
@@ -614,6 +766,13 @@ def validate_code(code: str, problem: str | None = None) -> None:
                     raise ValueError("Không được giảm khoảng cách tối thiểu giữa các điểm phụ.")
                 if numeric_keywords.get("maximum_aspect_ratio", 2.0) > 2.0:
                     raise ValueError("Không được nới tỷ lệ rộng/cao tối đa của bố cục quá 2.0.")
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "Circle"
+        ):
+            circle_calls.append(node)
         if isinstance(node, ast.ClassDef):
             scene_classes.append(node)
         if isinstance(node, ast.Lambda):
@@ -731,6 +890,16 @@ def validate_code(code: str, problem: str | None = None) -> None:
         request = problem.casefold()
         drawing_facts = _drawing_facts_text(problem)
         drawing_request = drawing_facts.casefold()
+        circle_is_given = bool(re.search(
+            r"\b(?:đường\s+tròn|circle|nội\s+tiếp|ngoại\s+tiếp)\b",
+            drawing_facts,
+            re.I,
+        ))
+        if circle_calls and not circle_is_given:
+            raise ValueError(
+                "Không được vẽ đường tròn chỉ xuất hiện trong phần cần chứng minh; "
+                "chỉ vẽ đường tròn khi nó thuộc giả thiết hoặc phép dựng của đề."
+            )
         point_tokens = re.findall(r"(?<![A-Z])([A-Z]{2,6})(?![A-Z])", problem)
         point_tokens += re.findall(
             r"(?:góc|điểm|tâm|tại|gọi|lấy)\s+([A-Z])\b", problem, re.I
@@ -1939,7 +2108,11 @@ DRAWING_INCOMPLETE = (f"{APP_NAME} chưa dựng được hình khớp với mọ
 def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
-    deterministic = _right_trapezoid_with_perpendicular_diagonal_scene(problem, animate)
+    deterministic = (
+        _midradius_perpendicular_chord_tangent_scene(problem, animate)
+        or _radius_chord_external_point_scene(problem, animate)
+        or _right_trapezoid_with_perpendicular_diagonal_scene(problem, animate)
+    )
     if deterministic is not None:
         try:
             code = sanitize_code(deterministic, animate=animate, problem=problem)
@@ -1959,7 +2132,15 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
         )
     mode = ("Use self.play animations and finish with self.wait(0.5)." if animate else
             "Do not use self.play. Add all mobjects with self.add(...) and finish with self.wait(0.1).")
-    user = f"Animation mode: {mode}\n\nGeometry problem:\n{problem.strip()}"
+    drawing_facts = _drawing_facts_text(problem)
+    user = (
+        f"Animation mode: {mode}\n\nGeometry problem:\n{problem.strip()}\n\n"
+        "Authoritative drawing facts (the only objects and relationship marks permitted in "
+        f"the diagram):\n{drawing_facts}\n\n"
+        "Everything after a proof command is context for which named segments may be useful, "
+        "but its claimed circle, incidence, equality, parallelism, perpendicularity, special "
+        "shape, or angle relation must not be shown as already true."
+    )
     if previous_code:
         # Chat follow-ups: the problem now ends with "Yêu cầu bổ sung"; update the last drawing.
         user += ("\n\nThe current drawing was made for an earlier version of this problem. "

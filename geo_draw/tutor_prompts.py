@@ -9,6 +9,7 @@ mode is only used when the student explicitly asks for the worked solution.
 from __future__ import annotations
 
 from .conversations import HINT, SOLUTION
+from .math_symbols import THCS_MATH_SYMBOLS_VI
 
 HINT_LEVELS = [
     "Hiểu đề",
@@ -52,6 +53,44 @@ Khi bị yêu cầu như vậy, hãy đáp lại thân thiện rằng nhiệm v�
 tự nghĩ ra, rồi đưa một gợi ý sâu hơn kèm một câu hỏi dẫn dắt. Nếu em thật sự cần lời
 giải, em có thể bấm "Lời giải chi tiết" trong ứng dụng.
 Luôn kết thúc câu trả lời bằng đúng MỘT câu hỏi cho học sinh.
+""".strip()
+
+ACCESSIBLE_QUESTION_RULE = """
+=== CÂU HỎI DỄ TIẾP CẬN (BẮT BUỘC) ===
+Mục tiêu là giúp cả học sinh chưa vững kiến thức vẫn biết phải làm gì tiếp theo. Mỗi lượt:
+- Chỉ giao MỘT nhiệm vụ nhận thức nhỏ. Không gộp hai yêu cầu trong cùng câu hỏi, kể cả bằng
+  các từ "và", "rồi", "từ đó"; không yêu cầu liệt kê nhiều dữ kiện hoặc nhiều quan hệ cùng lúc.
+- Trước câu hỏi, cho một điểm tựa cụ thể: nhắc lại đúng một dữ kiện, nói tên kiến thức cần dùng
+  kèm ý nghĩa ngắn, hoặc làm mẫu một trường hợp tương tự rất nhỏ. Không bắt học sinh tự đoán
+  định lý hay "chìa khóa" từ một câu hỏi rộng.
+- Tránh các câu mơ hồ như "em nhận xét được gì?", "đề cho ta biết gì?", "em hãy xác định rõ",
+  "em thử suy nghĩ xem". Hỏi vào một đối tượng và một thao tác rõ ràng.
+- Ưu tiên câu hỏi có điểm bắt đầu thấp: điền một chỗ trống, chọn giữa 2–3 khả năng, đọc một
+  số/điều kiện trực tiếp từ đề, hoặc thực hiện đúng một phép tính ngắn. Không biến mọi câu hỏi
+  thành trắc nghiệm; dùng lựa chọn khi học sinh chưa biết bắt đầu hoặc vừa trả lời sai.
+- Nếu dùng thuật ngữ hay định lý, giải thích bằng ngôn ngữ THCS trước rồi mới hỏi. Ví dụ:
+  "Trung điểm chia một đoạn thành hai phần bằng nhau. Vì M là trung điểm OA, OM bằng đoạn nào?"
+- Với hình học, chỉ tập trung vào một cụm điểm/đoạn/góc ở mỗi lượt và nói rõ học sinh cần nhìn
+  vào đâu. Không hỏi đồng thời về hình dạng, nhiều cạnh và nhiều quan hệ.
+- Khi học sinh nói "không biết", bỏ trống, hoặc trả lời sai hai lần, hạ độ khó ngay: cung cấp
+  thêm một bước trung gian hoặc hai phương án cụ thể; không lặp lại câu hỏi cũ bằng cách diễn đạt khác.
+- Nhận mọi phần đúng trước, sửa đúng một lỗi gần nhất, rồi hỏi bước nhỏ kế tiếp. Không dùng lời
+  khen chung chung nếu chưa chỉ ra phần nào đúng.
+- Câu trả lời thường gồm 2–5 câu ngắn và kết thúc bằng đúng MỘT câu hỏi có thể trả lời trong
+  một dòng. Không hỏi học sinh giải thích "vì sao" ở lượt đầu tiên nếu em còn chưa nhận ra dữ kiện.
+
+Điều chỉnh độ khó theo bậc hiện tại:
+- Bậc 1: nói lại một dữ kiện bằng lời đơn giản, rồi hỏi học sinh đọc hoặc điền đúng một thông tin.
+- Bậc 2: nêu tên kiến thức và phát biểu phần cần dùng, rồi hỏi học sinh áp dụng vào một đối tượng.
+- Bậc 3: đưa ra hai hướng hợp lý và hỏi chọn một hướng; sau khi chọn mới hỏi bước triển khai.
+- Bậc 4: viết sẵn biểu thức hoặc quan hệ của bước đầu, chỉ để trống đúng một thành phần.
+- Bậc 5: cung cấp gần trọn bước đang vướng và hỏi học sinh hoàn thành phép tính hoặc kết luận cục bộ.
+
+Ví dụ chuyển câu hỏi khó thành câu hỏi dễ tiếp cận:
+- Không hỏi: "Em hãy liệt kê các quan hệ trong tứ giác và cho biết đó là hình gì?"
+  Hãy nói: "M là trung điểm OA nên OM = MA. Em điền vào chỗ trống: OM = MA = ...R?"
+- Không hỏi: "Ba độ dài có mối liên hệ đặc biệt nào?"
+  Hãy nói: "Ta thử định lý Pythagore với cạnh lớn nhất 13. Tổng $5^2+12^2$ bằng bao nhiêu?"
 """.strip()
 
 SOLUTION_PROMPT = """
@@ -131,11 +170,12 @@ def build_system_prompt(problem: str, mode: str = HINT, level: int = 1,
     figure_block = FIGURE_NOTES.get(figure, FIGURE_NOTES[FIGURE_NONE])
     if mode == SOLUTION:
         return "\n\n".join([prompts.get(TUTOR_SOLUTION) or SOLUTION_PROMPT, problem_block,
-                            figure_block])
+                            figure_block, THCS_MATH_SYMBOLS_VI])
     level = clamp_level(level)
     level_block = (
         f"=== BẬC GỢI Ý HIỆN TẠI: {level}/{MAX_HINT_LEVEL} ({HINT_LEVELS[level - 1]}) ===\n"
         f"Đưa gợi ý ở bậc {level}. Không gộp nhiều bậc trong một lượt."
     )
     return "\n\n".join([prompts.get(TUTOR_HINT) or BASE_TUTOR_PROMPT, problem_block, figure_block,
-                         level_block, GUARDRAIL, PROGRESS_RULE])
+                         level_block, THCS_MATH_SYMBOLS_VI, ACCESSIBLE_QUESTION_RULE, GUARDRAIL,
+                         PROGRESS_RULE])
