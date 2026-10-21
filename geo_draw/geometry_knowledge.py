@@ -57,6 +57,10 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   subsegment is never mistaken for one of the equal halves.
 - When two carrier lines meet outside an original finite segment, visibly extend the carrier to
   the named intersection. Never show an intersection that the drawn strokes do not reach.
+- When a named intersection lies inside two finite segments (for example, DC intersects median AM
+  at I), each carrier may be drawn as one whole segment or as the two visible halves meeting at I.
+  A verified median/altitude helper also counts as its full carrier; never reject a complete visible
+  construction merely because its stroke was split at the named intersection.
 - Define, dot, label, and connect every named point from the problem. Keep point labels clear of
   incident lines, their extensions, nearby lines, markers, and other labels. Stroke clearance takes
   priority over placing a label outward; a central point name must never sit on a crossing line.
