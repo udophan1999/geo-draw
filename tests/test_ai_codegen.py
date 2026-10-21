@@ -77,6 +77,30 @@ class GeoScene(Scene):
             sanitized,
         )
 
+    def test_sanitizer_adds_missing_stated_right_angle_marker(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 0.0, 0.0])
+        B = np.array([3.0, 0.0, 0.0])
+        C = np.array([0.0, 4.0, 0.0])
+        self.add(Line(A, B), Line(B, C), Line(C, A),
+                 Text("A"), Text("B"), Text("C"))
+        fit_scene_to_frame(self)
+'''
+        sanitized = sanitize_code(
+            code, animate=False,
+            problem="Cho tam giác ABC vuông tại A, AB = 3, AC = 4.",
+        )
+        self.assertIn(
+            "self.add(interior_angle_marker([A, B, C], 0, degrees=90, mark_count=1))",
+            sanitized,
+        )
+
     def test_sanitizer_connects_every_edge_of_shapes_to_identify(self):
         code = '''from manim import *
 import numpy as np

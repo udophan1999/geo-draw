@@ -1972,6 +1972,79 @@ def _ensure_triangle_shape_checks(code: str, problem: str | None) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _ensure_stated_right_angle_markers(code: str, problem: str | None) -> str:
+    """Add a visible square for every right-triangle vertex stated in the givens."""
+    conditions = _stated_triangle_conditions(problem)
+    required = [(names, right) for names, _apex, right in conditions if right]
+    if not required:
+        return code
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    scene_class = next(
+        (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GeoScene"),
+        None,
+    )
+    construct = next(
+        (node for node in (scene_class.body if scene_class else [])
+         if isinstance(node, ast.FunctionDef) and node.name == "construct"),
+        None,
+    )
+    if construct is None:
+        return code
+    fit_call = next(
+        (node for node in ast.walk(construct)
+         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+         and node.func.id == "fit_scene_to_frame"),
+        None,
+    )
+    if fit_call is None:
+        return code
+    defined = {
+        target.id
+        for node in ast.walk(construct)
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(target, ast.Name) and re.fullmatch(r"[A-Z]", target.id)
+    }
+    existing_vertices: set[str] = set()
+    for node in ast.walk(construct):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "interior_angle_marker" and len(node.args) >= 2):
+            continue
+        points, index = node.args[0], node.args[1]
+        if isinstance(points, (ast.List, ast.Tuple)) and isinstance(index, ast.Constant):
+            names = [item.id for item in points.elts if isinstance(item, ast.Name)]
+            if isinstance(index.value, int) and 0 <= index.value < len(names):
+                existing_vertices.add(names[index.value])
+    additions = []
+    for names, right in required:
+        if set(names) <= defined and right not in existing_vertices:
+            additions.append(
+                f"self.add(interior_angle_marker([{', '.join(names)}], {names.index(right)}, "
+                "degrees=90, mark_count=1))"
+            )
+            existing_vertices.add(right)
+    if not additions:
+        return code
+    lines = code.rstrip().splitlines()
+    insertion_index = fit_call.lineno - 1
+    indent = re.match(r"\s*", lines[insertion_index]).group(0)
+    lines[insertion_index:insertion_index] = [f"{indent}{line}" for line in additions]
+    imports_helper = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "geo_draw.geometry_primitives"
+        and any(alias.name in {"interior_angle_marker", "*"} for alias in node.names)
+        for node in tree.body
+    )
+    if not imports_helper:
+        import_nodes = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+        import_index = max(node.end_lineno or node.lineno for node in import_nodes)
+        lines.insert(import_index, "from geo_draw.geometry_primitives import interior_angle_marker")
+    return "\n".join(lines) + "\n"
+
+
 def _classification_shapes(problem: str | None) -> list[str]:
     """Return polygons explicitly named in a 'what shape is ...?' proof goal."""
     if not problem:
@@ -2192,6 +2265,7 @@ def sanitize_code(code: str, animate: bool, problem: str | None = None) -> str:
     code = _ensure_classification_shape_edges(code, problem)
     code = _ensure_ordinary_polygon_checks(code, problem)
     code = _ensure_triangle_shape_checks(code, problem)
+    code = _ensure_stated_right_angle_markers(code, problem)
     validate_code(code, problem=problem)
     return code
 
