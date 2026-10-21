@@ -285,6 +285,23 @@ def _fold_geometry_notation(text: str) -> str:
     ).replace("Đ", "D")
 
 
+def _explicit_segment_equality_pairs(text: str) -> list[tuple[str, str]]:
+    """Return every adjacent pair in stated chains such as AD = DE = EB."""
+    facts = _drawing_facts_text(text)
+    pairs: list[tuple[str, str]] = []
+    for match in re.finditer(
+        r"\b([A-Z]{2}(?:\s*(?:=|bằng)\s*[A-Z]{2})+)\b",
+        facts,
+        re.I,
+    ):
+        segments = [
+            segment.upper()
+            for segment in re.split(r"\s*(?:=|bằng)\s*", match.group(1), flags=re.I)
+        ]
+        pairs.extend(zip(segments, segments[1:]))
+    return list(dict.fromkeys(pairs))
+
+
 def _radius_chord_external_point_scene(problem: str, animate: bool) -> str | None:
     """Build O-A-B from OA=r, AB=a, OB=d without displaying proof conclusions."""
     normalized = _normalize_geometry_notation(problem)
@@ -522,6 +539,53 @@ class GeoScene(Scene):
             safe_point_label(D, "D", B, C, E, F),
             safe_point_label(E, "E", A, C, D),
             safe_point_label(F, "F", A, B, D),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
+def _triangle_median_with_trisected_side_scene(
+    problem: str, animate: bool,
+) -> str | None:
+    """Build a triangle with median AM and A-D-E-B trisecting side AB exactly."""
+    compact = re.sub(r"[^A-Z0-9]+", "", _fold_geometry_notation(problem))
+    if not (
+        "TAMGIACABC" in compact
+        and "TRUNGTUYENAM" in compact
+        and ("HAIDIEMDVAETRENCANHAB" in compact or "DIEMDVAETRENCANHAB" in compact)
+        and "ADDEEB" in compact
+        and "DNAMGIUAHAIDIEMAE" in compact
+    ):
+        return None
+
+    # Keep BC horizontal and use affine division so all incidences and equalities are exact.
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, median_segment, midpoint_marker, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-1.0, 3.2, 0.0])
+        B = np.array([-4.0, 0.0, 0.0])
+        C = np.array([4.5, 0.0, 0.0])
+        M = (B + C) / 2.0
+        D = A + (B - A) / 3.0
+        E = A + 2.0 * (B - A) / 3.0
+        self.add(
+            Line(A, B), Line(B, C), Line(C, A),
+            median_segment(A, M, B, C),
+            midpoint_marker(M, B, C, other_points=(A, D, E), count=1),
+            equal_segment_marks((A, D), (D, E), (E, B), count=2),
+            Dot(A), Dot(B), Dot(C), Dot(M), Dot(D), Dot(E),
+            safe_point_label(A, "A", B, C, M, D, E),
+            safe_point_label(B, "B", A, C, M, D, E),
+            safe_point_label(C, "C", A, B, M),
+            safe_point_label(M, "M", A, B, C, distance=0.38),
+            safe_point_label(D, "D", A, B, E, distance=0.34),
+            safe_point_label(E, "E", A, B, D, distance=0.34),
         )
         fit_scene_to_frame(self)
         {wait}
@@ -1106,12 +1170,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 )
 
         stated_equalities = [
-            (tuple(sorted(match.group(1).upper())), tuple(sorted(match.group(2).upper())))
-            for match in re.finditer(
-                r"\b([A-Z]{2})\s*=\s*([A-Z]{2})\b",
-                drawing_facts,
-                re.I,
-            )
+            (tuple(sorted(left)), tuple(sorted(right)))
+            for left, right in _explicit_segment_equality_pairs(drawing_facts)
         ]
         given_equal_pairs = list(stated_equalities)
         parent_equalities = {frozenset((left, right)) for left, right in stated_equalities}
@@ -1545,12 +1605,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
             for segment in (relation.group(1).upper(), relation.group(2).upper())
         }
         stated_equalities = [
-            (tuple(sorted(match.group(1).upper())), tuple(sorted(match.group(2).upper())))
-            for match in re.finditer(
-                r"\b([A-Z]{2})\s*=\s*([A-Z]{2})\b",
-                drawing_facts,
-                re.I,
-            )
+            (tuple(sorted(left)), tuple(sorted(right)))
+            for left, right in _explicit_segment_equality_pairs(drawing_facts)
         ]
         if stated_equalities:
             if "equal_segment_marks" not in called_names:
@@ -2311,12 +2367,7 @@ def _ensure_ordinary_polygon_checks(code: str, problem: str | None) -> str:
         return code
 
     facts = _drawing_facts_text(problem or "")
-    equality_pairs = [
-        (match.group(1).upper(), match.group(2).upper())
-        for match in re.finditer(
-            r"\b([A-Z]{2})\s*(?:=|bằng)\s*([A-Z]{2})\b", facts, re.I,
-        )
-    ]
+    equality_pairs = _explicit_segment_equality_pairs(facts)
     measured = [
         (match.group(1).upper(), float(match.group(2).replace(",", ".")))
         for match in re.finditer(
@@ -2583,6 +2634,7 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
     deterministic = (
         _right_isosceles_altitude_midpoints_scene(problem, animate)
         or _triangle_point_with_two_parallels_scene(problem, animate)
+        or _triangle_median_with_trisected_side_scene(problem, animate)
         or _midradius_perpendicular_chord_tangent_scene(problem, animate)
         or _radius_chord_external_point_scene(problem, animate)
         or _right_trapezoid_with_perpendicular_diagonal_scene(problem, animate)
