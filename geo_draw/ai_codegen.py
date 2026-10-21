@@ -1972,6 +1972,91 @@ def _ensure_triangle_shape_checks(code: str, problem: str | None) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _classification_shapes(problem: str | None) -> list[str]:
+    """Return polygons explicitly named in a 'what shape is ...?' proof goal."""
+    if not problem:
+        return []
+    folded = _fold_geometry_notation(problem)
+    found: list[str] = []
+    patterns = (
+        r"TU\s+GIAC\s+([A-Z]{4})\s+(?:LA\s+)?HINH\s+GI",
+        r"TAM\s+GIAC\s+([A-Z]{3})\s+(?:LA\s+)?(?:TAM\s+GIAC|HINH)\s+GI",
+    )
+    for pattern in patterns:
+        for match in re.finditer(pattern, folded):
+            names = match.group(1)
+            if len(set(names)) == len(names) and names not in found:
+                found.append(names)
+    return found
+
+
+def _ensure_classification_shape_edges(code: str, problem: str | None) -> str:
+    """Draw every boundary edge of a polygon whose type students must identify."""
+    shapes = _classification_shapes(problem)
+    if not shapes:
+        return code
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    scene_class = next(
+        (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GeoScene"),
+        None,
+    )
+    construct = next(
+        (node for node in (scene_class.body if scene_class else [])
+         if isinstance(node, ast.FunctionDef) and node.name == "construct"),
+        None,
+    )
+    if construct is None:
+        return code
+    fit_call = next(
+        (node for node in ast.walk(construct)
+         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+         and node.func.id == "fit_scene_to_frame"),
+        None,
+    )
+    if fit_call is None:
+        return code
+    defined = {
+        target.id
+        for node in ast.walk(construct)
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(target, ast.Name) and re.fullmatch(r"[A-Z]", target.id)
+    }
+    existing_edges: set[frozenset[str]] = set()
+    for node in ast.walk(construct):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+            continue
+        if node.func.id == "Line" and len(node.args) >= 2:
+            if all(isinstance(arg, ast.Name) for arg in node.args[:2]):
+                existing_edges.add(frozenset((node.args[0].id, node.args[1].id)))
+        elif node.func.id == "Polygon":
+            vertices = [arg.id for arg in node.args if isinstance(arg, ast.Name)]
+            if len(vertices) >= 3:
+                for index, first in enumerate(vertices):
+                    existing_edges.add(frozenset((first, vertices[(index + 1) % len(vertices)])))
+    missing: list[tuple[str, str]] = []
+    for names in shapes:
+        if not set(names) <= defined:
+            continue
+        for index, first in enumerate(names):
+            second = names[(index + 1) % len(names)]
+            edge = frozenset((first, second))
+            if edge not in existing_edges:
+                missing.append((first, second))
+                existing_edges.add(edge)
+    if not missing:
+        return code
+    lines = code.rstrip().splitlines()
+    insertion_index = fit_call.lineno - 1
+    indent = re.match(r"\s*", lines[insertion_index]).group(0)
+    edge_calls = ", ".join(f"Line({first}, {second})" for first, second in missing)
+    lines.insert(insertion_index, f"{indent}self.add({edge_calls})")
+    return "\n".join(lines) + "\n"
+
+
 def _ensure_ordinary_polygon_checks(code: str, problem: str | None) -> str:
     """Insert trusted numerical checks for ordinary base polygons, not proof goals."""
     polygons = _ordinary_polygons(problem)
@@ -2104,6 +2189,7 @@ def sanitize_code(code: str, animate: bool, problem: str | None = None) -> str:
     del animate
     code = code.strip() + "\n"
     code = _ensure_explicit_parallel_verifiers(code, problem)
+    code = _ensure_classification_shape_edges(code, problem)
     code = _ensure_ordinary_polygon_checks(code, problem)
     code = _ensure_triangle_shape_checks(code, problem)
     validate_code(code, problem=problem)

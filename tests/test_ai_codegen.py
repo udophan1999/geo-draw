@@ -77,6 +77,36 @@ class GeoScene(Scene):
             sanitized,
         )
 
+    def test_sanitizer_connects_every_edge_of_shapes_to_identify(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 0.0, 0.0])
+        B = np.array([0.0, 2.0, 0.0])
+        C = np.array([2.0, 2.0, 0.0])
+        D = np.array([2.0, 0.0, 0.0])
+        O = np.array([0.5, 0.5, 0.0])
+        H = np.array([1.0, 1.0, 0.0])
+        E = np.array([0.5, 1.5, 0.0])
+        self.add(Line(A, B), Line(B, C), Line(A, O), Line(H, E),
+                 Text("A"), Text("B"), Text("C"), Text("D"),
+                 Text("O"), Text("H"), Text("E"))
+        fit_scene_to_frame(self)
+'''
+        sanitized = sanitize_code(
+            code,
+            animate=False,
+            problem="a) Tứ giác ABCD là hình gì? b) Tứ giác AOHE là hình gì?",
+        )
+        self.assertIn("Line(C, D)", sanitized)
+        self.assertIn("Line(D, A)", sanitized)
+        self.assertIn("Line(O, H)", sanitized)
+        self.assertIn("Line(E, A)", sanitized)
+
     @patch("geo_draw.ai_codegen._request_chat")
     def test_midradius_chord_and_tangent_problem_is_built_without_ai(self, request_chat):
         problem = (
