@@ -7,7 +7,8 @@ from pathlib import Path
 from geo_draw.accounts import ADMIN, USER, AccountStore
 from geo_draw.app_config import ConfigStore
 from geo_draw.tutor_prompts import (
-    BASE_TUTOR_PROMPT, GUARDRAIL, SOLUTION_PROMPT, TUTOR_HINT, TUTOR_SOLUTION, build_system_prompt,
+    ACCESSIBLE_QUESTION_RULE, BASE_TUTOR_PROMPT, GUARDRAIL, SOLUTION_PROMPT, TUTOR_HINT,
+    TUTOR_SOLUTION, build_system_prompt,
 )
 from geo_draw.conversations import HINT, SOLUTION
 
@@ -70,6 +71,7 @@ class PromptOverrideTests(unittest.TestCase):
         self.assertTrue(hint.startswith("Bạn là cô giáo vui tính."))
         self.assertNotIn(BASE_TUTOR_PROMPT, hint)
         self.assertIn(GUARDRAIL, hint)
+        self.assertIn(ACCESSIBLE_QUESTION_RULE, hint)
         solution = build_system_prompt("x + 1 = 2", SOLUTION, 1, prompts=prompts)
         self.assertTrue(solution.startswith("Giải thật ngắn."))
         self.assertTrue(build_system_prompt("x", SOLUTION, 1, prompts={}).startswith(SOLUTION_PROMPT))
@@ -239,7 +241,9 @@ class AdminApiTests(ApiTestCase):
         prompts = admin.get("/api/admin/prompts").json()
         self.assertEqual([p["key"] for p in prompts["prompts"]], [TUTOR_HINT, TUTOR_SOLUTION])
         self.assertFalse(prompts["prompts"][0]["custom"])
-        self.assertEqual(len(prompts["fixed"]), 2)
+        self.assertEqual(len(prompts["fixed"]), 3)
+        self.assertEqual(prompts["fixed"][0]["label"], "Câu hỏi dễ tiếp cận")
+        self.assertIn("MỘT nhiệm vụ nhận thức nhỏ", prompts["fixed"][0]["text"])
 
         saved = admin.put(f"/api/admin/prompts/{TUTOR_HINT}", json={"value": "Bạn là thầy giáo nghiêm khắc."}).json()
         self.assertTrue(saved["prompts"][0]["custom"])
@@ -247,6 +251,7 @@ class AdminApiTests(ApiTestCase):
         read_events(admin, self.send(admin, EQUATION).json()["job_id"])
         system = self.tutor_stream.call_args.args[1][0]["content"]
         self.assertTrue(system.startswith("Bạn là thầy giáo nghiêm khắc."))
+        self.assertIn(ACCESSIBLE_QUESTION_RULE, system)
         self.assertIn(GUARDRAIL, system)
 
         self.assertEqual(admin.put(f"/api/admin/prompts/{TUTOR_HINT}", json={"value": "  "}).status_code, 422)
