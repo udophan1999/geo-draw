@@ -535,6 +535,7 @@ class GeoScene(Scene):
         ):
             self.assertIn(grade_nine_relation, MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("white canvas with black geometry", SYSTEM_PROMPT)
+        self.assertIn("differences visually obvious to a student", SYSTEM_PROMPT)
         self.assertIn("upright_polygon_check", SYSTEM_PROMPT)
         self.assertIn("exactly horizontal", SYSTEM_PROMPT)
         self.assertIn(DRAWING_ERROR_MEMORY, SYSTEM_PROMPT)

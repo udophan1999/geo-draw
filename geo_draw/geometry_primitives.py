@@ -314,13 +314,15 @@ def upright_polygon_check(vertices, names: str, tolerance: float = 0.015):
 
 def ordinary_polygon_check(vertices, names: str, allowed_equal_pairs=(),
                            allowed_right_vertices=(), allowed_parallel_pairs=(),
-                           side_gap: float = 0.06, right_gap_degrees: float = 7.0,
-                           parallel_sine_gap: float = 0.08):
+                           side_gap: float = 0.10, right_gap_degrees: float = 10.0,
+                           parallel_sine_gap: float = 0.12):
     """Reject an unstated special case in a named ordinary triangle/quadrilateral.
 
     This checks only the original polygon, not auxiliary polygons that the
     exercise asks the student to prove special. Explicitly stated relations can
-    be exempted without weakening checks on unrelated sides or vertices.
+    be exempted without weakening checks on unrelated sides or vertices. The
+    margins are intentionally visible so a generic school figure does not merely
+    look isosceles, right, or parallel by accident.
     """
     points = [_point(vertex) for vertex in vertices]
     if len(points) not in (3, 4) or len(names) != len(points):
