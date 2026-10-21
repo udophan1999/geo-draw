@@ -35,6 +35,49 @@ class GeoScene(Scene):
 
 class AiCodegenTests(unittest.TestCase):
     @patch("geo_draw.ai_codegen._request_chat")
+    def test_right_isosceles_altitude_midpoints_problem_is_built_exactly(self, request_chat):
+        problem = (
+            "Cho tam giác ABC vuông cân tại A có đường cao AH. Gọi O là trung điểm của AC, "
+            "trên tia đối của tia OB lấy điểm D sao cho OD = OB. "
+            "a) Tứ giác ABCD là hình gì? Vì sao? "
+            "b) Gọi E là trung điểm của AB. Tứ giác AOHE là hình gì? Vì sao?"
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("B = np.array([3.6, 1.5", result.code)
+        self.assertIn("C = np.array([0.0, -2.1", result.code)
+        self.assertIn("altitude_segment(A, H, B, C)", result.code)
+        self.assertIn("D = opposite_ray_point(O, B)", result.code)
+        self.assertIn("equal_segment_marks((A, B), (A, C)", result.code)
+        self.assertIn("triangle_shape_check(A, B, C, names='ABC'", result.code)
+
+    def test_sanitizer_injects_positive_right_isosceles_check(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, interior_angle_marker
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 0.0, 0.0])
+        B = np.array([4.0, 0.0, 0.0])
+        C = np.array([0.0, 2.0, 0.0])
+        self.add(Line(A, B), Line(B, C), Line(C, A),
+                 interior_angle_marker([A, B, C], 0, degrees=90, mark_count=1),
+                 Dot(A), Dot(B), Dot(C),
+                 Text("A"), Text("B"), Text("C"))
+        fit_scene_to_frame(self)
+'''
+        sanitized = sanitize_code(code, animate=False,
+                                  problem="Cho tam giác ABC vuông cân tại A.")
+        self.assertIn(
+            "triangle_shape_check(A, B, C, names='ABC', "
+            "isosceles_apex='A', right_vertex='A')",
+            sanitized,
+        )
+
+    @patch("geo_draw.ai_codegen._request_chat")
     def test_midradius_chord_and_tangent_problem_is_built_without_ai(self, request_chat):
         problem = (
             "Cho đường tròn tâm O có bán kính OA = R, dây BC vuông góc với OA "

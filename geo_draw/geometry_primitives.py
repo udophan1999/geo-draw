@@ -243,6 +243,50 @@ def equilateral_triangle_check(first, second, third, tolerance: float = 0.01):
     return True
 
 
+def triangle_shape_check(first, second, third, names: str,
+                         isosceles_apex: str | None = None,
+                         right_vertex: str | None = None,
+                         tolerance: float = 0.01):
+    """Verify stated isosceles/right conditions without adding visible marks."""
+    if len(names) != 3 or len(set(names.upper())) != 3:
+        raise ValueError("triangle_shape_check cần đúng ba tên đỉnh khác nhau.")
+    names = names.upper()
+    points = dict(zip(names, (_point(first), _point(second), _point(third))))
+    scale = max(
+        float(np.linalg.norm(points[names[i]] - points[names[j]]))
+        for i in range(3) for j in range(i + 1, 3)
+    )
+    if scale < EPS or abs(_cross2(points[names[1]] - points[names[0]],
+                                  points[names[2]] - points[names[0]])) < EPS * scale * scale:
+        raise ValueError(f"GEOMETRY_TRIANGLE_DEGENERATE: Tam giác {names} bị suy biến.")
+    if isosceles_apex:
+        apex = isosceles_apex.upper()
+        if apex not in points:
+            raise ValueError(f"Đỉnh cân {apex} không thuộc tam giác {names}.")
+        others = [name for name in names if name != apex]
+        first_leg = float(np.linalg.norm(points[others[0]] - points[apex]))
+        second_leg = float(np.linalg.norm(points[others[1]] - points[apex]))
+        if abs(first_leg - second_leg) > tolerance * max(first_leg, second_leg, 1.0):
+            raise ValueError(
+                f"GEOMETRY_ISOSCELES_MISMATCH: Tam giác {names} phải cân tại {apex}, "
+                f"nhưng {apex}{others[0]} và {apex}{others[1]} chưa bằng nhau."
+            )
+    if right_vertex:
+        vertex = right_vertex.upper()
+        if vertex not in points:
+            raise ValueError(f"Đỉnh vuông {vertex} không thuộc tam giác {names}.")
+        others = [name for name in names if name != vertex]
+        first_ray = points[others[0]] - points[vertex]
+        second_ray = points[others[1]] - points[vertex]
+        product = max(float(np.linalg.norm(first_ray) * np.linalg.norm(second_ray)), 1.0)
+        if abs(float(np.dot(first_ray[:2], second_ray[:2]))) > tolerance * product:
+            raise ValueError(
+                f"GEOMETRY_RIGHT_MISMATCH: Tam giác {names} phải vuông tại {vertex}, "
+                f"nhưng hai cạnh tại {vertex} chưa vuông góc."
+            )
+    return True
+
+
 def ordinary_polygon_check(vertices, names: str, allowed_equal_pairs=(),
                            allowed_right_vertices=(), allowed_parallel_pairs=(),
                            side_gap: float = 0.06, right_gap_degrees: float = 7.0,
