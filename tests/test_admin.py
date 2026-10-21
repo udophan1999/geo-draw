@@ -243,7 +243,12 @@ class AdminApiTests(ApiTestCase):
         self.assertFalse(prompts["prompts"][0]["custom"])
         self.assertEqual(len(prompts["fixed"]), 3)
         self.assertEqual(prompts["fixed"][0]["label"], "Câu hỏi dễ tiếp cận")
-        self.assertIn("MỘT nhiệm vụ nhận thức nhỏ", prompts["fixed"][0]["text"])
+        accessible_rule = prompts["fixed"][0]["text"]
+        self.assertIn("xác định 2–4 chặng", accessible_rule)
+        self.assertIn("logic chính, rồi dẫn dắt", accessible_rule)
+        self.assertIn("Mỗi lượt chỉ đặt đúng MỘT câu hỏi", accessible_rule)
+        self.assertIn("một bước suy luận có ý nghĩa", accessible_rule)
+        self.assertIn("**Cách trình bày:**", accessible_rule)
 
         saved = admin.put(f"/api/admin/prompts/{TUTOR_HINT}", json={"value": "Bạn là thầy giáo nghiêm khắc."}).json()
         self.assertTrue(saved["prompts"][0]["custom"])
