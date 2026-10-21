@@ -472,6 +472,62 @@ class GeoScene(Scene):
 '''
 
 
+def _triangle_point_with_two_parallels_scene(
+    problem: str, animate: bool,
+) -> str | None:
+    """Build ABC with D on BC and the two parallels through D exactly.
+
+    This common grade-7 configuration is simple enough to construct locally.  Keeping it
+    deterministic prevents repeated AI repair attempts from preserving a globally tilted
+    triangle after the upright-layout validator rejects it.
+    """
+    compact = re.sub(r"[^A-Z0-9]+", "", _fold_geometry_notation(problem))
+    if not (
+        "TAMGIACABC" in compact
+        and ("DNAMGIUABVAC" in compact or "DLA1DIEMNAMGIUABVAC" in compact
+             or "DLAMOTDIEMNAMGIUABVAC" in compact)
+        and "QUAD" in compact
+        and ("SONGSONGVOIABAC" in compact
+             or ("SONGSONGVOIAB" in compact and "SONGSONGVOIAC" in compact))
+        and "CATCACCANHACABLANLUOTTAIEF" in compact
+    ):
+        return None
+
+    # A deliberately scalene triangle with horizontal BC.  D is an interior point of BC.
+    # Affine interpolation then guarantees DE || AB and DF || AC exactly.
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, parallel_segment_marks, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-1.0, 3.2, 0.0])
+        B = np.array([-4.0, 0.0, 0.0])
+        C = np.array([4.5, 0.0, 0.0])
+        t = 0.56
+        D = B + t * (C - B)
+        E = A + t * (C - A)
+        F = A + (1.0 - t) * (B - A)
+        self.add(
+            Line(A, B), Line(B, C), Line(C, A),
+            Line(D, E), Line(D, F),
+            parallel_segment_marks((D, E), (A, B), count=1),
+            parallel_segment_marks((D, F), (A, C), count=2),
+            Dot(A), Dot(B), Dot(C), Dot(D), Dot(E), Dot(F),
+            safe_point_label(A, "A", B, C, E, F),
+            safe_point_label(B, "B", A, C, D, F),
+            safe_point_label(C, "C", A, B, D, E),
+            safe_point_label(D, "D", B, C, E, F),
+            safe_point_label(E, "E", A, C, D),
+            safe_point_label(F, "F", A, B, D),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
 def _right_trapezoid_with_perpendicular_diagonal_scene(
     problem: str, animate: bool,
 ) -> str | None:
@@ -2526,6 +2582,7 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
         _right_isosceles_altitude_midpoints_scene(problem, animate)
+        or _triangle_point_with_two_parallels_scene(problem, animate)
         or _midradius_perpendicular_chord_tangent_scene(problem, animate)
         or _radius_chord_external_point_scene(problem, animate)
         or _right_trapezoid_with_perpendicular_diagonal_scene(problem, animate)

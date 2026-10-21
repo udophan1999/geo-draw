@@ -35,6 +35,24 @@ class GeoScene(Scene):
 
 class AiCodegenTests(unittest.TestCase):
     @patch("geo_draw.ai_codegen._request_chat")
+    def test_triangle_point_with_two_parallels_is_built_upright_without_ai(self, request_chat):
+        problem = (
+            "Cho tam giác ABC, D là một điểm nằm giữa B và C. Qua D kẻ các đường thẳng "
+            "song song với AB, AC, chúng cắt các cạnh AC, AB lần lượt tại E, F."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("B = np.array([-4.0, 0.0", result.code)
+        self.assertIn("C = np.array([4.5, 0.0", result.code)
+        self.assertIn("D = B + t * (C - B)", result.code)
+        self.assertIn("E = A + t * (C - A)", result.code)
+        self.assertIn("F = A + (1.0 - t) * (B - A)", result.code)
+        self.assertIn("parallel_segment_marks((D, E), (A, B), count=1)", result.code)
+        self.assertIn("parallel_segment_marks((D, F), (A, C), count=2)", result.code)
+        self.assertIn("upright_polygon_check([A, B, C], names='ABC')", result.code)
+
+    @patch("geo_draw.ai_codegen._request_chat")
     def test_right_isosceles_altitude_midpoints_problem_is_built_exactly(self, request_chat):
         problem = (
             "Cho tam giác ABC vuông cân tại A có đường cao AH. Gọi O là trung điểm của AC, "
