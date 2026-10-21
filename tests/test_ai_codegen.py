@@ -5,6 +5,7 @@ from geo_draw.ai_codegen import (
     AiSettings,
     SYSTEM_PROMPT,
     _drawing_facts_text,
+    _explicit_segment_equality_pairs,
     _ensure_light_theme,
     _normalize_geometry_notation,
     _ordinary_polygons,
@@ -34,6 +35,32 @@ class GeoScene(Scene):
 
 
 class AiCodegenTests(unittest.TestCase):
+    def test_segment_equality_chain_keeps_every_adjacent_relation(self):
+        self.assertEqual(
+            _explicit_segment_equality_pairs("Cho AD = DE = EB và MN bằng NP."),
+            [("AD", "DE"), ("DE", "EB"), ("MN", "NP")],
+        )
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_triangle_median_and_trisected_side_are_built_exactly_without_ai(self, request_chat):
+        problem = (
+            "Cho tam giác ABC có trung tuyến AM (M∈BC). Lấy hai điểm D và E trên cạnh AB "
+            "sao cho AD = DE = EB và D nằm giữa hai điểm A, E."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("M = (B + C) / 2.0", result.code)
+        self.assertIn("D = A + (B - A) / 3.0", result.code)
+        self.assertIn("E = A + 2.0 * (B - A) / 3.0", result.code)
+        self.assertIn("median_segment(A, M, B, C)", result.code)
+        self.assertIn("midpoint_marker(M, B, C", result.code)
+        self.assertIn(
+            "equal_segment_marks((A, D), (D, E), (E, B), count=2)",
+            result.code,
+        )
+        self.assertIn("upright_polygon_check([A, B, C], names='ABC')", result.code)
+
     @patch("geo_draw.ai_codegen._request_chat")
     def test_triangle_point_with_two_parallels_is_built_upright_without_ai(self, request_chat):
         problem = (
