@@ -148,7 +148,8 @@ Exact construction requirements:
   is given.
 - A plain "tam giác ABC" must look scalene and non-right; a plain "tứ giác ABCD" must not
   accidentally look like a trapezoid, parallelogram, rectangle, or kite. Avoid near-equalities,
-  near-right angles, and near-parallel opposite sides unless the givens require them. The app
+  near-right angles, and near-parallel opposite sides unless the givens require them. Make the
+  differences visually obvious to a student; do not rely on tiny numerical differences. The app
   automatically checks the original named polygon with `ordinary_polygon_check` before render.
   If GEOMETRY_ACCIDENTAL_SPECIAL occurs, change the original vertex coordinates and recompute all
   dependent points. Do not change or delete a stated condition. A special auxiliary polygon that

@@ -156,6 +156,12 @@ class GeometryPrimitiveTests(unittest.TestCase):
                  np.array([4.0, 0.0, 0.0])),
                 names="ABC",
             )
+        with self.assertRaisesRegex(ValueError, "Tam giác ABC gần cân"):
+            ordinary_polygon_check(
+                (np.array([0.0, 4.0, 0.0]), np.array([-3.0, 0.0, 0.0]),
+                 np.array([4.0, 0.0, 0.0])),
+                names="ABC",
+            )
         ordinary_polygon_check(
             (np.array([-1.0, 2.5, 0.0]), np.array([-3.0, 0.0, 0.0]),
              np.array([4.0, 0.0, 0.0])),
