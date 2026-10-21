@@ -287,6 +287,31 @@ def triangle_shape_check(first, second, third, names: str,
     return True
 
 
+def upright_polygon_check(vertices, names: str, tolerance: float = 0.015):
+    """Require a named polygon to have a truly horizontal boundary side.
+
+    Middle-school diagrams are easier to parse when the main figure is not
+    globally rotated.  This verifier is invisible; it makes code generation
+    retry with conventional upright coordinates when every side is tilted.
+    """
+    points = [_point(vertex) for vertex in vertices]
+    if len(points) not in (3, 4) or len(names) != len(points):
+        raise ValueError("upright_polygon_check cần ba hoặc bốn đỉnh có tên.")
+    sides = [points[(index + 1) % len(points)] - points[index]
+             for index in range(len(points))]
+    lengths = [float(np.linalg.norm(side[:2])) for side in sides]
+    if min(lengths) < EPS:
+        raise ValueError(f"GEOMETRY_UPRIGHT_DEGENERATE: Đa giác {names} có cạnh suy biến.")
+    if not any(abs(float(side[1])) <= tolerance * length
+               for side, length in zip(sides, lengths)):
+        raise ValueError(
+            f"GEOMETRY_FIGURE_TILTED: Hình {names} đang bị xoay nghiêng. "
+            "Hãy xoay đồng thời mọi điểm để ít nhất một cạnh biên nằm ngang tuyệt đối, "
+            "rồi tính lại các điểm phụ từ các tọa độ đã xoay."
+        )
+    return True
+
+
 def ordinary_polygon_check(vertices, names: str, allowed_equal_pairs=(),
                            allowed_right_vertices=(), allowed_parallel_pairs=(),
                            side_gap: float = 0.06, right_gap_degrees: float = 7.0,

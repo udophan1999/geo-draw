@@ -46,6 +46,13 @@ Rules:
   have clear negative space. Avoid skinny, excessively wide, or excessively tall shapes and
   near-coincident construction points. Aim for a main-figure bounding-box aspect ratio between
   about 1.2 and 1.8 (never above 2.0), normally 7-9 Manim units wide and 4.5-6.5 units high.
+- Keep the main figure upright in the conventional textbook orientation; never rotate the whole
+  diagram arbitrarily. Every named triangle or quadrilateral must have at least one boundary side
+  exactly horizontal. Normally draw triangle base BC horizontally with A above it. For a right
+  triangle, a horizontal leg and a vertical leg are also preferred. Draw trapezoid bases,
+  rectangle/square top and bottom sides, chords described as horizontal, and principal baselines
+  exactly horizontal. Compute every auxiliary point only after fixing this orientation, and call
+  `upright_polygon_check([A, B, C], names="ABC")` (or four vertices) before rendering.
 - When three or more important auxiliary points form the focus of the exercise, call
   `layout_spacing_check(E, I, F, all_points=(A, B, C, D), maximum_aspect_ratio=2.0)` after
   computing them. For a symmetric
@@ -165,7 +172,7 @@ Exact construction requirements:
 - For all mathematical markers and special lines, use the verified helpers from
   `geo_draw.geometry_primitives`: apply_light_theme, interior_angle_marker, equal_segment_marks,
   parallel_segment_marks, midpoint_marker, median_segment, altitude_segment,
-  equilateral_triangle_check, triangle_shape_check,
+  equilateral_triangle_check, triangle_shape_check, upright_polygon_check,
   perpendicular_intersection_marker,
   angle_bisector_segment, perpendicular_bisector, perpendicular_through_point,
   opposite_ray_point, ray_intersection, ray, infinite_line,
@@ -196,6 +203,7 @@ Exact construction requirements:
   `line_through_intersection(A, B, E)`;
   `layout_spacing_check(E, I, F, all_points=(A, B, C, D), maximum_aspect_ratio=2.0)`;
   `triangle_shape_check(A, B, C, names="ABC", isosceles_apex="A", right_vertex="A")`;
+  `upright_polygon_check([A, B, C], names="ABC")`;
   `safe_point_label(E, "E", B, avoid_points=(A, C, D),`
   `avoid_segments=((A, B), (B, C)))`; `fit_scene_to_frame(self)`.
   Never pass a Manim Line object to these helpers.
@@ -2063,6 +2071,86 @@ def _classification_shapes(problem: str | None) -> list[str]:
     return found
 
 
+def _stated_polygons(problem: str | None) -> list[str]:
+    """Return every triangle/quadrilateral introduced in the problem givens."""
+    if not problem:
+        return []
+    facts = _fold_geometry_notation(_drawing_facts_text(problem))
+    found: list[str] = []
+    for size, word in ((3, r"TAM\s+GIAC"), (4, r"TU\s+GIAC")):
+        for match in re.finditer(rf"\b{word}\s+([A-Z]{{{size}}})(?![A-Z])", facts):
+            names = match.group(1)
+            if len(set(names)) == size and names not in found:
+                found.append(names)
+    return found
+
+
+def _ensure_upright_polygon_checks(code: str, problem: str | None) -> str:
+    """Inject an invisible check that rejects globally tilted main figures."""
+    polygons = _stated_polygons(problem)
+    if not polygons:
+        return code
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    scene_class = next(
+        (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GeoScene"),
+        None,
+    )
+    construct = next(
+        (node for node in (scene_class.body if scene_class else [])
+         if isinstance(node, ast.FunctionDef) and node.name == "construct"),
+        None,
+    )
+    if construct is None:
+        return code
+    fit_call = next(
+        (node for node in ast.walk(construct)
+         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+         and node.func.id == "fit_scene_to_frame"),
+        None,
+    )
+    if fit_call is None:
+        return code
+    defined = {
+        target.id
+        for node in ast.walk(construct)
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(target, ast.Name) and re.fullmatch(r"[A-Z]", target.id)
+    }
+    existing = {
+        keyword.value.value
+        for node in ast.walk(construct)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "upright_polygon_check"
+        for keyword in node.keywords
+        if keyword.arg == "names" and isinstance(keyword.value, ast.Constant)
+    }
+    additions = [
+        f"upright_polygon_check([{', '.join(names)}], names={names!r})"
+        for names in polygons if set(names) <= defined and names not in existing
+    ]
+    if not additions:
+        return code
+    lines = code.rstrip().splitlines()
+    insertion_index = fit_call.lineno - 1
+    indent = re.match(r"\s*", lines[insertion_index]).group(0)
+    lines[insertion_index:insertion_index] = [f"{indent}{line}" for line in additions]
+    imports_helper = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "geo_draw.geometry_primitives"
+        and any(alias.name in {"upright_polygon_check", "*"} for alias in node.names)
+        for node in tree.body
+    )
+    if not imports_helper:
+        import_nodes = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+        import_index = max(node.end_lineno or node.lineno for node in import_nodes)
+        lines.insert(import_index, "from geo_draw.geometry_primitives import upright_polygon_check")
+    return "\n".join(lines) + "\n"
+
+
 def _ensure_classification_shape_edges(code: str, problem: str | None) -> str:
     """Draw every boundary edge of a polygon whose type students must identify."""
     shapes = _classification_shapes(problem)
@@ -2266,6 +2354,7 @@ def sanitize_code(code: str, animate: bool, problem: str | None = None) -> str:
     code = _ensure_ordinary_polygon_checks(code, problem)
     code = _ensure_triangle_shape_checks(code, problem)
     code = _ensure_stated_right_angle_markers(code, problem)
+    code = _ensure_upright_polygon_checks(code, problem)
     validate_code(code, problem=problem)
     return code
 

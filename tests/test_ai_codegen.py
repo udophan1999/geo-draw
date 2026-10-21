@@ -101,6 +101,31 @@ class GeoScene(Scene):
             sanitized,
         )
 
+    def test_sanitizer_requires_stated_triangle_to_be_upright(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-1.0, 2.0, 0.0])
+        B = np.array([-2.0, -1.0, 0.0])
+        C = np.array([3.0, -0.4, 0.0])
+        self.add(Line(A, B), Line(B, C), Line(C, A),
+                 Dot(A), Dot(B), Dot(C), Text("A"), Text("B"), Text("C"))
+        fit_scene_to_frame(self)
+'''
+        sanitized = sanitize_code(code, animate=False, problem="Cho tam giác ABC.")
+        self.assertIn(
+            "upright_polygon_check([A, B, C], names='ABC')",
+            sanitized,
+        )
+        self.assertIn(
+            "from geo_draw.geometry_primitives import upright_polygon_check",
+            sanitized,
+        )
+
     def test_sanitizer_connects_every_edge_of_shapes_to_identify(self):
         code = '''from manim import *
 import numpy as np
@@ -492,6 +517,8 @@ class GeoScene(Scene):
         ):
             self.assertIn(grade_nine_relation, MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("white canvas with black geometry", SYSTEM_PROMPT)
+        self.assertIn("upright_polygon_check", SYSTEM_PROMPT)
+        self.assertIn("exactly horizontal", SYSTEM_PROMPT)
         self.assertIn(DRAWING_ERROR_MEMORY, SYSTEM_PROMPT)
         for remembered_rule in (
             "exactly one right-angle square",
