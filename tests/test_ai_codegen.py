@@ -62,6 +62,23 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("upright_polygon_check([A, B, C], names='ABC')", result.code)
 
     @patch("geo_draw.ai_codegen._request_chat")
+    def test_triangle_median_proof_segments_and_intersection_are_connected(self, request_chat):
+        problem = (
+            "Cho tam giác ABC có trung tuyến AM (M∈BC). Lấy hai điểm D và E trên cạnh AB "
+            "sao cho AD = DE = EB và D nằm giữa hai điểm A, E. "
+            "a) Chứng minh DC // EM. b) DC cắt AM tại I. "
+            "Chứng minh I là trung điểm của AM."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("Line(D, C), Line(E, M)", result.code)
+        self.assertIn("I = ray_intersection(D, C - D, A, M - A)", result.code)
+        self.assertIn('safe_point_label(I, "I"', result.code)
+        self.assertNotIn("parallel_segment_marks((D, C), (E, M)", result.code)
+        self.assertNotIn("midpoint_marker(I, A, M", result.code)
+
+    @patch("geo_draw.ai_codegen._request_chat")
     def test_triangle_point_with_two_parallels_is_built_upright_without_ai(self, request_chat):
         problem = (
             "Cho tam giác ABC, D là một điểm nằm giữa B và C. Qua D kẻ các đường thẳng "
@@ -573,6 +590,7 @@ class GeoScene(Scene):
             "Use only solid strokes",
             "Define, dot, label, and connect every named point",
             "each carrier may be drawn as one whole segment or as the two visible halves",
+            "connect those endpoints automatically so the student can use the segment",
         ):
             self.assertIn(remembered_rule, DRAWING_ERROR_MEMORY)
 
