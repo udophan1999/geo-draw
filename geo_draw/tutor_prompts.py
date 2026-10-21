@@ -9,6 +9,7 @@ mode is only used when the student explicitly asks for the worked solution.
 from __future__ import annotations
 
 from .conversations import HINT, SOLUTION
+from .math_symbols import THCS_MATH_SYMBOLS_VI
 
 HINT_LEVELS = [
     "Hiểu đề",
@@ -169,11 +170,12 @@ def build_system_prompt(problem: str, mode: str = HINT, level: int = 1,
     figure_block = FIGURE_NOTES.get(figure, FIGURE_NOTES[FIGURE_NONE])
     if mode == SOLUTION:
         return "\n\n".join([prompts.get(TUTOR_SOLUTION) or SOLUTION_PROMPT, problem_block,
-                            figure_block])
+                            figure_block, THCS_MATH_SYMBOLS_VI])
     level = clamp_level(level)
     level_block = (
         f"=== BẬC GỢI Ý HIỆN TẠI: {level}/{MAX_HINT_LEVEL} ({HINT_LEVELS[level - 1]}) ===\n"
         f"Đưa gợi ý ở bậc {level}. Không gộp nhiều bậc trong một lượt."
     )
     return "\n\n".join([prompts.get(TUTOR_HINT) or BASE_TUTOR_PROMPT, problem_block, figure_block,
-                         level_block, ACCESSIBLE_QUESTION_RULE, GUARDRAIL, PROGRESS_RULE])
+                         level_block, THCS_MATH_SYMBOLS_VI, ACCESSIBLE_QUESTION_RULE, GUARDRAIL,
+                         PROGRESS_RULE])
