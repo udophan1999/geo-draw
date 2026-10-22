@@ -170,6 +170,11 @@ Exact construction requirements:
   Never mark the same segment in two calls, never mix unrelated segments in a call, and give
   different equality classes different counts. Example: if AB=CD and EF=GH are separately stated,
   use count=1 for `(A,B),(C,D)` and count=2 for `(E,F),(G,H)`.
+- If the request explicitly gives or asks to draw congruent objects, show all corresponding data.
+  For `triangle ABC congruent to triangle DEF`, preserve the stated order A-D, B-E, C-F; draw
+  matching tick counts on AB-DE, BC-EF, CA-FD and matching arc counts on angles A-D, B-E, C-F.
+  Use a different count for each independent corresponding pair so students can read the mapping.
+  Do not add these congruence marks when congruence is only a conclusion to be proved.
 - For all mathematical markers and special lines, use the verified helpers from
   `geo_draw.geometry_primitives`: apply_light_theme, interior_angle_marker, equal_segment_marks,
   parallel_segment_marks, midpoint_marker, median_segment, altitude_segment,
@@ -300,6 +305,22 @@ def _explicit_segment_equality_pairs(text: str) -> list[tuple[str, str]]:
             for segment in re.split(r"\s*(?:=|bằng)\s*", match.group(1), flags=re.I)
         ]
         pairs.extend(zip(segments, segments[1:]))
+    return list(dict.fromkeys(pairs))
+
+
+def _explicit_congruent_triangles(text: str) -> list[tuple[str, str]]:
+    """Return ordered triangle-name pairs explicitly stated or requested as congruent."""
+    folded = _fold_geometry_notation(_drawing_facts_text(text))
+    patterns = (
+        r"(?:VE\s+)?(?:HAI\s+)?TAM\s+GIAC\s+([A-Z]{3})\s+VA\s+([A-Z]{3})\s+BANG\s+NHAU",
+        r"TAM\s+GIAC\s+([A-Z]{3})\s*(?:=|≅)\s*TAM\s+GIAC\s+([A-Z]{3})",
+    )
+    pairs: list[tuple[str, str]] = []
+    for pattern in patterns:
+        for match in re.finditer(pattern, folded):
+            first, second = match.groups()
+            if len(set(first + second)) == 6:
+                pairs.append((first, second))
     return list(dict.fromkeys(pairs))
 
 
@@ -605,6 +626,57 @@ class GeoScene(Scene):
             safe_point_label(D, "D", A, B, E, distance=0.34),
             safe_point_label(E, "E", A, B, D, distance=0.34),
 {auxiliary_labels}        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
+def _congruent_triangles_scene(problem: str, animate: bool) -> str | None:
+    """Draw two explicitly requested congruent triangles with full correspondence marks."""
+    congruent_pairs = _explicit_congruent_triangles(problem)
+    if not congruent_pairs:
+        return None
+    first, second = congruent_pairs[0]
+
+    A, B, C = first
+    D, E, F = second
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, interior_angle_marker, safe_point_label, upright_polygon_check
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        {A} = np.array([-4.0, 2.3, 0.0])
+        {B} = np.array([-5.2, -1.7, 0.0])
+        {C} = np.array([-1.0, -1.7, 0.0])
+        offset = np.array([5.9, 0.0, 0.0])
+        {D} = {A} + offset
+        {E} = {B} + offset
+        {F} = {C} + offset
+        upright_polygon_check([{A}, {B}, {C}], names="{first}")
+        upright_polygon_check([{D}, {E}, {F}], names="{second}")
+        self.add(
+            Line({A}, {B}), Line({B}, {C}), Line({C}, {A}),
+            Line({D}, {E}), Line({E}, {F}), Line({F}, {D}),
+            equal_segment_marks(({A}, {B}), ({D}, {E}), count=1),
+            equal_segment_marks(({B}, {C}), ({E}, {F}), count=2),
+            equal_segment_marks(({C}, {A}), ({F}, {D}), count=3),
+            interior_angle_marker([{A}, {B}, {C}], 0, mark_count=1),
+            interior_angle_marker([{D}, {E}, {F}], 0, mark_count=1),
+            interior_angle_marker([{A}, {B}, {C}], 1, mark_count=2),
+            interior_angle_marker([{D}, {E}, {F}], 1, mark_count=2),
+            interior_angle_marker([{A}, {B}, {C}], 2, mark_count=3),
+            interior_angle_marker([{D}, {E}, {F}], 2, mark_count=3),
+            *[Dot(point) for point in ({A}, {B}, {C}, {D}, {E}, {F})],
+            safe_point_label({A}, "{A}", {B}, {C}),
+            safe_point_label({B}, "{B}", {A}, {C}),
+            safe_point_label({C}, "{C}", {A}, {B}),
+            safe_point_label({D}, "{D}", {E}, {F}),
+            safe_point_label({E}, "{E}", {D}, {F}),
+            safe_point_label({F}, "{F}", {D}, {E}),
+        )
         fit_scene_to_frame(self)
         {wait}
 '''
@@ -1192,6 +1264,12 @@ def validate_code(code: str, problem: str | None = None) -> None:
             for left, right in _explicit_segment_equality_pairs(drawing_facts)
         ]
         given_equal_pairs = list(stated_equalities)
+        for first, second in _explicit_congruent_triangles(drawing_facts):
+            given_equal_pairs.extend((
+                (tuple(sorted((first[0], first[1]))), tuple(sorted((second[0], second[1])))),
+                (tuple(sorted((first[1], first[2]))), tuple(sorted((second[1], second[2])))),
+                (tuple(sorted((first[2], first[0]))), tuple(sorted((second[2], second[0])))),
+            ))
         parent_equalities = {frozenset((left, right)) for left, right in stated_equalities}
         for match in re.finditer(
             r"tam\s+giác\s+([A-Z]{3})\s+(?:vuông\s+)?cân\s+tại\s+([A-Z])",
@@ -2679,7 +2757,8 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
-        _right_isosceles_altitude_midpoints_scene(problem, animate)
+        _congruent_triangles_scene(problem, animate)
+        or _right_isosceles_altitude_midpoints_scene(problem, animate)
         or _triangle_point_with_two_parallels_scene(problem, animate)
         or _triangle_median_with_trisected_side_scene(problem, animate)
         or _midradius_perpendicular_chord_tangent_scene(problem, animate)

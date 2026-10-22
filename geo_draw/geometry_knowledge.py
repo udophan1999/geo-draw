@@ -53,6 +53,11 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   label beside it. A conclusion to prove (for example, EFGH is a rectangle) gets no right-angle square.
 - All explicitly equal segments share one tick style and one equality group. Unrelated or unequal
   segments never share a tick style. Do not infer visible side ticks from a standard shape name.
+- When the task explicitly gives or requests congruent objects, mark every corresponding part.
+  For congruent triangles ABC and DEF, correspondence follows the written order: A-D, B-E, C-F.
+  Mark AB-DE, BC-EF, CA-FD with matching tick styles and mark angles A-D, B-E, C-F with matching
+  arc styles; use distinct styles for the three independent pairs. Omit all such marks when the
+  congruence itself is only a conclusion that students still have to prove.
 - Every stated midpoint gets its own midpoint_marker covering both halves. Midpoints of equal parent
   segments share a style; an unrelated midpoint relation uses a different style. Never overlay a
   proof-conclusion equality group on segments already marked by a midpoint helper.
