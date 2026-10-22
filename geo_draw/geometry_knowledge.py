@@ -32,6 +32,10 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   are concyclic or a quadrilateral is cyclic, do not draw the claimed circle. Likewise do not
   add equality ticks, equal-angle arcs, parallel marks, right-angle squares, tangency marks, or
   incidence marks that occur only in the conclusion. Draw them only when stated in the givens.
+- When a proof task explicitly names a segment whose endpoints are already defined (for example
+  prove DC parallel EM), connect those endpoints automatically so the student can use the segment.
+  Draw a named intersection such as I when the task states DC intersects AM at I. Do not add the
+  parallel, equality, midpoint, cyclic, or other relationship mark that remains to be proved.
 - If a problem refers to a numbered figure but only the text is available, do not invent the
   positions of unnamed-in-givens points such as E, F, G, H. Ask for the actual figure or its
   precise point/line relations before generating geometry.

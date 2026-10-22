@@ -560,11 +560,28 @@ def _triangle_median_with_trisected_side_scene(
     ):
         return None
 
+    draws_dc_em = "DCEM" in compact
+    draws_intersection_i = "DCCATAMTAII" in compact
+    auxiliary_definitions = ""
+    auxiliary_lines = ""
+    auxiliary_points = ""
+    auxiliary_labels = ""
+    other_points = "(A, D, E)"
+    if draws_dc_em or draws_intersection_i:
+        auxiliary_lines = "            Line(D, C), Line(E, M),\n"
+    if draws_intersection_i:
+        auxiliary_definitions = "        I = ray_intersection(D, C - D, A, M - A)\n"
+        auxiliary_points = " Dot(I),"
+        auxiliary_labels = (
+            '            safe_point_label(I, "I", A, C, D, M, distance=0.34),\n'
+        )
+        other_points = "(A, D, E, I)"
+
     # Keep BC horizontal and use affine division so all incidences and equalities are exact.
     wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
     return f'''from manim import *
 import numpy as np
-from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, median_segment, midpoint_marker, safe_point_label
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, median_segment, midpoint_marker, ray_intersection, safe_point_label
 
 class GeoScene(Scene):
     def construct(self):
@@ -575,19 +592,19 @@ class GeoScene(Scene):
         M = (B + C) / 2.0
         D = A + (B - A) / 3.0
         E = A + 2.0 * (B - A) / 3.0
-        self.add(
-            Line(A, B), Line(B, C), Line(C, A),
+{auxiliary_definitions}        self.add(
+{auxiliary_lines}            Line(A, B), Line(B, C), Line(C, A),
             median_segment(A, M, B, C),
-            midpoint_marker(M, B, C, other_points=(A, D, E), count=1),
+            midpoint_marker(M, B, C, other_points={other_points}, count=1),
             equal_segment_marks((A, D), (D, E), (E, B), count=2),
-            Dot(A), Dot(B), Dot(C), Dot(M), Dot(D), Dot(E),
+            Dot(A), Dot(B), Dot(C), Dot(M), Dot(D), Dot(E),{auxiliary_points}
             safe_point_label(A, "A", B, C, M, D, E),
             safe_point_label(B, "B", A, C, M, D, E),
             safe_point_label(C, "C", A, B, M),
             safe_point_label(M, "M", A, B, C, distance=0.38),
             safe_point_label(D, "D", A, B, E, distance=0.34),
             safe_point_label(E, "E", A, B, D, distance=0.34),
-        )
+{auxiliary_labels}        )
         fit_scene_to_frame(self)
         {wait}
 '''
