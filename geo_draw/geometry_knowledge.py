@@ -58,6 +58,10 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   Mark AB-DE, BC-EF, CA-FD with matching tick styles and mark angles A-D, B-E, C-F with matching
   arc styles; use distinct styles for the three independent pairs. Omit all such marks when the
   congruence itself is only a conclusion that students still have to prove.
+- For a basic request with unspecified or "arbitrary" measurements, choose a conventional,
+  readable valid figure automatically and complete every object named in the request. Never stop
+  to ask the student to invent side lengths or angles. Unless a special type is stated, choose an
+  ordinary figure visibly separated from isosceles, equilateral, right, or other special cases.
 - Every stated midpoint gets its own midpoint_marker covering both halves. Midpoints of equal parent
   segments share a style; an unrelated midpoint relation uses a different style. Never overlay a
   proof-conclusion equality group on segments already marked by a midpoint helper.

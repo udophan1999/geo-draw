@@ -175,6 +175,10 @@ Exact construction requirements:
   matching tick counts on AB-DE, BC-EF, CA-FD and matching arc counts on angles A-D, B-E, C-F.
   Use a different count for each independent corresponding pair so students can read the mapping.
   Do not add these congruence marks when congruence is only a conclusion to be proved.
+- For a basic drawing request with unspecified or "arbitrary" lengths/angles, choose a valid,
+  readable ordinary configuration automatically and finish the drawing. Do not ask the student
+  to choose measurements first. Keep unstated triangles clearly scalene and non-right and keep
+  every explicitly named object, equality, angle, segment, and marker from the request.
 - For all mathematical markers and special lines, use the verified helpers from
   `geo_draw.geometry_primitives`: apply_light_theme, interior_angle_marker, equal_segment_marks,
   parallel_segment_marks, midpoint_marker, median_segment, altitude_segment,
@@ -648,10 +652,10 @@ from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks,
 class GeoScene(Scene):
     def construct(self):
         apply_light_theme(self)
-        {A} = np.array([-4.0, 2.3, 0.0])
-        {B} = np.array([-5.2, -1.7, 0.0])
-        {C} = np.array([-1.0, -1.7, 0.0])
-        offset = np.array([5.9, 0.0, 0.0])
+        {A} = np.array([-3.4, 1.5, 0.0])
+        {B} = np.array([-4.0, -1.5, 0.0])
+        {C} = np.array([0.0, -1.5, 0.0])
+        offset = np.array([4.8, 0.0, 0.0])
         {D} = {A} + offset
         {E} = {B} + offset
         {F} = {C} + offset
