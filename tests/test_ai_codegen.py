@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import patch
 
+import numpy as np
+
 from geo_draw.ai_codegen import (
     AiSettings,
     SYSTEM_PROMPT,
@@ -23,6 +25,7 @@ from geo_draw.geometry_knowledge import (
     MIDDLE_SCHOOL_GEOMETRY_RULES,
     THCS_GEOMETRY_CURRICULUM_VI,
 )
+from geo_draw.geometry_primitives import ordinary_polygon_check
 
 
 SAFE_CODE = """from manim import *
@@ -57,6 +60,17 @@ class AiCodegenTests(unittest.TestCase):
         result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
         self.assertTrue(result.ok, result.error)
         request_chat.assert_not_called()
+        self.assertIn("A = np.array([-3.4, 1.5, 0.0])", result.code)
+        self.assertIn("B = np.array([-4.0, -1.5, 0.0])", result.code)
+        self.assertIn("C = np.array([0.0, -1.5, 0.0])", result.code)
+        ordinary_polygon_check(
+            (
+                np.array([-3.4, 1.5, 0.0]),
+                np.array([-4.0, -1.5, 0.0]),
+                np.array([0.0, -1.5, 0.0]),
+            ),
+            names="ABC",
+        )
         for expected in (
             "equal_segment_marks((A, B), (D, E), count=1)",
             "equal_segment_marks((B, C), (E, F), count=2)",
@@ -627,6 +641,7 @@ class GeoScene(Scene):
             "each carrier may be drawn as one whole segment or as the two visible halves",
             "connect those endpoints automatically so the student can use the segment",
             "mark every corresponding part",
+            'unspecified or "arbitrary" measurements',
         ):
             self.assertIn(remembered_rule, DRAWING_ERROR_MEMORY)
 
