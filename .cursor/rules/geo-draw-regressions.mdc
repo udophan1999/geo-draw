@@ -16,6 +16,8 @@ alwaysApply: true
 - Chỉ vẽ ô vuông cho quan hệ vuông góc thuộc dữ kiện; kết luận cần chứng minh không được tự gắn ký hiệu.
 - Một quan hệ vuông góc đã cho chỉ có một ô vuông; các quan hệ đã cho khác nhau có ô riêng.
 - Các đoạn bằng nhau dùng cùng số vạch; các nhóm không bằng nhau không được dùng chung kiểu.
+- So sánh cả vạch do `equal_segment_marks` và `midpoint_marker` tạo ra: hai lớp độc lập phải dùng
+  số vạch khác nhau. Ví dụ AB=AC dùng một vạch thì BM=CM do M là trung điểm BC phải dùng hai vạch.
 - Mỗi dữ kiện trung điểm phải đánh dấu đúng cả hai nửa; không chồng thêm bộ vạch khác lên chúng.
 - Nếu một nửa đoạn trung điểm chứa thêm điểm có tên, ẩn cả hai vạch và chỉ kiểm tra bằng tọa độ.
 - Trung điểm của hai đoạn bằng nhau dùng cùng kiểu; quan hệ trung điểm độc lập dùng kiểu khác.

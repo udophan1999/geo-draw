@@ -170,6 +170,10 @@ Exact construction requirements:
   Never mark the same segment in two calls, never mix unrelated segments in a call, and give
   different equality classes different counts. Example: if AB=CD and EF=GH are separately stated,
   use count=1 for `(A,B),(C,D)` and count=2 for `(E,F),(G,H)`.
+- Midpoint ticks are equality marks too. Compare their count with every `equal_segment_marks`
+  group, not only with other midpoint groups. For example, if AB=AC and M is the midpoint of BC,
+  AB,AC may use count=1 while BM,CM must use count=2; identical ticks would falsely claim all four
+  segments are equal.
 - If the request explicitly gives or asks to draw congruent objects, show all corresponding data.
   For `triangle ABC congruent to triangle DEF`, preserve the stated order A-D, B-E, C-F; draw
   matching tick counts on AB-DE, BC-EF, CA-FD and matching arc counts on angles A-D, B-E, C-F.
@@ -1131,6 +1135,14 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 if isinstance(element, ast.Name)
             },
         })
+
+    for segment_keys, equality_count in equality_groups:
+        for midpoint_info in midpoint_call_info:
+            if segment_keys and equality_count == midpoint_info["count"]:
+                raise ValueError(
+                    "Nhóm cạnh bằng nhau và hai nửa của một đoạn có trung điểm phải dùng "
+                    "số vạch khác nhau; cùng kiểu vạch sẽ khẳng định sai rằng mọi đoạn đều bằng nhau."
+                )
 
     perpendicular_marker_keys = set()
     for call in perpendicular_intersection_calls:
