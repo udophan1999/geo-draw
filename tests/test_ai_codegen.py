@@ -5,6 +5,7 @@ from geo_draw.ai_codegen import (
     AiSettings,
     SYSTEM_PROMPT,
     _drawing_facts_text,
+    _explicit_congruent_triangles,
     _explicit_segment_equality_pairs,
     _ensure_light_theme,
     _normalize_geometry_notation,
@@ -35,6 +36,40 @@ class GeoScene(Scene):
 
 
 class AiCodegenTests(unittest.TestCase):
+    def test_congruent_triangle_correspondence_uses_written_vertex_order(self):
+        self.assertEqual(
+            _explicit_congruent_triangles("Vẽ hai tam giác ABC và DEF bằng nhau."),
+            [("ABC", "DEF")],
+        )
+        self.assertEqual(
+            _explicit_congruent_triangles(
+                "Cho tam giác ABC và DEF. Chứng minh hai tam giác ABC và DEF bằng nhau."
+            ),
+            [],
+        )
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_congruent_triangles_show_all_corresponding_side_and_angle_marks(self, request_chat):
+        problem = (
+            "Vẽ hai tam giác ABC và DEF bằng nhau, kí hiệu các cặp cạnh tương ứng "
+            "và các góc bằng nhau."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        for expected in (
+            "equal_segment_marks((A, B), (D, E), count=1)",
+            "equal_segment_marks((B, C), (E, F), count=2)",
+            "equal_segment_marks((C, A), (F, D), count=3)",
+            "interior_angle_marker([A, B, C], 0, mark_count=1)",
+            "interior_angle_marker([D, E, F], 0, mark_count=1)",
+            "interior_angle_marker([A, B, C], 1, mark_count=2)",
+            "interior_angle_marker([D, E, F], 1, mark_count=2)",
+            "interior_angle_marker([A, B, C], 2, mark_count=3)",
+            "interior_angle_marker([D, E, F], 2, mark_count=3)",
+        ):
+            self.assertIn(expected, result.code)
+
     def test_segment_equality_chain_keeps_every_adjacent_relation(self):
         self.assertEqual(
             _explicit_segment_equality_pairs("Cho AD = DE = EB và MN bằng NP."),
@@ -591,6 +626,7 @@ class GeoScene(Scene):
             "Define, dot, label, and connect every named point",
             "each carrier may be drawn as one whole segment or as the two visible halves",
             "connect those endpoints automatically so the student can use the segment",
+            "mark every corresponding part",
         ):
             self.assertIn(remembered_rule, DRAWING_ERROR_MEMORY)
 
