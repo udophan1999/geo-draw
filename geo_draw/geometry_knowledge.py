@@ -53,6 +53,9 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   label beside it. A conclusion to prove (for example, EFGH is a rectangle) gets no right-angle square.
 - All explicitly equal segments share one tick style and one equality group. Unrelated or unequal
   segments never share a tick style. Do not infer visible side ticks from a standard shape name.
+- Equality ticks from midpoint_marker must also differ from unrelated side-equality ticks. For
+  example, AB=AC dùng một vạch thì BM=CM from midpoint M of BC must use two vạch; otherwise the
+  diagram falsely communicates AB=AC=BM=CM.
 - When the task explicitly gives or requests congruent objects, mark every corresponding part.
   For congruent triangles ABC and DEF, correspondence follows the written order: A-D, B-E, C-F.
   Mark AB-DE, BC-EF, CA-FD with matching tick styles and mark angles A-D, B-E, C-F with matching
@@ -130,6 +133,10 @@ BASIC OBJECTS AND RELATIONS
 - Segment equality is transitive. Build complete equality classes before marking: if AD=BC and
   EB=BC, draw AD, BC, and EB together with one identical tick count. Never draw a second marker
   over BC. Use a different tick count for a separate class such as AB=CD.
+- Treat the two halves identified by a midpoint as their own equality class. Its tick count must
+  differ from every unrelated side-equality class. Thus AB=AC and midpoint M of BC require one
+  shared style on AB,AC and a different shared style on BM,CM; reusing one style falsely states
+  AB=AC=BM=CM.
 
 GENERAL POLYGONS
 - A polygon named A1 A2 ... An has its vertices in boundary order. Connect consecutive

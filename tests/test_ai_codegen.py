@@ -90,6 +90,45 @@ class AiCodegenTests(unittest.TestCase):
             [("AD", "DE"), ("DE", "EB"), ("MN", "NP")],
         )
 
+    def test_side_equality_and_unrelated_midpoint_use_distinct_tick_counts(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, midpoint_marker, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 3.0, 0.0])
+        B = np.array([-2.0, 0.0, 0.0])
+        C = np.array([2.0, 0.0, 0.0])
+        M = (B + C) / 2.0
+        self.add(
+            Line(A, B), Line(B, C), Line(C, A), Line(A, M),
+            equal_segment_marks((A, B), (A, C), count=1),
+            midpoint_marker(M, B, C, other_points=(A,), count=1),
+            Dot(A), Dot(B), Dot(C), Dot(M),
+            safe_point_label(A, "A", B, C, M),
+            safe_point_label(B, "B", A, C, M),
+            safe_point_label(C, "C", A, B, M),
+            safe_point_label(M, "M", A, B, C),
+        )
+        fit_scene_to_frame(self)
+        self.wait(0.1)
+'''
+        problem = "Tam giác ABC có AB = AC. Gọi M là trung điểm cạnh BC."
+        with self.assertRaisesRegex(ValueError, "số vạch khác nhau"):
+            validate_code(code, problem=problem)
+
+        corrected = code.replace(
+            "midpoint_marker(M, B, C, other_points=(A,), count=1)",
+            "midpoint_marker(M, B, C, other_points=(A,), count=2)",
+        )
+        validate_code(corrected, problem=problem)
+
+    def test_memory_distinguishes_side_equality_from_midpoint_equality(self):
+        self.assertIn("AB=AC=BM=CM", MIDDLE_SCHOOL_GEOMETRY_RULES)
+        self.assertIn("AB=AC dùng một vạch", DRAWING_ERROR_MEMORY)
+
     @patch("geo_draw.ai_codegen._request_chat")
     def test_triangle_median_and_trisected_side_are_built_exactly_without_ai(self, request_chat):
         problem = (
@@ -1102,8 +1141,8 @@ class GeoScene(Scene):
         self.add(Line(A, B), Line(B, C), Line(C, A))
         self.add(Line(D, I), Line(I, C), median_segment(A, M, B, C))
         self.add(Line(E, M))
-        self.add(midpoint_marker(M, B, C, other_points=(A, D, E, I)))
-        self.add(equal_segment_marks((A, D), (D, E), (E, B)))
+        self.add(midpoint_marker(M, B, C, other_points=(A, D, E, I), count=1))
+        self.add(equal_segment_marks((A, D), (D, E), (E, B), count=2))
         self.add(*[Dot(point) for point in (A, B, C, D, E, M, I)])
         self.add(*[safe_point_label(point, name) for point, name in (
             (A, "A"), (B, "B"), (C, "C"), (D, "D"), (E, "E"),
