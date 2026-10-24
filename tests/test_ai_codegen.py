@@ -719,8 +719,19 @@ class GeoScene(Scene):
             "connect those endpoints automatically so the student can use the segment",
             "mark every corresponding part",
             'unspecified or "arbitrary" measurements',
+            "Classify missing information before stopping",
+            "visual degrees of freedom",
+            "Request clarification only if unresolved alternatives change a named incidence",
         ):
             self.assertIn(remembered_rule, DRAWING_ERROR_MEMORY)
+
+        for flexible_reading_rule in (
+            "Separate mathematical facts from harmless drawing choices",
+            "choose any free visual parameter",
+            "Do not ask the student to decide these visual parameters",
+            "must never create an unstated mathematical fact",
+        ):
+            self.assertIn(flexible_reading_rule, SYSTEM_PROMPT)
 
     def test_complete_thcs_geometry_curriculum_is_shared_by_prompt_and_help(self):
         required_units = (

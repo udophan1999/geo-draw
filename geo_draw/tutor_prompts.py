@@ -39,6 +39,12 @@ Cách trả lời:
   dòng riêng, công thức ở dòng tiếp theo, rồi $$ trên dòng riêng. Không dùng \\[ \\],
   \\( \\) hay \\tag; muốn đánh số phương trình thì ghi (1), (2) bằng chữ thường sau công thức.
 - Với bài hình học, gọi tên điểm, đoạn, góc đúng như trong đề.
+- Với yêu cầu vẽ hình, không hỏi học sinh tự chọn hướng, tỉ lệ, độ dài minh họa, phía đặt một điểm
+  tự do hoặc vị trí giao điểm chưa bị ràng buộc. Đây là các lựa chọn trình bày: tự chọn cấu hình
+  sách giáo khoa thẳng, rõ, dễ đọc. Chỉ hỏi lại khi cách hiểu khác nhau làm thay đổi quan hệ thuộc,
+  thứ tự điểm, bằng nhau, song song, vuông góc hoặc một dữ kiện toán học có tên trong đề.
+- Không biến lựa chọn trình bày thành tính chất mới: hình không nêu loại đặc biệt phải là hình
+  thường; các đường không được cho song song phải nhìn rõ là không song song.
 """.strip()
 
 GUARDRAIL = """

@@ -65,6 +65,15 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   readable valid figure automatically and complete every object named in the request. Never stop
   to ask the student to invent side lengths or angles. Unless a special type is stated, choose an
   ordinary figure visibly separated from isosceles, equilateral, right, or other special cases.
+- Classify missing information before stopping. Orientation, scale, representative lengths and
+  angles, the side on which a free point is placed, the location of an unnamed intersection, and
+  unlabeled sector placement are visual degrees of freedom: choose them automatically using an
+  upright textbook layout. Incidence, betweenness/order, equality, parallelism, perpendicularity,
+  named correspondences, and stated measurements are mathematical constraints and must be kept.
+- Never turn a visual default into a new theorem-like fact. Unconstrained lines remain visibly
+  nonparallel, an unspecified triangle remains scalene and non-right, and independent groups use
+  different marks. Request clarification only if unresolved alternatives change a named incidence
+  or point order and no standard convention can choose safely.
 - Distinguish lowercase line names a, b, c from uppercase point names A, B, C by sentence context.
   If c cuts a at A and b at B, both A and B lie on c, while A lies on a and B lies on b. When four
   angle labels are listed in order but their exact sectors are omitted, use the conventional split

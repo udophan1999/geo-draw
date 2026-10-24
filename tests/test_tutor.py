@@ -53,6 +53,8 @@ class PromptTests(unittest.TestCase):
         self.assertIn("Mỗi lượt chỉ đặt đúng MỘT câu hỏi", prompt)
         self.assertIn("không tách một bước thành hàng loạt câu hỏi", prompt)
         self.assertIn("dữ kiện hoặc kết quả trước → định lý/tính chất → kết luận mới", prompt)
+        self.assertIn("không hỏi học sinh tự chọn hướng, tỉ lệ", prompt)
+        self.assertIn("Không biến lựa chọn trình bày thành tính chất mới", prompt)
         self.assertIn("[[bac:N]]", prompt)  # the tutor reports progress
         self.assertNotIn("[[bac:N]]", build_system_prompt(TRIANGLE, SOLUTION, 2))
 
