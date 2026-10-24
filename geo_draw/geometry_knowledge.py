@@ -18,6 +18,8 @@ GEOMETRY_HELP_VI = """
 - Góc 90° chỉ dùng một ô vuông nhỏ ở đỉnh; không vẽ cung và không ghi thêm số đo 90°.
 - Bộ nhớ chống lặp lỗi luôn kiểm tra: đủ điểm và đường, nét liền, nhãn thoáng, hình không tràn khung,
   đúng nhóm đoạn bằng nhau, đúng số ký hiệu góc và đúng số ô vuông tại mỗi quan hệ vuông góc.
+  Nhãn điểm, số góc, số đo và ký hiệu phải có khoảng trống riêng; không được chạm hoặc chồng lên
+  nhau, lên chấm điểm hay lên đường hình học.
 """
 
 

@@ -75,6 +75,8 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("labels_at_A = VGroup", result.code)
         self.assertIn("labels_at_B = VGroup", result.code)
         self.assertNotIn("Angle(", result.code)
+        self.assertIn('Text("A", font_size=27).move_to(A + np.array([0.0, -0.82, 0.0]))', result.code)
+        self.assertIn('Text("B", font_size=27).move_to(B + np.array([0.0, -0.82, 0.0]))', result.code)
         for number in "1234":
             self.assertEqual(result.code.count(f'Text("{number}"'), 2)
 

@@ -25,6 +25,8 @@ alwaysApply: true
 - Ký hiệu song song chỉ để kiểm chứng, không vẽ mũi tên lên đoạn thẳng.
 - Đường thẳng phải được kéo dài tới giao điểm ngoài đoạn khi đề nói chúng cắt nhau tại đó.
 - Mọi điểm trong đề phải được dựng, chấm và ghi tên; nhãn không được chạm đường, phần kéo dài hoặc ký hiệu.
+- Mỗi nhãn điểm, số góc, số đo và ký hiệu phải chiếm vùng trống riêng; không được chạm hoặc chồng
+  lên nhãn khác, chấm điểm, đường thẳng hay ký hiệu. Sau khi thêm ký hiệu mới phải dời các nhãn lân cận.
 - Nhãn giao điểm trong như E, F, G, H phải gần chấm điểm, không bị đẩy sang vùng xa.
 - Hình và các điểm phụ phải cân đối, đủ thoáng, không tràn khung và vẫn zoom được.
 - Dùng các helper đã kiểm chứng; thêm kiểm thử hồi quy cho mọi lỗi hình học mới được sửa.

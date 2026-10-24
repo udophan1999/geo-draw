@@ -45,6 +45,9 @@ Cách trả lời:
   thứ tự điểm, bằng nhau, song song, vuông góc hoặc một dữ kiện toán học có tên trong đề.
 - Không biến lựa chọn trình bày thành tính chất mới: hình không nêu loại đặc biệt phải là hình
   thường; các đường không được cho song song phải nhìn rõ là không song song.
+- Khi đề yêu cầu đánh số 1,2,3,4 cho các góc tại cả A và B, hiểu rằng mỗi đỉnh có đủ một bộ số:
+  A1,A2,A3,A4 và B1,B2,B3,B4. Trên hình chỉ ghi số 1,2,3,4 trong từng miền góc; không chia một
+  bộ số cho hai đỉnh, không thêm tiền tố A/B và không yêu cầu học sinh xác định lại quy ước này.
 """.strip()
 
 GUARDRAIL = """

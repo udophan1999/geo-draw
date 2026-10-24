@@ -55,6 +55,9 @@ class PromptTests(unittest.TestCase):
         self.assertIn("dữ kiện hoặc kết quả trước → định lý/tính chất → kết luận mới", prompt)
         self.assertIn("không hỏi học sinh tự chọn hướng, tỉ lệ", prompt)
         self.assertIn("Không biến lựa chọn trình bày thành tính chất mới", prompt)
+        self.assertIn("mỗi đỉnh có đủ một bộ số", prompt)
+        self.assertIn("không chia một", prompt)
+        self.assertIn("bộ số cho hai đỉnh", prompt)
         self.assertIn("[[bac:N]]", prompt)  # the tutor reports progress
         self.assertNotIn("[[bac:N]]", build_system_prompt(TRIANGLE, SOLUTION, 2))
 
