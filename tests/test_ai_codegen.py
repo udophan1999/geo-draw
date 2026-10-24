@@ -12,6 +12,7 @@ from geo_draw.ai_codegen import (
     _ensure_light_theme,
     _normalize_geometry_notation,
     _ordinary_polygons,
+    _transversal_numbered_angles_scene,
     extract_problem_from_image,
     extract_python,
     generate_manim_code,
@@ -39,6 +40,43 @@ class GeoScene(Scene):
 
 
 class AiCodegenTests(unittest.TestCase):
+    def test_transversal_numbered_angles_accepts_flexible_wording(self):
+        variants = (
+            "Vẽ hình: Cho đường thẳng c cắt đường thẳng a tại A, đường thẳng c cắt "
+            "đường thẳng b tại B, đánh dấu các góc ở đỉnh A và B lần lượt là 1, 2, 3, 4. "
+            "Các đường thẳng a và b không được vẽ song song.",
+            "c giao a tại A; c giao b tại B. Kí hiệu các góc 1, 2, 3, 4; "
+            "a không song song với b.",
+            "Đường thẳng a bị đường thẳng c cắt tại A, đường thẳng b bị c cắt tại B. "
+            "Ghi số các góc 1 2 3 4, hai đường thẳng a và b không song song.",
+        )
+        for problem in variants:
+            with self.subTest(problem=problem):
+                code = _transversal_numbered_angles_scene(problem, animate=False)
+                self.assertIsNotNone(code)
+                validate_code(code, problem=problem)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_transversal_numbered_angles_are_drawn_without_ai(self, request_chat):
+        problem = (
+            "vẽ hình: Cho đường thẳng c cắt đường thẳng a tại A, đường thẳng c cắt "
+            "đường thẳng b tại B, đánh dấu các góc ở đỉnh A và B lần lượt là 1, 2, 3, 4. "
+            "Các đường thẳng a và b không được vẽ song song"
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertIn("line_a = infinite_line", result.code)
+        self.assertIn("line_b = infinite_line", result.code)
+        self.assertIn("line_c = infinite_line", result.code)
+        for number in "1234":
+            self.assertIn(f'Text("{number}"', result.code)
+
+    def test_memory_explains_lowercase_lines_and_numbered_angle_default(self):
+        self.assertIn("lowercase line names a, b, c", DRAWING_ERROR_MEMORY)
+        self.assertIn("1,2 at A and 3,4 at B", DRAWING_ERROR_MEMORY)
+        self.assertIn("Không đồng nhất đường thẳng a với điểm A", THCS_GEOMETRY_CURRICULUM_VI)
+
     def test_congruent_triangle_correspondence_uses_written_vertex_order(self):
         self.assertEqual(
             _explicit_congruent_triangles("Vẽ hai tam giác ABC và DEF bằng nhau."),
