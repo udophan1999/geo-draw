@@ -2410,14 +2410,14 @@ def _ensure_stated_right_angle_markers(code: str, problem: str | None) -> str:
 
 
 def _classification_shapes(problem: str | None) -> list[str]:
-    """Return polygons explicitly named in a 'what shape is ...?' proof goal."""
+    """Return every explicitly named polygon whose boundary must be visible."""
     if not problem:
         return []
     folded = _fold_geometry_notation(problem)
     found: list[str] = []
     patterns = (
-        r"TU\s+GIAC\s+([A-Z]{4})\s+(?:LA\s+)?HINH\s+GI",
-        r"TAM\s+GIAC\s+([A-Z]{3})\s+(?:LA\s+)?(?:TAM\s+GIAC|HINH)\s+GI",
+        r"\bTU\s+GIAC\s+([A-Z]{4})(?![A-Z])",
+        r"\bTAM\s+GIAC\s+([A-Z]{3})(?![A-Z])",
     )
     for pattern in patterns:
         for match in re.finditer(pattern, folded):
@@ -2508,7 +2508,7 @@ def _ensure_upright_polygon_checks(code: str, problem: str | None) -> str:
 
 
 def _ensure_classification_shape_edges(code: str, problem: str | None) -> str:
-    """Draw every boundary edge of a polygon whose type students must identify."""
+    """Draw every boundary edge of each triangle/quadrilateral explicitly named in the task."""
     shapes = _classification_shapes(problem)
     if not shapes:
         return code
