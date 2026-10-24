@@ -55,6 +55,9 @@ class AiCodegenTests(unittest.TestCase):
                 code = _transversal_numbered_angles_scene(problem, animate=False)
                 self.assertIsNotNone(code)
                 validate_code(code, problem=problem)
+                self.assertNotIn("Angle(", code)
+                for number in "1234":
+                    self.assertEqual(code.count(f'Text("{number}"'), 2)
 
     @patch("geo_draw.ai_codegen._request_chat")
     def test_transversal_numbered_angles_are_drawn_without_ai(self, request_chat):
@@ -69,12 +72,15 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("line_a = infinite_line", result.code)
         self.assertIn("line_b = infinite_line", result.code)
         self.assertIn("line_c = infinite_line", result.code)
+        self.assertIn("labels_at_A = VGroup", result.code)
+        self.assertIn("labels_at_B = VGroup", result.code)
+        self.assertNotIn("Angle(", result.code)
         for number in "1234":
-            self.assertIn(f'Text("{number}"', result.code)
+            self.assertEqual(result.code.count(f'Text("{number}"'), 2)
 
     def test_memory_explains_lowercase_lines_and_numbered_angle_default(self):
         self.assertIn("lowercase line names a, b, c", DRAWING_ERROR_MEMORY)
-        self.assertIn("1,2 at A and 3,4 at B", DRAWING_ERROR_MEMORY)
+        self.assertIn("A1,A2,A3,A4 and B1,B2,B3,B4", DRAWING_ERROR_MEMORY)
         self.assertIn("Không đồng nhất đường thẳng a với điểm A", THCS_GEOMETRY_CURRICULUM_VI)
 
     def test_congruent_triangle_correspondence_uses_written_vertex_order(self):

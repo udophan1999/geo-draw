@@ -76,8 +76,10 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   or point order and no standard convention can choose safely.
 - Distinguish lowercase line names a, b, c from uppercase point names A, B, C by sentence context.
   If c cuts a at A and b at B, both A and B lie on c, while A lies on a and B lies on b. When four
-  angle labels are listed in order but their exact sectors are omitted, use the conventional split
-  1,2 at A and 3,4 at B and choose readable adjacent sectors consistently; this is enough to draw.
+  angle labels 1,2,3,4 are requested at vertices A and B, repeat the complete set around each
+  intersection: A1,A2,A3,A4 and B1,B2,B3,B4. Number the four sectors consistently around each
+  vertex; never split one set of four labels between the two vertices. On the diagram, write only
+  the numerals 1,2,3,4 inside the corresponding sectors; do not add A/B prefixes or angle arcs.
 - Every stated midpoint gets its own midpoint_marker covering both halves. Midpoints of equal parent
   segments share a style; an unrelated midpoint relation uses a different style. Never overlay a
   proof-conclusion equality group on segments already marked by a midpoint helper.

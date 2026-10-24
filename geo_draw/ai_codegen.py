@@ -362,7 +362,7 @@ def _explicit_congruent_triangles(text: str) -> list[tuple[str, str]]:
 
 
 def _transversal_numbered_angles_scene(problem: str, animate: bool) -> str | None:
-    """Build two nonparallel lines cut by a transversal with four ordered angle labels."""
+    """Build two nonparallel lines cut by a transversal, numbering all four angles at each vertex."""
     folded = _fold_geometry_notation(problem)
     normalized = re.sub(r"[,:;.]", " ", folded)
     normalized = re.sub(r"\s+", " ", normalized).strip()
@@ -408,17 +408,21 @@ class GeoScene(Scene):
         line_a = infinite_line(a_negative, a_positive, half_length=3.4)
         line_b = infinite_line(b_negative, b_positive, half_length=3.4)
         line_c = infinite_line(c_left, c_right, half_length=4.3)
-        angle_1 = Angle(Line(A, c_right), Line(A, a_positive), radius=0.42, other_angle=False, color=BLACK)
-        angle_2 = Angle(Line(A, a_positive), Line(A, c_left), radius=0.48, other_angle=False, color=BLACK)
-        angle_3 = Angle(Line(B, b_positive), Line(B, c_left), radius=0.42, other_angle=False, color=BLACK)
-        angle_4 = Angle(Line(B, c_right), Line(B, b_positive), radius=0.48, other_angle=False, color=BLACK)
+        labels_at_A = VGroup(
+            Text("1", font_size=22).move_to(A + np.array([0.51, 0.23, 0.0])),
+            Text("2", font_size=22).move_to(A + np.array([-0.30, 0.54, 0.0])),
+            Text("3", font_size=22).move_to(A + np.array([-0.51, -0.23, 0.0])),
+            Text("4", font_size=22).move_to(A + np.array([0.30, -0.54, 0.0])),
+        )
+        labels_at_B = VGroup(
+            Text("1", font_size=22).move_to(B + np.array([0.30, 0.54, 0.0])),
+            Text("2", font_size=22).move_to(B + np.array([-0.51, 0.23, 0.0])),
+            Text("3", font_size=22).move_to(B + np.array([-0.30, -0.54, 0.0])),
+            Text("4", font_size=22).move_to(B + np.array([0.51, -0.23, 0.0])),
+        )
         self.add(
             line_a, line_b, line_c,
-            angle_1, angle_2, angle_3, angle_4,
-            Text("1", font_size=24).move_to(A + np.array([0.52, 0.25, 0.0])),
-            Text("2", font_size=24).move_to(A + np.array([-0.38, 0.48, 0.0])),
-            Text("3", font_size=24).move_to(B + np.array([-0.43, 0.34, 0.0])),
-            Text("4", font_size=24).move_to(B + np.array([0.42, 0.48, 0.0])),
+            labels_at_A, labels_at_B,
             Text("a", font_size=25).next_to(line_a.get_end(), UP, buff=0.08),
             Text("b", font_size=25).next_to(line_b.get_end(), UP, buff=0.08),
             Text("c", font_size=25).next_to(line_c.get_end(), RIGHT, buff=0.08),

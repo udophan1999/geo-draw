@@ -29,8 +29,9 @@ alwaysApply: true
 - Hình và các điểm phụ phải cân đối, đủ thoáng, không tràn khung và vẫn zoom được.
 - Dùng các helper đã kiểm chứng; thêm kiểm thử hồi quy cho mọi lỗi hình học mới được sửa.
 - Phân biệt tên đường thẳng chữ thường a,b,c với điểm chữ hoa A,B,C theo ngữ cảnh. Đề “c cắt a tại
-  A, c cắt b tại B” đã đủ để dựng; nếu bốn góc chỉ được liệt kê 1,2,3,4 thì quy ước 1–2 tại A,
-  3–4 tại B và tự chọn các miền góc dễ đọc, không hỏi lại học sinh.
+  A, c cắt b tại B” đã đủ để dựng. Nếu đề yêu cầu đánh số các góc tại A và B là 1,2,3,4 thì mỗi
+  đỉnh phải có đủ bốn góc: A1,A2,A3,A4 và B1,B2,B3,B4; không chia một bộ số cho hai đỉnh. Trên
+  hình chỉ ghi các số 1,2,3,4 trong từng miền góc, không thêm tiền tố A/B và không vẽ cung góc.
 - Mặc định tự chọn mọi tham số trình bày chưa nêu: hướng hình, tỉ lệ, độ dài/góc minh họa, phía đặt
   điểm tự do, vị trí giao điểm không tên và miền đặt nhãn. Không được dùng các lựa chọn này để tự
   thêm quan hệ thuộc, thứ tự, bằng nhau, song song, vuông góc hoặc dạng hình đặc biệt.
