@@ -31,3 +31,8 @@ alwaysApply: true
 - Phân biệt tên đường thẳng chữ thường a,b,c với điểm chữ hoa A,B,C theo ngữ cảnh. Đề “c cắt a tại
   A, c cắt b tại B” đã đủ để dựng; nếu bốn góc chỉ được liệt kê 1,2,3,4 thì quy ước 1–2 tại A,
   3–4 tại B và tự chọn các miền góc dễ đọc, không hỏi lại học sinh.
+- Mặc định tự chọn mọi tham số trình bày chưa nêu: hướng hình, tỉ lệ, độ dài/góc minh họa, phía đặt
+  điểm tự do, vị trí giao điểm không tên và miền đặt nhãn. Không được dùng các lựa chọn này để tự
+  thêm quan hệ thuộc, thứ tự, bằng nhau, song song, vuông góc hoặc dạng hình đặc biệt.
+- Chỉ yêu cầu làm rõ khi hai cách hiểu làm thay đổi quan hệ toán học có tên và không thể giải quyết
+  bằng ngữ cảnh hoặc quy ước hình học THCS; không hỏi học sinh chọn bố cục hay số đo minh họa.

@@ -183,6 +183,16 @@ Exact construction requirements:
   readable ordinary configuration automatically and finish the drawing. Do not ask the student
   to choose measurements first. Keep unstated triangles clearly scalene and non-right and keep
   every explicitly named object, equality, angle, segment, and marker from the request.
+- Separate mathematical facts from harmless drawing choices. Preserve every stated incidence,
+  order, equality, parallelism, perpendicularity, measurement, and shape condition. Automatically
+  choose any free visual parameter the problem leaves open: orientation, scale, representative
+  lengths/angles, which side of a carrier holds an otherwise unconstrained point, where an unnamed
+  line intersection appears, and which readable sectors receive listed labels. Prefer the standard
+  upright textbook layout. Do not ask the student to decide these visual parameters.
+- A free drawing choice must never create an unstated mathematical fact. Keep unrelated lines
+  visibly nonparallel, ordinary triangles scalene and non-right, and independent lengths/angles
+  visually distinct. Ask for clarification only when two interpretations change a named incidence
+  or order relation and neither wording nor a standard convention resolves it.
 - Lowercase letters a, b, c may name lines while uppercase A, B, C name points. Read relations from
   grammar and context, not letter identity. For a numbered-angle request where transversal c meets
   a at A and b at B, distribute labels in written order: 1,2 around A and 3,4 around B. If the
