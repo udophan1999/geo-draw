@@ -65,6 +65,10 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   readable valid figure automatically and complete every object named in the request. Never stop
   to ask the student to invent side lengths or angles. Unless a special type is stated, choose an
   ordinary figure visibly separated from isosceles, equilateral, right, or other special cases.
+- Distinguish lowercase line names a, b, c from uppercase point names A, B, C by sentence context.
+  If c cuts a at A and b at B, both A and B lie on c, while A lies on a and B lies on b. When four
+  angle labels are listed in order but their exact sectors are omitted, use the conventional split
+  1,2 at A and 3,4 at B and choose readable adjacent sectors consistently; this is enough to draw.
 - Every stated midpoint gets its own midpoint_marker covering both halves. Midpoints of equal parent
   segments share a style; an unrelated midpoint relation uses a different style. Never overlay a
   proof-conclusion equality group on segments already marked by a midpoint helper.
@@ -228,6 +232,8 @@ HỆ THỐNG KIẾN THỨC VÀ KÝ HIỆU HÌNH HỌC THCS (LỚP 6–9)
 1. KÝ HIỆU VÀ CÁCH ĐỌC
 - Điểm viết bằng chữ in hoa A, B, C; đường thẳng viết bằng chữ thường a, b hoặc qua hai điểm AB.
   Tia Ox có gốc O và đi qua x; đoạn thẳng AB có hai đầu mút A, B; độ dài viết AB hoặc |AB|.
+- Không đồng nhất đường thẳng a với điểm A sau khi chuẩn hóa chữ hoa/thường; phải giữ loại đối tượng
+  theo cụm “đường thẳng a” và “tại A”. Với “c cắt a tại A, c cắt b tại B”, suy ra A∈a,c và B∈b,c.
 - A ∈ d: A thuộc d; A ∉ d: A không thuộc d; A, B, C thẳng hàng; B nằm giữa A và C.
 - a ∥ b: a song song b; a ⟂ b: a vuông góc b; a ∩ b = {O}: hai đường cắt tại O;
   AB = CD: hai đoạn bằng nhau; AB < CD: độ dài AB nhỏ hơn CD.

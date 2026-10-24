@@ -183,6 +183,11 @@ Exact construction requirements:
   readable ordinary configuration automatically and finish the drawing. Do not ask the student
   to choose measurements first. Keep unstated triangles clearly scalene and non-right and keep
   every explicitly named object, equality, angle, segment, and marker from the request.
+- Lowercase letters a, b, c may name lines while uppercase A, B, C name points. Read relations from
+  grammar and context, not letter identity. For a numbered-angle request where transversal c meets
+  a at A and b at B, distribute labels in written order: 1,2 around A and 3,4 around B. If the
+  exact sectors are not specified, choose a consistent readable convention and draw instead of
+  asking the student to choose positions.
 - For all mathematical markers and special lines, use the verified helpers from
   `geo_draw.geometry_primitives`: apply_light_theme, interior_angle_marker, equal_segment_marks,
   parallel_segment_marks, midpoint_marker, median_segment, altitude_segment,
@@ -299,6 +304,20 @@ def _fold_geometry_notation(text: str) -> str:
     ).replace("Đ", "D")
 
 
+def _has_positive_parallel_relation(text: str) -> bool:
+    """Return whether text states parallelism, ignoring explicitly negated mentions."""
+    folded = _fold_geometry_notation(text)
+    for match in re.finditer(r"//|∥|SONG SONG|PARALLEL", folded):
+        prefix = folded[max(0, match.start() - 40):match.start()]
+        if re.search(
+            r"(?:KHONG|KO|NOT)(?:\s+(?:DUOC|PHAI|VE|THE|CAN|LA)){0,5}\s*$",
+            prefix,
+        ):
+            continue
+        return True
+    return False
+
+
 def _explicit_segment_equality_pairs(text: str) -> list[tuple[str, str]]:
     """Return every adjacent pair in stated chains such as AD = DE = EB."""
     facts = _drawing_facts_text(text)
@@ -330,6 +349,76 @@ def _explicit_congruent_triangles(text: str) -> list[tuple[str, str]]:
             if len(set(first + second)) == 6:
                 pairs.append((first, second))
     return list(dict.fromkeys(pairs))
+
+
+def _transversal_numbered_angles_scene(problem: str, animate: bool) -> str | None:
+    """Build two nonparallel lines cut by a transversal with four ordered angle labels."""
+    folded = _fold_geometry_notation(problem)
+    normalized = re.sub(r"[,:;.]", " ", folded)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    def line_meets(first: str, second: str, point: str) -> bool:
+        patterns = (
+            rf"(?:DUONG THANG )?{first} CAT (?:DUONG THANG )?{second} TAI {point}",
+            rf"(?:DUONG THANG )?{second} BI (?:DUONG THANG )?{first} CAT TAI {point}",
+            rf"{first} GIAO {second} TAI {point}",
+        )
+        return any(re.search(pattern, normalized) for pattern in patterns)
+
+    c_meets_a = line_meets("C", "A", "A")
+    c_meets_b = line_meets("C", "B", "B")
+    nonparallel = bool(re.search(
+        r"(?:A VA B|A B|HAI DUONG(?: THANG)? A VA B).{0,24}KHONG(?: DUOC VE)? SONG SONG"
+        r"|A KHONG SONG SONG(?: VOI)? B",
+        normalized,
+    ))
+    numbered = all(re.search(rf"(?<!\d){number}(?!\d)", normalized) for number in range(1, 5))
+    asks_angles = "GOC" in normalized and any(
+        phrase in normalized for phrase in ("DANH DAU", "KY HIEU", "KI HIEU", "GHI SO", "GHI TEN")
+    )
+    if not (c_meets_a and c_meets_b and nonparallel and numbered and asks_angles):
+        return None
+
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, infinite_line
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-2.0, 0.0, 0.0])
+        B = np.array([2.0, 0.0, 0.0])
+        a_direction = np.array([1.0, 2.2, 0.0])
+        b_direction = np.array([-1.0, 1.6, 0.0])
+        c_direction = np.array([1.0, 0.0, 0.0])
+        a_positive, a_negative = A + a_direction, A - a_direction
+        b_positive, b_negative = B + b_direction, B - b_direction
+        c_left, c_right = A - c_direction, B + c_direction
+        line_a = infinite_line(a_negative, a_positive, half_length=3.4)
+        line_b = infinite_line(b_negative, b_positive, half_length=3.4)
+        line_c = infinite_line(c_left, c_right, half_length=4.3)
+        angle_1 = Angle(Line(A, c_right), Line(A, a_positive), radius=0.42, other_angle=False, color=BLACK)
+        angle_2 = Angle(Line(A, a_positive), Line(A, c_left), radius=0.48, other_angle=False, color=BLACK)
+        angle_3 = Angle(Line(B, b_positive), Line(B, c_left), radius=0.42, other_angle=False, color=BLACK)
+        angle_4 = Angle(Line(B, c_right), Line(B, b_positive), radius=0.48, other_angle=False, color=BLACK)
+        self.add(
+            line_a, line_b, line_c,
+            angle_1, angle_2, angle_3, angle_4,
+            Text("1", font_size=24).move_to(A + np.array([0.52, 0.25, 0.0])),
+            Text("2", font_size=24).move_to(A + np.array([-0.38, 0.48, 0.0])),
+            Text("3", font_size=24).move_to(B + np.array([-0.43, 0.34, 0.0])),
+            Text("4", font_size=24).move_to(B + np.array([0.42, 0.48, 0.0])),
+            Text("a", font_size=25).next_to(line_a.get_end(), UP, buff=0.08),
+            Text("b", font_size=25).next_to(line_b.get_end(), UP, buff=0.08),
+            Text("c", font_size=25).next_to(line_c.get_end(), RIGHT, buff=0.08),
+            Dot(A), Dot(B),
+            Text("A", font_size=27).move_to(A + np.array([0.28, -0.30, 0.0])),
+            Text("B", font_size=27).move_to(B + np.array([-0.28, -0.30, 0.0])),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
 
 
 def _radius_chord_external_point_scene(problem: str, animate: bool) -> str | None:
@@ -1751,8 +1840,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
                         "Không tự đánh dấu cạnh bằng nhau của hình bình hành, hình chữ nhật, "
                         "hình vuông hoặc hình thoi khi đề không cho đẳng thức đó."
                     )
-        if ("//" in drawing_request or "song song" in drawing_request
-                or "parallel" in drawing_request) and "parallel_segment_marks" not in called_names:
+        if (_has_positive_parallel_relation(drawing_facts)
+                and "parallel_segment_marks" not in called_names):
             raise ValueError(
                 "Thiếu kiểm tra quan hệ song song được nêu trực tiếp trong đề bằng "
                 "parallel_segment_marks((A, B), (C, D))."
@@ -2773,7 +2862,8 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
-        _congruent_triangles_scene(problem, animate)
+        _transversal_numbered_angles_scene(problem, animate)
+        or _congruent_triangles_scene(problem, animate)
         or _right_isosceles_altitude_midpoints_scene(problem, animate)
         or _triangle_point_with_two_parallels_scene(problem, animate)
         or _triangle_median_with_trisected_side_scene(problem, animate)
