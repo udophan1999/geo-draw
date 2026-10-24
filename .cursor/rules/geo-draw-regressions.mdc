@@ -24,6 +24,9 @@ alwaysApply: true
 - Không tự đánh dấu cạnh bằng nhau của hình bình hành, chữ nhật, vuông hoặc thoi nếu đề không yêu cầu.
 - Ký hiệu song song chỉ để kiểm chứng, không vẽ mũi tên lên đoạn thẳng.
 - Đường thẳng phải được kéo dài tới giao điểm ngoài đoạn khi đề nói chúng cắt nhau tại đó.
+- Tam giác hoặc tứ giác được gọi tên trong dữ kiện hay phần chứng minh phải được nối đủ chu trình
+  cạnh theo thứ tự tên, kể cả cạnh khép kín. Ví dụ ADEK phải có AD, DE, EK, KA; không tự thêm dấu
+  song song, bằng nhau, vuông góc hay tính chất đặc biệt còn phải chứng minh.
 - Mọi điểm trong đề phải được dựng, chấm và ghi tên; nhãn không được chạm đường, phần kéo dài hoặc ký hiệu.
 - Mỗi nhãn điểm, số góc, số đo và ký hiệu phải chiếm vùng trống riêng; không được chạm hoặc chồng
   lên nhãn khác, chấm điểm, đường thẳng hay ký hiệu. Sau khi thêm ký hiệu mới phải dời các nhãn lân cận.

@@ -36,6 +36,9 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   incidence marks that occur only in the conclusion. Draw them only when stated in the givens.
 - When a proof task explicitly names a segment whose endpoints are already defined (for example
   prove DC parallel EM), connect those endpoints automatically so the student can use the segment.
+  When it names a triangle or quadrilateral, connect every consecutive boundary edge in the written
+  vertex order, including the closing edge (for ADEK: AD, DE, EK, KA), even when the polygon appears
+  only in a proof conclusion. Draw only its boundary, never the special-shape marks to be proved.
   Draw a named intersection such as I when the task states DC intersects AM at I. Do not add the
   parallel, equality, midpoint, cyclic, or other relationship mark that remains to be proved.
 - If a problem refers to a numbered figure but only the text is available, do not invent the
