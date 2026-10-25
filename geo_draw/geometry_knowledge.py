@@ -100,6 +100,10 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
 - Define, dot, label, and connect every named point from the problem. Keep point labels clear of
   incident lines, their extensions, nearby lines, markers, and other labels. Stroke clearance takes
   priority over placing a label outward; a central point name must never sit on a crossing line.
+- Put every point name in the nearest collision-free empty sector around its dot. Use about
+  0.45-0.70 Manim units in ordinary layouts. At a dense intersection with numbered angles or
+  markers, increase only as needed up to about 1.0; never push a label farther away merely to avoid
+  a collision when a nearer clear sector exists.
 - Interior intersection labels such as E, F, G, H stay close to their dots (normally 0.32-0.42
   Manim units); do not push them into unrelated regions merely to avoid a stroke.
 - Keep auxiliary points readable and balanced: neither crowded nor excessively spread out. Fit
@@ -127,8 +131,10 @@ BASIC OBJECTS AND RELATIONS
 - An angle xOy has vertex O and sides rays Ox and Oy. Every angle marker must be centered at O
   and join those actual rays. Never place an angle arc at a segment midpoint.
 - A point dot lies on its lines, but its letter label must not. Place every point name in the
-  widest empty angular sector between all incident sides, diagonals, and auxiliary lines, with
-  enough clearance that no stroke touches the letter.
+  nearest collision-free empty angular sector between all incident sides, diagonals, and auxiliary
+  lines, with enough clearance that no stroke, number, arc, or marker touches the letter. Keep the
+  usual distance around 0.45-0.70 Manim units; dense numbered intersections may use up to about
+  1.0, but no farther unless every nearer sector is blocked.
 - An internal angle bisector starts at the angle vertex and divides the angle into two equal angles.
 - When a vertex is split into sub-angles, number the two parts 1 and 2 beside their matching arcs.
   In a polygon, draw each bisector as one continuous ray from its vertex through every named
