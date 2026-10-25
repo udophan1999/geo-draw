@@ -75,11 +75,13 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("labels_at_A = VGroup", result.code)
         self.assertIn("labels_at_B = VGroup", result.code)
         self.assertNotIn("Angle(", result.code)
-        self.assertIn('Text("A", font_size=24).move_to(A + np.array([0.0, -1.25, 0.0]))', result.code)
-        self.assertIn('Text("B", font_size=24).move_to(B + np.array([0.0, -1.25, 0.0]))', result.code)
-        # Point names sit outside the ring of numbered sectors (whose farthest label is 0.62 away).
+        self.assertIn('Text("A", font_size=24).move_to(A + np.array([0.0, -1.0, 0.0]))', result.code)
+        self.assertIn('Text("B", font_size=24).move_to(B + np.array([0.0, -1.0, 0.0]))', result.code)
+        # Point names stay near the dots but outside the numbered sectors.
         self.assertNotIn('Text("A", font_size=24).move_to(A + np.array([0.0, -0.82, 0.0]))', result.code)
         self.assertNotIn('Text("B", font_size=24).move_to(B + np.array([0.0, -0.82, 0.0]))', result.code)
+        self.assertNotIn('Text("A", font_size=24).move_to(A + np.array([0.0, -1.25, 0.0]))', result.code)
+        self.assertNotIn('Text("B", font_size=24).move_to(B + np.array([0.0, -1.25, 0.0]))', result.code)
         for number in "1234":
             self.assertEqual(result.code.count(f'Text("{number}"'), 2)
 
@@ -87,6 +89,10 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("lowercase line names a, b, c", DRAWING_ERROR_MEMORY)
         self.assertIn("A1,A2,A3,A4 and B1,B2,B3,B4", DRAWING_ERROR_MEMORY)
         self.assertIn("Không đồng nhất đường thẳng a với điểm A", THCS_GEOMETRY_CURRICULUM_VI)
+        self.assertIn("nearest collision-free empty sector", SYSTEM_PROMPT)
+        self.assertIn("0.45-0.70 Manim units", DRAWING_ERROR_MEMORY)
+        self.assertIn("dense numbered intersections may use up to about", MIDDLE_SCHOOL_GEOMETRY_RULES)
+        self.assertIn("1.0, but no farther", MIDDLE_SCHOOL_GEOMETRY_RULES)
 
     def test_congruent_triangle_correspondence_uses_written_vertex_order(self):
         self.assertEqual(

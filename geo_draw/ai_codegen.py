@@ -74,6 +74,10 @@ Rules:
   feet/midpoints do not touch sides, diagonals, or right-angle marks. Example:
   `safe_point_label(H, "H", A, B, D, I, avoid_points=(C, K),`
   `avoid_segments=((A, B), (B, D), (C, D)))`.
+- Put each point name in the nearest collision-free empty sector around its dot. Normally keep the
+  label about 0.45-0.70 Manim units away; at a dense intersection with numbered angles, arcs, or
+  other markers, increase only as needed up to about 1.0. Never solve a collision by pushing the
+  label farther away when a nearer clear sector is available.
 - Follow the requested animation mode exactly.
 
 Exact construction requirements:
@@ -427,8 +431,8 @@ class GeoScene(Scene):
             Text("b", font_size=25).next_to(line_b.get_end(), UP, buff=0.08),
             Text("c", font_size=25).next_to(line_c.get_end(), RIGHT, buff=0.08),
             Dot(A), Dot(B),
-            Text("A", font_size=24).move_to(A + np.array([0.0, -1.25, 0.0])),
-            Text("B", font_size=24).move_to(B + np.array([0.0, -1.25, 0.0])),
+            Text("A", font_size=24).move_to(A + np.array([0.0, -1.0, 0.0])),
+            Text("B", font_size=24).move_to(B + np.array([0.0, -1.0, 0.0])),
         )
         fit_scene_to_frame(self)
         {wait}
