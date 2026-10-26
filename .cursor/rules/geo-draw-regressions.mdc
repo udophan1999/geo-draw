@@ -5,6 +5,9 @@ alwaysApply: true
 
 # Geo-draw: bộ nhớ lỗi đã sửa
 
+- Mỗi lỗi đã được xác nhận và sửa là một hợp đồng chống hồi quy vĩnh viễn: phải ghi thành quy tắc
+  cụ thể, có kiểm thử tái hiện lỗi và giữ kiểm thử đó trong mọi thay đổi sau. Không sửa lỗi mới bằng
+  cách làm tái xuất hiện lỗi cũ, nới lỏng hoặc xóa cơ chế bảo vệ đã có.
 - Mọi thay đổi phải bảo toàn đầy đủ dữ kiện và đối tượng được nêu trong đề.
 - Tam giác đều phải có ba cạnh bằng nhau thật và được kiểm tra số trước khi render; không tự vẽ vạch cạnh.
 - Nền bản vẽ màu trắng; nét, điểm, nhãn và ký hiệu màu đen.

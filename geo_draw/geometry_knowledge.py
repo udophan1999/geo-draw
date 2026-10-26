@@ -20,12 +20,18 @@ GEOMETRY_HELP_VI = """
   đúng nhóm đoạn bằng nhau, đúng số ký hiệu góc và đúng số ô vuông tại mỗi quan hệ vuông góc.
   Nhãn điểm, số góc, số đo và ký hiệu phải có khoảng trống riêng; không được chạm hoặc chồng lên
   nhau, lên chấm điểm hay lên đường hình học.
+- Mỗi lỗi dựng hình đã được xác nhận và sửa phải trở thành quy tắc chống hồi quy lâu dài kèm kiểm
+  thử tái hiện lỗi. Mọi lần sinh hình sau phải tuân thủ toàn bộ các quy tắc đã tích lũy; không được
+  sửa lỗi mới bằng cách làm tái xuất hiện một lỗi cũ.
 """
 
 
 DRAWING_ERROR_MEMORY = r"""
 
 NON-REGRESSION MEMORY -- previously corrected drawing failures:
+- Every confirmed drawing bug and its accepted fix is a permanent regression contract. Preserve
+  the corresponding regression test and all earlier contracts in every later change; never fix a
+  new case by reintroducing an old failure or by weakening/removing its guard.
 - Always use a white canvas and black strokes, dots, labels, and construction marks.
 - Preserve every stated object and condition when later auxiliary objects are added.
 - Treat every a/b/c item after "Chứng minh" as a conclusion, even across line breaks. Never
