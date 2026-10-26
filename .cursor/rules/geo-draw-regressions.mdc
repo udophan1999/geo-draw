@@ -30,6 +30,9 @@ alwaysApply: true
 - Mọi điểm trong đề phải được dựng, chấm và ghi tên; nhãn không được chạm đường, phần kéo dài hoặc ký hiệu.
 - Mỗi nhãn điểm, số góc, số đo và ký hiệu phải chiếm vùng trống riêng; không được chạm hoặc chồng
   lên nhãn khác, chấm điểm, đường thẳng hay ký hiệu. Sau khi thêm ký hiệu mới phải dời các nhãn lân cận.
+- Nếu một miền góc vừa có số thứ tự vừa có số đo, phải xếp theo ba dải bán kính riêng trên tia phân
+  giác của miền: số thứ tự gần đỉnh, cung ở giữa, số đo nằm ngoài cung. Không đặt số góc và số đo
+  cùng hoặc gần cùng tâm; cả hai nhãn không được chạm nhau, chạm cung hay chạm hai cạnh góc.
 - Tên điểm phải nằm trong sector trống gần nhất quanh chấm điểm, thường cách khoảng 0.45-0.70 đơn vị
   Manim. Với giao điểm dày đặc số góc hoặc ký hiệu có thể tăng vừa đủ tới khoảng 1.0; không đẩy nhãn
   ra xa chỉ để tránh va chạm khi vẫn còn sector gần hơn không va chạm.
