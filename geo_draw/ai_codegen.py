@@ -78,6 +78,10 @@ Rules:
   label about 0.45-0.70 Manim units away; at a dense intersection with numbered angles, arcs, or
   other markers, increase only as needed up to about 1.0. Never solve a collision by pushing the
   label farther away when a nearer clear sector is available.
+- When one angle sector contains both its identifying number and a numerical degree measure, use
+  separate radial bands along the sector bisector: the number nearest the vertex, the arc next,
+  and the degree label beyond the arc. Never center the sector number and degree text at the same
+  or adjacent position, and keep both texts clear of the arc and boundary rays.
 - Follow the requested animation mode exactly.
 
 Exact construction requirements:
@@ -366,10 +370,12 @@ def _explicit_congruent_triangles(text: str) -> list[tuple[str, str]]:
 
 
 def _transversal_numbered_angles_scene(problem: str, animate: bool) -> str | None:
-    """Build two nonparallel lines cut by a transversal, numbering all four angles at each vertex."""
+    """Build two lines cut by a transversal, numbering all four angles at each vertex."""
     folded = _fold_geometry_notation(problem)
     normalized = re.sub(r"[,:;.]", " ", folded)
     normalized = re.sub(r"\s+", " ", normalized).strip()
+    normalized_numbers = normalized.translate(str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789"))
+    normalized_numbers = normalized_numbers.replace("_", "")
 
     def line_meets(first: str, second: str, point: str) -> bool:
         patterns = (
@@ -379,21 +385,109 @@ def _transversal_numbered_angles_scene(problem: str, animate: bool) -> str | Non
         )
         return any(re.search(pattern, normalized) for pattern in patterns)
 
-    c_meets_a = line_meets("C", "A", "A")
-    c_meets_b = line_meets("C", "B", "B")
+    combined_meets = bool(re.search(
+        r"(?:DUONG THANG )?C CAT (?:DUONG THANG )?A VA (?:DUONG THANG )?B "
+        r"LAN LUOT TAI A VA B",
+        normalized,
+    ))
+    c_meets_a = line_meets("C", "A", "A") or combined_meets
+    c_meets_b = line_meets("C", "B", "B") or combined_meets
     nonparallel = bool(re.search(
         r"(?:A VA B|A B|HAI DUONG(?: THANG)? A VA B).{0,24}KHONG(?: DUOC VE)? SONG SONG"
         r"|A KHONG SONG SONG(?: VOI)? B",
         normalized,
     ))
+    parallel = _has_positive_parallel_relation(problem)
     numbered = all(re.search(rf"(?<!\d){number}(?!\d)", normalized) for number in range(1, 5))
     asks_angles = "GOC" in normalized and any(
         phrase in normalized for phrase in ("DANH DAU", "KY HIEU", "KI HIEU", "GHI SO", "GHI TEN")
     )
-    if not (c_meets_a and c_meets_b and nonparallel and numbered and asks_angles):
+    if not (c_meets_a and c_meets_b and (nonparallel or parallel) and numbered and asks_angles):
         return None
 
     wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    if parallel:
+        measure_match = re.search(
+            r"(?:GOC\s*)?A\s*2\s*(?:=|BANG)\s*(\d+(?:[.,]\d+)?)\s*(?:°|DO)?",
+            normalized_numbers,
+        )
+        measure = float(measure_match.group(1).replace(",", ".")) if measure_match else None
+        if measure is not None and not 15.0 <= measure <= 165.0:
+            return None
+        if measure is not None and abs(measure - 90.0) <= 0.75:
+            return None
+        drawing_angle = measure if measure is not None else 60.0
+        measured_marker = ""
+        measured_objects = ""
+        if measure is not None:
+            measured_marker = f'''
+        angle_A2 = Angle(
+            Line(A, c_positive), Line(A, a_positive),
+            radius=0.68, color=BLACK, other_angle=False,
+        )
+        degree_A2 = Text("{measure:g}°", font_size=24).move_to(
+            A + 1.15 * angle_two_direction
+        )
+'''
+            measured_objects = "\n            angle_A2, degree_A2,"
+        return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, infinite_line, parallel_segment_marks
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        theta = np.deg2rad({drawing_angle:g})
+        a_direction = np.array([1.0, 0.0, 0.0])
+        b_direction = np.array([1.0, 0.0, 0.0])
+        c_direction = np.array([np.cos(theta), -np.sin(theta), 0.0])
+        A = np.array([-0.8, 1.4, 0.0])
+        B = A + (2.8 / np.sin(theta)) * c_direction
+        a_positive, a_negative = A + a_direction, A - a_direction
+        b_positive, b_negative = B + b_direction, B - b_direction
+        c_positive, c_negative = A + c_direction, A - c_direction
+        line_a = infinite_line(a_negative, a_positive, half_length=4.2)
+        line_b = infinite_line(b_negative, b_positive, half_length=4.2)
+        line_c = infinite_line(c_negative, c_positive, half_length=4.5)
+        angle_one_direction = np.array([
+            np.cos(np.pi - theta / 2), np.sin(np.pi - theta / 2), 0.0
+        ])
+        angle_two_direction = np.array([
+            np.cos(-theta / 2), np.sin(-theta / 2), 0.0
+        ])
+        angle_three_direction = np.array([
+            np.cos(1.5 * np.pi - theta / 2), np.sin(1.5 * np.pi - theta / 2), 0.0
+        ])
+        angle_four_direction = np.array([
+            np.cos((np.pi - theta) / 2), np.sin((np.pi - theta) / 2), 0.0
+        ])
+        labels_at_A = VGroup(
+            Text("1", font_size=22).move_to(A + 0.60 * angle_one_direction),
+            Text("2", font_size=22).move_to(A + 0.36 * angle_two_direction),
+            Text("3", font_size=22).move_to(A + 0.64 * angle_three_direction),
+            Text("4", font_size=22).move_to(A + 0.64 * angle_four_direction),
+        )
+        labels_at_B = VGroup(
+            Text("1", font_size=22).move_to(B + 0.60 * angle_one_direction),
+            Text("2", font_size=22).move_to(B + 0.60 * angle_two_direction),
+            Text("3", font_size=22).move_to(B + 0.64 * angle_three_direction),
+            Text("4", font_size=22).move_to(B + 0.64 * angle_four_direction),
+        )
+{measured_marker}        self.add(
+            line_a, line_b, line_c,
+            parallel_segment_marks((a_negative, a_positive), (b_negative, b_positive), count=1),
+            labels_at_A, labels_at_B,{measured_objects}
+            Text("a", font_size=25).next_to(line_a.get_end(), RIGHT, buff=0.08),
+            Text("b", font_size=25).next_to(line_b.get_end(), RIGHT, buff=0.08),
+            Text("c", font_size=25).next_to(line_c.get_end(), RIGHT, buff=0.08),
+            Dot(A), Dot(B),
+            Text("A", font_size=24).move_to(A + np.array([0.0, 0.95, 0.0])),
+            Text("B", font_size=24).move_to(B + np.array([0.0, 0.95, 0.0])),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
     return f'''from manim import *
 import numpy as np
 from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, infinite_line

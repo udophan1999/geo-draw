@@ -104,6 +104,10 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   0.45-0.70 Manim units in ordinary layouts. At a dense intersection with numbered angles or
   markers, increase only as needed up to about 1.0; never push a label farther away merely to avoid
   a collision when a nearer clear sector exists.
+- If a numbered angle also has a stated degree measure, reserve three separate radial bands along
+  that sector's bisector: number nearest the vertex, arc in the middle, and degree text outside the
+  arc. The number and degree text must never share or nearly share a center, touch each other, cross
+  the arc, or touch either boundary ray.
 - Interior intersection labels such as E, F, G, H stay close to their dots (normally 0.32-0.42
   Manim units); do not push them into unrelated regions merely to avoid a stroke.
 - Keep auxiliary points readable and balanced: neither crowded nor excessively spread out. Fit
@@ -130,6 +134,9 @@ BASIC OBJECTS AND RELATIONS
   stop the carrier at A or B. Apply this convention to every construction of the form "cắt XY tại Z".
 - An angle xOy has vertex O and sides rays Ox and Oy. Every angle marker must be centered at O
   and join those actual rays. Never place an angle arc at a segment midpoint.
+- When a sector has both an angle number and a degree measure, place the number nearest the vertex,
+  the arc at the next radius, and the degree text beyond the arc along the sector bisector. Treat
+  the number, arc, and degree text as three collision regions; never overlay any pair of them.
 - A point dot lies on its lines, but its letter label must not. Place every point name in the
   nearest collision-free empty angular sector between all incident sides, diagonals, and auxiliary
   lines, with enough clearance that no stroke, number, arc, or marker touches the letter. Keep the

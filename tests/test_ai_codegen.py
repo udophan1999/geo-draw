@@ -85,6 +85,25 @@ class AiCodegenTests(unittest.TestCase):
         for number in "1234":
             self.assertEqual(result.code.count(f'Text("{number}"'), 2)
 
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_parallel_transversal_separates_angle_number_and_degree_measure(self, request_chat):
+        problem = (
+            "Cho hai đường thẳng a và b song song với nhau, vẽ đường thẳng c cắt đường thẳng "
+            "a và b lần lượt tại A và B, đánh dấu 4 góc ở đỉnh A và B lần lượt là 1, 2, 3, 4 "
+            "thỏa mãn góc A₂ = 60°."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertIn("parallel_segment_marks", result.code)
+        self.assertIn("angle_A2 = Angle(", result.code)
+        self.assertIn('Text("2", font_size=22).move_to(A + 0.36 * angle_two_direction)', result.code)
+        self.assertIn('Text("60°", font_size=24).move_to(', result.code)
+        self.assertIn("A + 1.15 * angle_two_direction", result.code)
+        self.assertNotIn('Text("2", font_size=22).move_to(A + 1.15 * angle_two_direction)', result.code)
+        for number in "1234":
+            self.assertEqual(result.code.count(f'Text("{number}"'), 2)
+
     def test_memory_explains_lowercase_lines_and_numbered_angle_default(self):
         self.assertIn("lowercase line names a, b, c", DRAWING_ERROR_MEMORY)
         self.assertIn("A1,A2,A3,A4 and B1,B2,B3,B4", DRAWING_ERROR_MEMORY)
@@ -93,6 +112,9 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("0.45-0.70 Manim units", DRAWING_ERROR_MEMORY)
         self.assertIn("dense numbered intersections may use up to about", MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("1.0, but no farther", MIDDLE_SCHOOL_GEOMETRY_RULES)
+        self.assertIn("separate radial bands", SYSTEM_PROMPT)
+        self.assertIn("number nearest the vertex", DRAWING_ERROR_MEMORY)
+        self.assertIn("three collision regions", MIDDLE_SCHOOL_GEOMETRY_RULES)
 
     def test_congruent_triangle_correspondence_uses_written_vertex_order(self):
         self.assertEqual(
