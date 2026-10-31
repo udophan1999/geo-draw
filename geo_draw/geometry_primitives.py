@@ -288,11 +288,13 @@ def triangle_shape_check(first, second, third, names: str,
 
 
 def upright_polygon_check(vertices, names: str, tolerance: float = 0.015):
-    """Require a named polygon to have a truly horizontal boundary side.
+    """Require a named polygon to use a conventional axis-aligned layout.
 
     Middle-school diagrams are easier to parse when the main figure is not
-    globally rotated.  This verifier is invisible; it makes code generation
-    retry with conventional upright coordinates when every side is tilted.
+    globally rotated.  A non-square rhombus is the important exception to the
+    horizontal-boundary rule: its symmetry diagonals must be vertical and
+    horizontal.  This verifier is invisible; it makes code generation retry
+    with conventional upright coordinates when the figure is tilted.
     """
     points = [_point(vertex) for vertex in vertices]
     if len(points) not in (3, 4) or len(names) != len(points):
@@ -302,6 +304,36 @@ def upright_polygon_check(vertices, names: str, tolerance: float = 0.015):
     lengths = [float(np.linalg.norm(side[:2])) for side in sides]
     if min(lengths) < EPS:
         raise ValueError(f"GEOMETRY_UPRIGHT_DEGENERATE: Đa giác {names} có cạnh suy biến.")
+
+    if len(points) == 4:
+        longest_side = max(lengths)
+        all_sides_equal = (
+            max(lengths) - min(lengths) <= tolerance * longest_side
+        )
+        adjacent_at_first = points[-1] - points[0]
+        square_like = abs(float(np.dot(sides[0][:2], adjacent_at_first[:2]))) <= (
+            tolerance * lengths[0] * lengths[-1]
+        )
+        if all_sides_equal and not square_like:
+            first_diagonal = points[2] - points[0]
+            second_diagonal = points[3] - points[1]
+            first_length = float(np.linalg.norm(first_diagonal[:2]))
+            second_length = float(np.linalg.norm(second_diagonal[:2]))
+            axis_aligned = (
+                abs(float(first_diagonal[0])) <= tolerance * first_length
+                and abs(float(second_diagonal[1])) <= tolerance * second_length
+            ) or (
+                abs(float(first_diagonal[1])) <= tolerance * first_length
+                and abs(float(second_diagonal[0])) <= tolerance * second_length
+            )
+            if not axis_aligned:
+                raise ValueError(
+                    f"GEOMETRY_RHOMBUS_TILTED: Hình thoi {names} đang bị nghiêng. "
+                    "Hãy đặt hai đường chéo (các trục đối xứng) theo phương dọc và ngang, "
+                    "với giao điểm ở tâm, rồi tính lại các điểm phụ."
+                )
+            return True
+
     if not any(abs(float(side[1])) <= tolerance * length
                for side, length in zip(sides, lengths)):
         raise ValueError(

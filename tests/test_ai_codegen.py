@@ -117,6 +117,10 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("three collision regions", MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("permanent regression contract", DRAWING_ERROR_MEMORY)
         self.assertIn("sửa lỗi mới bằng cách làm tái xuất hiện một lỗi cũ", GEOMETRY_HELP_VI)
+        self.assertIn("balanced textbook composition", SYSTEM_PROMPT)
+        self.assertIn("a principal symmetry axis must be", DRAWING_ERROR_MEMORY)
+        self.assertIn("align a principal symmetry axis exactly", MIDDLE_SCHOOL_GEOMETRY_RULES)
+        self.assertIn("phải đặt một trục đối xứng chính xác", GEOMETRY_HELP_VI)
 
     def test_congruent_triangle_correspondence_uses_written_vertex_order(self):
         self.assertEqual(

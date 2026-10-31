@@ -46,9 +46,17 @@ Rules:
   have clear negative space. Avoid skinny, excessively wide, or excessively tall shapes and
   near-coincident construction points. Aim for a main-figure bounding-box aspect ratio between
   about 1.2 and 1.8 (never above 2.0), normally 7-9 Manim units wide and 4.5-6.5 units high.
+- Use a balanced textbook composition: center the main construction, distribute negative space
+  evenly, and keep labels and marks visually grouped with their objects without crowding. When
+  orientation is free, align a principal symmetry axis exactly vertically or horizontally, never
+  diagonally or slightly tilted. Aesthetic choices must never alter a stated incidence, length,
+  angle, or relation; additional symmetry axes retain their mathematically required directions.
 - Keep the main figure upright in the conventional textbook orientation; never rotate the whole
   diagram arbitrarily. Every named triangle or quadrilateral must have at least one boundary side
-  exactly horizontal. Normally draw triangle base BC horizontally with A above it. For a right
+  exactly horizontal, except a non-square rhombus whose two symmetry diagonals must be exactly
+  vertical and horizontal. For rhombus ABCD in boundary order, normally put A above, B left, C
+  below, D right, and diagonal intersection O at the center. Normally draw triangle base BC
+  horizontally with A above it. For a right
   triangle, a horizontal leg and a vertical leg are also preferred. Draw trapezoid bases,
   rectangle/square top and bottom sides, chords described as horizontal, and principal baselines
   exactly horizontal. Compute every auxiliary point only after fixing this orientation, and call
