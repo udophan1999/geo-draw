@@ -10,6 +10,11 @@ GEOMETRY_HELP_VI = """
 - Hình thoi: hình bình hành có bốn cạnh bằng nhau.
 - Hình vuông: bốn cạnh bằng nhau và bốn góc vuông.
 - Đa giác đều: các cạnh bằng nhau và các góc bằng nhau.
+- Mặc định dùng bố cục sách giáo khoa cân đối: đặt hình chính gần tâm khung, phân bố khoảng trắng
+  đều, ưu tiên các phương ngang/dọc và không xoay nghiêng toàn bộ hình nếu đề không bắt buộc.
+- Khi đề cho phép chọn hướng, phải đặt một trục đối xứng chính xác theo phương dọc hoặc ngang, không
+  để trục chính bị chéo hay hơi nghiêng. Với hình thoi không phải hình vuông, mặc định đặt cả hai
+  đường chéo là hai trục dọc-ngang; các trục khác vẫn giữ đúng quan hệ hình học bắt buộc.
 - Tam giác vuông lớp 9: dùng định lý Pythagore, các hệ thức cạnh–đường cao–hình chiếu
   và các tỉ số lượng giác sin, cos, tan để giải tọa độ trước khi vẽ.
 - Nếu đường cao từ đỉnh góc vuông xuống cạnh huyền chia cạnh huyền thành hai hình chiếu,
@@ -118,6 +123,14 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   Manim units); do not push them into unrelated regions merely to avoid a stroke.
 - Keep auxiliary points readable and balanced: neither crowded nor excessively spread out. Fit
   the complete figure and exterior labels inside the frame; preserve interactive zoom.
+- Use a balanced textbook composition: keep the main construction near the frame center, distribute
+  negative space evenly, avoid needless global tilt, and keep labels and marks close to the objects
+  they describe without crowding. When orientation is free, a principal symmetry axis must be
+  exactly vertical or horizontal, never diagonal or slightly tilted. Other symmetry axes retain
+  their mathematically required directions. Layout aesthetics never override geometry.
+- For a non-square rhombus ABCD in boundary order with diagonal intersection O, prefer A above,
+  B left, C below, D right, and O at the center, so AC is vertical and BD is horizontal. Do not
+  draw it as a leaning parallelogram when the problem leaves orientation free.
 - A plain triangle or quadrilateral must not accidentally become isosceles, right, a kite, a
   trapezoid, or a parallelogram unless a stated condition forces that special case.
 - A generated scene that violates any item above is invalid and must be regenerated, not rendered.
@@ -180,6 +193,10 @@ BASIC OBJECTS AND RELATIONS
 GENERAL POLYGONS
 - A polygon named A1 A2 ... An has its vertices in boundary order. Connect consecutive
   vertices and connect An back to A1. Never reorder vertices merely to simplify drawing.
+- Use an upright, balanced textbook composition with the main figure near the frame center and
+  clear, even negative space. When orientation is free, align a principal symmetry axis exactly
+  vertically or horizontally. Never leave the principal axis diagonal or almost axis-aligned, and
+  never distort additional axes whose directions are fixed by the geometry.
 - A diagonal joins two non-adjacent vertices. The interior-angle sum is (n-2)*180 degrees.
 - A regular polygon has all sides equal and all interior angles equal; each exterior angle
   is 360/n degrees and each interior angle is (n-2)*180/n degrees.

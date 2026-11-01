@@ -41,6 +41,12 @@ alwaysApply: true
   ra xa chỉ để tránh va chạm khi vẫn còn sector gần hơn không va chạm.
 - Nhãn giao điểm trong như E, F, G, H phải gần chấm điểm, không bị đẩy sang vùng xa.
 - Hình và các điểm phụ phải cân đối, đủ thoáng, không tràn khung và vẫn zoom được.
+- Mặc định dùng bố cục sách giáo khoa: đặt hình chính gần tâm khung, khoảng trắng cân đối, tỉ lệ dễ
+  nhìn, nhãn và ký hiệu gần đúng đối tượng nhưng không chen chúc; không hy sinh dữ kiện hình học để
+  đổi lấy thẩm mỹ và không xoay nghiêng toàn bộ hình khi đề không bắt buộc.
+- Khi đề cho phép chọn hướng, trục đối xứng chính chỉ được đặt chính xác theo phương dọc hoặc ngang,
+  không để chéo hay hơi nghiêng. Các trục còn lại phải giữ đúng quan hệ hình học. Với hình thoi không
+  phải hình vuông, mặc định đặt A trên, B trái, C dưới, D phải, O tại tâm; AC dọc và BD ngang.
 - Dùng các helper đã kiểm chứng; thêm kiểm thử hồi quy cho mọi lỗi hình học mới được sửa.
 - Phân biệt tên đường thẳng chữ thường a,b,c với điểm chữ hoa A,B,C theo ngữ cảnh. Đề “c cắt a tại
   A, c cắt b tại B” đã đủ để dựng. Nếu đề yêu cầu đánh số các góc tại A và B là 1,2,3,4 thì mỗi

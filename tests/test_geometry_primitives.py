@@ -4,6 +4,7 @@ from unittest.mock import patch
 import numpy as np
 from manim import BLACK, WHITE, Dot, Line, RightAngle, Scene
 
+from geo_draw.engine import build_figure
 from geo_draw.geometry_primitives import (
     _NAMED_POINTS,
     _apply_manual_constructions,
@@ -28,9 +29,18 @@ from geo_draw.geometry_primitives import (
     triangle_shape_check,
     upright_polygon_check,
 )
+from geo_draw.parser import parse_problem
 
 
 class GeometryPrimitiveTests(unittest.TestCase):
+    def test_default_rhombus_uses_vertical_and_horizontal_symmetry_axes(self):
+        problem = parse_problem("Cho hình thoi ABCD có cạnh 4.")
+        figure = build_figure(problem)
+        self.assertAlmostEqual(figure.points["A"][0], figure.points["C"][0])
+        self.assertAlmostEqual(figure.points["B"][1], figure.points["D"][1])
+        self.assertGreater(figure.points["A"][1], figure.points["C"][1])
+        self.assertLess(figure.points["B"][0], figure.points["D"][0])
+
     def test_upright_polygon_check_requires_a_horizontal_boundary_side(self):
         self.assertTrue(upright_polygon_check(
             (
@@ -48,6 +58,27 @@ class GeometryPrimitiveTests(unittest.TestCase):
                     np.array([3.0, -0.4, 0.0]),
                 ),
                 names="ABC",
+            )
+
+    def test_upright_polygon_check_axis_aligns_rhombus_symmetry_diagonals(self):
+        self.assertTrue(upright_polygon_check(
+            (
+                np.array([0.0, 3.2, 0.0]),
+                np.array([-2.4, 0.0, 0.0]),
+                np.array([0.0, -3.2, 0.0]),
+                np.array([2.4, 0.0, 0.0]),
+            ),
+            names="ABCD",
+        ))
+        with self.assertRaisesRegex(ValueError, "GEOMETRY_RHOMBUS_TILTED"):
+            upright_polygon_check(
+                (
+                    np.array([-2.0, 2.0, 0.0]),
+                    np.array([-4.0, -1.464101615, 0.0]),
+                    np.array([0.0, -1.464101615, 0.0]),
+                    np.array([2.0, 2.0, 0.0]),
+                ),
+                names="ABCD",
             )
 
     def test_triangle_shape_check_enforces_right_isosceles_conditions(self):
