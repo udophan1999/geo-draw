@@ -98,3 +98,6 @@ alwaysApply: true
 - Khi một đầu vào chứa nhiều Bài/Câu đánh số độc lập, trợ giảng phải giữ nguyên thứ tự và giải hoặc
   gợi ý từng bài riêng; không trộn giả thiết, biến, ký hiệu, hình vẽ hay kết quả giữa các bài. Các ý
   a), b), c) vẫn thuộc cùng một bài. Không ghép nhiều bài hình học độc lập vào một bản vẽ duy nhất.
+- Biểu đồ hộp, biểu đồ phân tán, cây xác suất và sơ đồ Venn phải được nhận diện là nội dung có thể
+  vẽ. Giữ đúng bộ năm số, mọi cặp dữ liệu, xác suất có điều kiện và quan hệ tập hợp; không tự thêm
+  đường xu thế, xác suất, phần tử, quan hệ rời nhau hoặc vùng tô mà đề không yêu cầu.
