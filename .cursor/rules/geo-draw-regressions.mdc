@@ -80,3 +80,6 @@ alwaysApply: true
 - Trợ giảng phải giữ ít nhất 32 tin nhắn gần nhất để không quên các bước học sinh đã lập luận trong
   hội thoại dài. Một tin nhắn quá dài được giới hạn riêng nhưng phải giữ cả phần mở đầu và kết luận;
   không cắt toàn bộ phần cuối nơi thường chứa đáp án hoặc câu hỏi hiện tại.
+- Tin nhắn nhập, tin nhắn chỉnh sửa và kết quả OCR dùng chung giới hạn 20.000 ký tự. Giao diện và API
+  phải báo rõ để học sinh chia nội dung thành phần nhỏ hơn; không gửi âm thầm nội dung quá dài tới AI
+  và không trừ lượt AI cho văn bản bị từ chối ngay ở API.

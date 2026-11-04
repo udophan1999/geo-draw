@@ -414,6 +414,9 @@ class ChatTests(ApiTestCase):
         bad = client.post("/api/messages", data={"text": "x"},
                           files={"image": ("de.txt", b"hello", "text/plain")})
         self.assertEqual(bad.status_code, 415)
+        too_long = self.send(client, "x" * 20_001)
+        self.assertEqual(too_long.status_code, 422)
+        self.assertIn("20.000 ký tự", too_long.json()["detail"])
 
     def test_a_crashing_turn_ends_with_failed(self):
         client = self.client()
