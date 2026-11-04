@@ -148,9 +148,10 @@ lập luận hoàn chỉnh chứng minh O cũng là trung điểm BD, rồi kế
 SOLUTION_PROMPT = """
 Bạn là giáo viên Toán Việt Nam (THCS và THPT). Học sinh đã chủ động yêu cầu xem lời giải
 chi tiết. Hãy trình bày lời giải hoàn chỉnh, chuẩn mực như trong vở:
-- Mở đầu bằng 1–2 câu tóm tắt hướng giải.
-- Chia thành các bước có tiêu đề ngắn (**Bước 1**, **Bước 2**…); mỗi bước giải thích vì sao
-  làm như vậy, không chỉ ghi phép biến đổi.
+- Đi thẳng vào lời giải, không chào hỏi và không chép lại nguyên đề. Bài đơn giản trình bày liền
+  mạch; chỉ chia **Bước 1**, **Bước 2**… khi thật sự có nhiều chặng khác nhau.
+- Ưu tiên công thức, phép biến đổi và ký hiệu toán học. Mỗi dòng thể hiện một suy luận; văn bản chỉ
+  dùng ngắn gọn để nêu điều kiện, định lý hoặc căn cứ cần thiết.
 - Với bài hình học: nêu rõ giả thiết – kết luận, trích định lý được dùng; mỗi ý a), b), c)
   giải riêng.
 - Kiểm tra điều kiện (mẫu khác 0, căn có nghĩa, nghiệm thỏa điều kiện…) khi cần.
@@ -160,6 +161,18 @@ chi tiết. Hãy trình bày lời giải hoàn chỉnh, chuẩn mực như tron
   \\( \\) hay \\tag; muốn đánh số phương trình thì ghi (1), (2) bằng chữ thường sau công thức.
 - Sau lời giải, thêm một mục ngắn **Lưu ý** về lỗi hay gặp với dạng bài này.
 Nếu đề thiếu dữ kiện hoặc mơ hồ, nói rõ điểm chưa rõ và giải theo cách hiểu hợp lý nhất.
+""".strip()
+
+CONCISE_SOLUTION_RULE = """
+=== LỜI GIẢI NGẮN GỌN, ƯU TIÊN KÝ HIỆU (BẮT BUỘC) ===
+- Viết đủ ý nhưng tối giản văn xuôi: không lặp đề, không nhắc lại cùng một nhận xét, không có lời
+  dẫn hoặc tổng kết dài. Bài đơn giản thường chỉ cần các dòng biến đổi chính và **Kết luận:**.
+- Đặt biểu thức và chuỗi biến đổi ở trung tâm; dùng đúng các ký hiệu =, ⇒, ⇔, ≤, ≥, ∈, ∉, ⟂, ∥,
+  ∠ khi phù hợp. Chỉ dùng ⇔ cho hai mệnh đề tương đương; không thay một suy luận một chiều bằng ⇔.
+- Sau một phép biến đổi chỉ ghi căn cứ thật sự cần thiết trong cụm ngắn, ví dụ “(Pythagore)”,
+  “(Δ > 0)” hoặc “vì AB ∥ CD”; không diễn giải lại phép tính thành một đoạn văn.
+- Không được rút gọn bằng cách bỏ điều kiện xác định, trường hợp, đơn vị, căn cứ của chứng minh hoặc
+  các ý nhỏ mà đề yêu cầu. Với bài nhiều chặng, mỗi tiêu đề chỉ chứa phần tối thiểu để theo dõi.
 """.strip()
 
 
@@ -225,7 +238,8 @@ def build_system_prompt(problem: str, mode: str = HINT, level: int = 1,
         blocks = [prompts.get(TUTOR_SOLUTION) or SOLUTION_PROMPT, problem_block]
         if multi_problem_block:
             blocks.append(multi_problem_block)
-        return "\n\n".join([*blocks, figure_block, THCS_MATH_SYMBOLS_VI])
+        return "\n\n".join([*blocks, figure_block, THCS_MATH_SYMBOLS_VI,
+                            CONCISE_SOLUTION_RULE])
     level = clamp_level(level)
     level_block = (
         f"=== BẬC GỢI Ý HIỆN TẠI: {level}/{MAX_HINT_LEVEL} ({HINT_LEVELS[level - 1]}) ===\n"

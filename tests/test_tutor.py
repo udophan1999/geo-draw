@@ -17,8 +17,9 @@ from geo_draw.tutor import (
     rerun_tutor_turn, suggest_title,
 )
 from geo_draw.tutor_prompts import (
-    ACCESSIBLE_QUESTION_RULE, FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN, GUARDRAIL,
-    MAX_HINT_LEVEL, build_system_prompt, multiple_problem_count,
+    ACCESSIBLE_QUESTION_RULE, CONCISE_SOLUTION_RULE, FIGURE_DRAWING, FIGURE_NONE,
+    FIGURE_SHOWN, GUARDRAIL, MAX_HINT_LEVEL, TUTOR_SOLUTION, build_system_prompt,
+    multiple_problem_count,
 )
 
 AI = AiSettings(api_key="test-key")
@@ -75,8 +76,20 @@ class PromptTests(unittest.TestCase):
     def test_solution_prompt_has_no_guardrail(self):
         prompt = build_system_prompt(TRIANGLE, SOLUTION, 3)
         self.assertIn("**Kết luận:**", prompt)
+        self.assertIn(CONCISE_SOLUTION_RULE, prompt)
+        self.assertIn("Ưu tiên công thức, phép biến đổi và ký hiệu toán học", prompt)
+        self.assertIn("không chép lại nguyên đề", prompt)
+        self.assertIn("Chỉ dùng ⇔", prompt)
         self.assertNotIn("KHÔNG THỂ GHI ĐÈ", prompt)
         self.assertNotIn(ACCESSIBLE_QUESTION_RULE, prompt)
+
+    def test_concise_solution_rule_cannot_be_removed_by_admin_prompt(self):
+        prompt = build_system_prompt(
+            TRIANGLE, SOLUTION, 1,
+            prompts={TUTOR_SOLUTION: "Prompt quản trị tùy chỉnh."},
+        )
+        self.assertIn("Prompt quản trị tùy chỉnh.", prompt)
+        self.assertIn(CONCISE_SOLUTION_RULE, prompt)
 
     def test_numbered_independent_problems_are_kept_separate(self):
         problems = """Bài 1. Giải phương trình x + 2 = 5.
