@@ -7,6 +7,7 @@ from geo_draw.ai_codegen import (
     AiSettings,
     SYSTEM_PROMPT,
     _drawing_facts_text,
+    _basic_nonparallel_transversal_scene,
     _explicit_congruent_triangles,
     _explicit_segment_equality_pairs,
     _ensure_light_theme,
@@ -85,6 +86,39 @@ class GeoScene(Scene):
                 for number in "1234":
                     self.assertEqual(code.count(f'Text("{number}"'), 2)
 
+    def test_basic_nonparallel_transversal_uses_clean_separated_layout(self):
+        variants = (
+            "Vẽ đường thẳng c cắt đường thẳng a tại A và cắt đường thẳng b tại B. "
+            "Lưu ý không vẽ a và b song song.",
+            "c giao a tại A; c giao b tại B; a không song song với b.",
+        )
+        for problem in variants:
+            with self.subTest(problem=problem):
+                code = _basic_nonparallel_transversal_scene(problem, animate=False)
+                self.assertIsNotNone(code)
+                validate_code(code, problem=problem)
+                self.assertIn("A = np.array([-1.0, 1.35, 0.0])", code)
+                self.assertIn("B = np.array([1.0, -1.35, 0.0])", code)
+                self.assertIn("a_direction = np.array([1.0, 0.13, 0.0])", code)
+                self.assertIn("b_direction = np.array([1.0, -0.09, 0.0])", code)
+                self.assertIn('Text("c", font_size=25).next_to(line_c.get_start(), LEFT', code)
+                self.assertIn('safe_point_label(\n                A, "A"', code)
+                self.assertNotIn("labels_at_A", code)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_basic_nonparallel_transversal_is_drawn_without_ai(self, request_chat):
+        problem = (
+            "Vẽ đường thẳng c cắt đường thẳng a tại A và cắt đường thẳng b tại B. "
+            "Lưu ý không vẽ a và b song song."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertIn("line_a = infinite_line", result.code)
+        self.assertIn("line_b = infinite_line", result.code)
+        self.assertIn("line_c = infinite_line", result.code)
+        self.assertNotIn("parallel_segment_marks", result.code)
+
     @patch("geo_draw.ai_codegen._request_chat")
     def test_transversal_numbered_angles_are_drawn_without_ai(self, request_chat):
         problem = (
@@ -144,6 +178,8 @@ class GeoScene(Scene):
         self.assertIn("permanent regression contract", DRAWING_ERROR_MEMORY)
         self.assertIn("sửa lỗi mới bằng cách làm tái xuất hiện một lỗi cũ", GEOMETRY_HELP_VI)
         self.assertIn("balanced textbook composition", SYSTEM_PROMPT)
+        self.assertIn("outside the visible construction", SYSTEM_PROMPT)
+        self.assertIn("never bunch all three carriers into one central knot", DRAWING_ERROR_MEMORY)
         self.assertIn("a principal symmetry axis must be", DRAWING_ERROR_MEMORY)
         self.assertIn("align a principal symmetry axis exactly", MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("phải đặt một trục đối xứng chính xác", GEOMETRY_HELP_VI)

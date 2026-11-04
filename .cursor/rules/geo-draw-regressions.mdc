@@ -113,3 +113,6 @@ alwaysApply: true
   kiện dưới dạng định nghĩa, đẳng thức và câu văn riêng; tên định lý/căn cứ chỉ ghi trong cụm ngắn.
   Trước khi xuất, phải tự kiểm tra mọi phép tính, suy luận, trường hợp và ý nhỏ; không dùng kết luận
   làm giả thiết. Khi có nhiều cách, chọn cách ngắn nhất vẫn chặt chẽ như bài giải của giáo viên.
+- Với c cắt hai đường thẳng không song song a, b lần lượt tại A, B: mặc định đặt a và b gần ngang,
+  tách thoáng và có độ dốc khác nhau rõ ràng; c là đường cắt chéo. Nếu giao điểm a∩b không được gọi
+  tên hay yêu cầu, phải đặt nó ngoài vùng hình chính, không dồn ba đường thành một nút giữa A và B.

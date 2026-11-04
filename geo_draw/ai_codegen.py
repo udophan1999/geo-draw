@@ -209,6 +209,10 @@ Exact construction requirements:
   visibly nonparallel, ordinary triangles scalene and non-right, and independent lengths/angles
   visually distinct. Ask for clarification only when two interpretations change a named incidence
   or order relation and neither wording nor a standard convention resolves it.
+- When a transversal c meets nonparallel lines a and b at named points A and B, use a clean textbook
+  composition: keep a and b as two separated near-horizontal carriers with visibly different slopes,
+  and let c cross them diagonally. Unless the intersection of a and b is named or requested, place it
+  outside the visible construction; never create an unnecessary crowded three-line knot near A/B.
 - Lowercase letters a, b, c may name lines while uppercase A, B, C name points. Read relations from
   grammar and context, not letter identity. For a numbered-angle request where transversal c meets
   a at A and b at B, distribute labels in written order: 1,2 around A and 3,4 around B. If the
@@ -372,10 +376,7 @@ def _has_positive_parallel_relation(text: str) -> bool:
     folded = _fold_geometry_notation(text)
     for match in re.finditer(r"//|∥|SONG SONG|PARALLEL", folded):
         prefix = folded[max(0, match.start() - 40):match.start()]
-        if re.search(
-            r"(?:KHONG|KO|NOT)(?:\s+(?:DUOC|PHAI|VE|THE|CAN|LA)){0,5}\s*$",
-            prefix,
-        ):
+        if re.search(r"(?:KHONG|KO|NOT)(?:\s+[A-Z]+){0,8}\s*$", prefix):
             continue
         return True
     return False
@@ -432,7 +433,9 @@ def _transversal_numbered_angles_scene(problem: str, animate: bool) -> str | Non
 
     combined_meets = bool(re.search(
         r"(?:DUONG THANG )?C CAT (?:DUONG THANG )?A VA (?:DUONG THANG )?B "
-        r"LAN LUOT TAI A VA B",
+        r"LAN LUOT TAI A VA B"
+        r"|(?:DUONG THANG )?C CAT (?:DUONG THANG )?A TAI A VA "
+        r"(?:(?:DUONG THANG )?C )?CAT (?:DUONG THANG )?B TAI B",
         normalized,
     ))
     c_meets_a = line_meets("C", "A", "A") or combined_meets
@@ -572,6 +575,78 @@ class GeoScene(Scene):
             Dot(A), Dot(B),
             Text("A", font_size=24).move_to(A + np.array([0.0, -1.0, 0.0])),
             Text("B", font_size=24).move_to(B + np.array([0.0, -1.0, 0.0])),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
+def _basic_nonparallel_transversal_scene(problem: str, animate: bool) -> str | None:
+    """Build a clean textbook layout for c meeting nonparallel a and b at A and B."""
+    folded = _fold_geometry_notation(problem)
+    normalized = re.sub(r"[,:;.]", " ", folded)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    def line_meets(first: str, second: str, point: str) -> bool:
+        patterns = (
+            rf"(?:DUONG THANG )?{first} CAT (?:DUONG THANG )?{second} TAI {point}",
+            rf"(?:DUONG THANG )?{second} BI (?:DUONG THANG )?{first} CAT TAI {point}",
+            rf"{first} GIAO {second} TAI {point}",
+        )
+        return any(re.search(pattern, normalized) for pattern in patterns)
+
+    combined_meets = bool(re.search(
+        r"(?:DUONG THANG )?C CAT (?:DUONG THANG )?A VA (?:DUONG THANG )?B "
+        r"LAN LUOT TAI A VA B"
+        r"|(?:DUONG THANG )?C CAT (?:DUONG THANG )?A TAI A VA "
+        r"(?:(?:DUONG THANG )?C )?CAT (?:DUONG THANG )?B TAI B",
+        normalized,
+    ))
+    c_meets_a = line_meets("C", "A", "A") or combined_meets
+    c_meets_b = line_meets("C", "B", "B") or combined_meets
+    nonparallel = bool(re.search(
+        r"(?:A VA B|A B|HAI DUONG(?: THANG)? A VA B).{0,24}"
+        r"KHONG(?: DUOC VE)? SONG SONG"
+        r"|A KHONG SONG SONG(?: VOI)? B"
+        r"|KHONG(?: DUOC)? VE (?:DUONG THANG )?A VA (?:DUONG THANG )?B SONG SONG",
+        normalized,
+    ))
+    if not (c_meets_a and c_meets_b and nonparallel) or "GOC" in normalized:
+        return None
+
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, infinite_line, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-1.0, 1.35, 0.0])
+        B = np.array([1.0, -1.35, 0.0])
+        a_direction = np.array([1.0, 0.13, 0.0])
+        b_direction = np.array([1.0, -0.09, 0.0])
+        c_direction = B - A
+        a_positive, a_negative = A + a_direction, A - a_direction
+        b_positive, b_negative = B + b_direction, B - b_direction
+        c_positive, c_negative = A + c_direction, A - c_direction
+        line_a = infinite_line(a_negative, a_positive, half_length=4.4)
+        line_b = infinite_line(b_negative, b_positive, half_length=4.4)
+        line_c = infinite_line(c_negative, c_positive, half_length=3.5)
+        self.add(
+            line_a, line_b, line_c,
+            Text("a", font_size=25).next_to(line_a.get_end(), UP, buff=0.10),
+            Text("b", font_size=25).next_to(line_b.get_end(), DOWN, buff=0.10),
+            Text("c", font_size=25).next_to(line_c.get_start(), LEFT, buff=0.10),
+            Dot(A), Dot(B),
+            safe_point_label(
+                A, "A", a_negative, a_positive, c_negative, c_positive,
+                avoid_points=(B,), distance=0.56,
+            ),
+            safe_point_label(
+                B, "B", b_negative, b_positive, c_negative, c_positive,
+                avoid_points=(A,), distance=0.56,
+            ),
         )
         fit_scene_to_frame(self)
         {wait}
@@ -3050,6 +3125,7 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
         _transversal_numbered_angles_scene(problem, animate)
+        or _basic_nonparallel_transversal_scene(problem, animate)
         or _congruent_triangles_scene(problem, animate)
         or _right_isosceles_altitude_midpoints_scene(problem, animate)
         or _triangle_point_with_two_parallels_scene(problem, animate)
