@@ -63,3 +63,6 @@ alwaysApply: true
 - Nhận diện tự động hình học phải chấp nhận chuỗi 2-12 đỉnh viết hoa, và chuỗi đỉnh viết thường khi
   nó đứng ngay sau tên đa giác: “tam giác abc” là A,B,C; “ngũ giác abcde” là A,B,C,D,E. Không được
   viết hoa chữ thường đứng riêng vì chúng có thể là tên đường thẳng hoặc biến đại số.
+- Tên điểm có chỉ số hoặc dấu phẩy như A1, A₁, A' phải được giữ nguyên trên nhãn và ánh xạ sang tên
+  biến Python an toàn. Chỉ hiểu A2 là điểm khi đề gọi rõ là điểm/đỉnh hoặc đặt nó trong tên đa giác;
+  ký hiệu góc A2 không được làm phát sinh thêm một điểm A2 trên hình.

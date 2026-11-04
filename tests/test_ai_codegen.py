@@ -44,6 +44,28 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn('"tam giác abc" means points A, B, C', SYSTEM_PROMPT)
         self.assertIn("Do not uppercase isolated lowercase", SYSTEM_PROMPT)
 
+    def test_validator_requires_indexed_point_labels_without_treating_angle_a2_as_point(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A1 = np.array([0.0, 2.0, 0.0])
+        B1 = np.array([-2.0, 0.0, 0.0])
+        C1 = np.array([2.0, 0.0, 0.0])
+        self.add(Line(A1, B1), Line(B1, C1), Line(C1, A1))
+        self.add(Dot(A1), Dot(B1), Dot(C1))
+        self.add(safe_point_label(A1, "A1"), safe_point_label(B1, "B1"),
+                 safe_point_label(C1, "C1"))
+        fit_scene_to_frame(self)
+'''
+        validate_code(code, problem="Cho tam giác A1B1C1. Góc A2 = 60°.")
+        with self.assertRaisesRegex(ValueError, "Thiếu nhãn điểm trên hình: B1"):
+            validate_code(code.replace('safe_point_label(B1, "B1"),\n                 ', ""),
+                          problem="Cho tam giác A1B1C1.")
+
     def test_transversal_numbered_angles_accepts_flexible_wording(self):
         variants = (
             "Vẽ hình: Cho đường thẳng c cắt đường thẳng a tại A, đường thẳng c cắt "
