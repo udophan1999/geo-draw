@@ -38,9 +38,13 @@ export function Composer({ images, onImages, onSend, busy, placeholder, header, 
     },
   })
 
-  const previews = useMemo(() => images.map((image) => URL.createObjectURL(image)), [images])
+  const previews = useMemo(() => images.map((image) => ({
+    url: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(image.type)
+      ? URL.createObjectURL(image) : null,
+    name: image.name,
+  })), [images])
   useEffect(() => () => {
-    previews.forEach((preview) => URL.revokeObjectURL(preview))
+    previews.forEach((preview) => { if (preview.url) URL.revokeObjectURL(preview.url) })
   }, [previews])
 
   const disabled = busy || submitting
@@ -69,8 +73,10 @@ export function Composer({ images, onImages, onSend, busy, placeholder, header, 
         {header}
         {previews.length > 0 && (
           <div className="flex flex-wrap gap-2 px-3 pt-3">
-            {previews.map((preview, index) => <div key={preview} className="relative inline-block">
-              <img src={preview} alt={`Ảnh đính kèm ${index + 1}`} className="h-20 rounded-lg border bg-white object-contain" />
+            {previews.map((preview, index) => <div key={`${preview.name}-${index}`} className="relative inline-block">
+              {preview.url
+                ? <img src={preview.url} alt={`Ảnh đính kèm ${index + 1}`} className="h-20 rounded-lg border bg-white object-contain" />
+                : <div className="flex h-20 max-w-40 items-center rounded-lg border bg-muted px-3 text-xs font-medium">{preview.name}</div>}
               <button
                 type="button"
                 aria-label={`Bỏ ảnh ${index + 1}`}
