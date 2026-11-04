@@ -104,3 +104,7 @@ alwaysApply: true
 - Yêu cầu biểu diễn khoảng hoặc tập nghiệm một ẩn trên trục số phải được định tuyến sang bộ vẽ. Đầu
   mút thuộc tập dùng chấm kín, đầu mút không thuộc dùng chấm rỗng, tia kéo đúng chiều; giữ nguyên hợp,
   giao, điểm loại trừ và vô cực. Không vẽ vô cực thành một đầu mút kín hay tô thành miền phẳng Oxy.
+- Lời giải chi tiết phải ngắn gọn nhưng đủ ý: đi thẳng vào phép giải, ưu tiên công thức và ký hiệu,
+  không chép lại đề hay diễn giải lặp. Chỉ dùng ⇔ cho tương đương và ⇒ cho suy ra; không được rút gọn
+  bằng cách bỏ điều kiện, trường hợp, đơn vị, căn cứ chứng minh hoặc ý nhỏ mà đề yêu cầu. Quy tắc này
+  là khối bắt buộc, không bị prompt quản trị tùy chỉnh ghi đè.
