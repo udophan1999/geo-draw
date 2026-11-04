@@ -157,6 +157,22 @@ class TutorTurnTests(unittest.TestCase):
         self.assertEqual(self.store.messages(self.conversation.id, CHAT)[-1].text,
                          "Chính xác! Em đã giải xong.")
 
+    def test_long_conversations_keep_thirty_two_recent_messages_with_bounded_turns(self):
+        self.turn(text=TRIANGLE)
+        for index in range(36):
+            role = USER if index % 2 == 0 else ASSISTANT
+            text = f"Lập luận cũ {index}"
+            if index == 35:
+                text = "Mở đầu " + "x" * 4000 + " kết luận quan trọng"
+            self.store.add_message(self.conversation.id, role, text, channel=CHAT)
+
+        _, prompt = self.turn(text="Em nên làm tiếp thế nào?")
+        contents = [message["content"] for message in prompt[1:-1]]
+        self.assertNotIn("Lập luận cũ 3", contents)
+        self.assertIn("Lập luận cũ 4", contents)
+        self.assertIn("[… phần giữa của tin nhắn dài đã lược bớt …]", contents[-1])
+        self.assertTrue(contents[-1].endswith("kết luận quan trọng"))
+
     def test_progress_tags_are_ignored_in_solution_mode(self):
         self.turn(text=TRIANGLE)
         self.turn(action=SHOW_SOLUTION, replies=("**Kết luận:** BC = 5\n[[xong]]",))
