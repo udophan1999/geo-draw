@@ -1,4 +1,4 @@
-"""Function graphs (hàm số, đồ thị, tích phân) drawn by DeepSeek with Manim ``Axes``.
+"""Graphs, statistical charts, and school-math diagrams drawn by DeepSeek with Manim.
 
 The geometry pipeline (``ai_codegen``) only knows plane figures; asked to "draw" an integral it
 invented a triangle. Problems are therefore routed by ``drawing_kind``: plane geometry goes to
@@ -40,6 +40,8 @@ _GRAPH_WORDS = [
     "histogram", "bieu do thong ke", "elip", "ellipse", "hypebol", "hyperbol",
     "duong cong tham so", "phuong trinh tham so", "toa do cuc", "duong cong cuc",
     "mien nghiem", "he bat phuong trinh hai an", "bat phuong trinh hai an",
+    "bieu do hop", "box plot", "bieu do phan tan", "scatter plot",
+    "cay xac suat", "so do cay", "bieu do venn", "so do venn",
 ]
 _SHAPE_WORDS = ["goc", "canh", "diem", "hinh", "duong thang", "tia", "cung"]
 _GRAPH_SYMBOLS = re.compile(r"∫|\\int(?![A-Za-z])|\by\s*=|\bf\s*\(\s*x\s*\)")
@@ -101,6 +103,17 @@ Rules:
   line chart use labeled axes, Dots, and connecting Lines; for a pie chart use proportional sectors
   totaling 360° with category and percentage Text. Never invent a missing observation or silently
   replace one chart type with another.
+- For a box-and-whisker plot, preserve the exact five-number summary (minimum, Q1, median, Q3,
+  maximum); place them in increasing order on one scaled number line. Never estimate quartiles from
+  appearance. For a scatter plot, plot every stated ordered pair once and label axes/units; draw a
+  trend or regression line only when explicitly requested.
+- For a probability tree, use a clean left-to-right tree with event names and probability labels on
+  branches. Probabilities leaving one node must sum to 1; preserve conditional probabilities and do
+  not replace them with unconditional ones. Show path products or final probabilities only when the
+  problem asks for them.
+- For a Venn diagram, use one closed region per named set, preserve subset/disjoint/overlap relations,
+  place each given element in exactly its stated region, and shade exactly the requested union,
+  intersection, difference, or complement. Never infer that two sets are disjoint from layout alone.
 - For an ellipse, hyperbola, or other implicit conic, derive a correct parametric representation
   and use axes.plot_parametric_curve; show its center, vertices, foci or asymptotes only when stated
   or directly required. For a parametric curve x=x(t), y=y(t), preserve the stated t interval.

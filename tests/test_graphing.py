@@ -58,6 +58,15 @@ class DrawingKindTests(unittest.TestCase):
         ):
             self.assertEqual(drawing_kind(text), GRAPH, text)
 
+    def test_common_statistical_and_probability_diagrams_are_drawable(self):
+        for text in (
+            "Vẽ biểu đồ hộp cho mẫu có min = 1, Q1 = 3, trung vị = 5, Q3 = 8, max = 10.",
+            "Lập scatter plot từ các cặp số liệu (1; 2), (2; 5), (3; 7).",
+            "Dùng cây xác suất biểu diễn hai lần tung đồng xu.",
+            "Vẽ sơ đồ Venn biểu diễn A giao B và phần bù của A.",
+        ):
+            self.assertEqual(drawing_kind(text), GRAPH, text)
+
     def test_geometry_stays_geometry(self):
         for text in ["Cho tam giác ABC vuông tại A, đường cao AH.",
                      "Cho góc xOy, vẽ tia phân giác Oz.",
@@ -123,6 +132,9 @@ class GenerateGraphCodeTests(unittest.TestCase):
         self.assertIn("implicit conic", GRAPH_PROMPT)
         self.assertIn("polar curve", GRAPH_PROMPT)
         self.assertIn("common solution region", GRAPH_PROMPT)
+        self.assertIn("five-number summary", GRAPH_PROMPT)
+        self.assertIn("probability tree", GRAPH_PROMPT)
+        self.assertIn("Venn diagram", GRAPH_PROMPT)
 
 
 class GraphPipelineTests(unittest.TestCase):
