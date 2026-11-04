@@ -302,6 +302,26 @@ class ChatTests(ApiTestCase):
                          [(FIGURE, ASSISTANT), (FIGURE, USER), (FIGURE, ASSISTANT)])
         self.assertEqual(len([m for m in messages if m["channel"] == CHAT]), 2)
 
+    def test_geometry_photo_on_a_later_turn_starts_a_drawing(self):
+        client = self.client()
+        self.register(client)
+        self.use_parser(client)
+        started = self.send(client, EQUATION).json()
+        read_events(client, started["job_id"])
+        conversation_id = started["conversation"]["id"]
+
+        with patch("geo_draw.tutor.extract_problem_from_image", return_value=TRIANGLE):
+            response = client.post(
+                "/api/messages",
+                data={"text": "", "conversation_id": conversation_id},
+                files={"image": ("geometry.png", b"fake-png", "image/png")},
+            )
+            events = read_events(client, response.json()["job_id"])
+
+        figure_job = next(data["job_id"] for kind, data in events if kind == "figure_job")
+        drawing = [data for kind, data in read_events(client, figure_job) if kind == "message"][-1]
+        self.assertTrue(drawing["has_drawing"])
+
     def test_problems_without_a_figure_are_never_drawn(self):
         client = self.client()
         self.use_parser(client)

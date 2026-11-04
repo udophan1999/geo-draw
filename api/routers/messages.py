@@ -32,7 +32,7 @@ from geo_draw.graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind
 from geo_draw.tutor import (
     ACTIONS, ASK, GENERIC, REPLY_DRAWING, REPLY_NOT_DRAWN, REPLY_SHOWN, SPECIFIC,
     drawing_request, editable_message, is_geometry_problem, record_canned_reply,
-    rerun_tutor_turn, run_tutor_turn,
+    rerun_tutor_turn, run_tutor_turn, should_auto_draw_geometry,
 )
 from geo_draw.tutor_prompts import FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN
 
@@ -212,8 +212,12 @@ async def send_message(
             if kind != "message" or payload.role != USER:
                 return
             # Once the problem is known (typed or read from a photo), draw plane geometry.
-            if first_turn and is_geometry_problem(payload.text):
-                start_figure()
+            if should_auto_draw_geometry(
+                payload.text, first_turn=first_turn, has_image=bool(image_bytes)
+            ):
+                # On the first turn the OCR text is already the conversation problem. On a
+                # later turn it is a new figure request and must be composed with that problem.
+                start_figure("" if first_turn else payload.text)
             elif wants_drawing == SPECIFIC:
                 start_figure(text)  # "kẻ thêm đường cao AH": refine, and the tutor answers too
 

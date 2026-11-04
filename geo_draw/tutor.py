@@ -377,6 +377,11 @@ def is_geometry_problem(text: str) -> bool:
     return _mentions(plain, _RELATIONS) and not _mentions(plain, _ALGEBRA)
 
 
+def should_auto_draw_geometry(text: str, *, first_turn: bool, has_image: bool) -> bool:
+    """Draw recognized geometry on the first turn or when a later photo introduces it."""
+    return is_geometry_problem(text) and (first_turn or has_image)
+
+
 # Drawing requests typed in the chat ------------------------------------------------------
 
 # The app's own replies to "vẽ giúp mình" (no AI call).

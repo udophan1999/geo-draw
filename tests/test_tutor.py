@@ -13,7 +13,7 @@ from geo_draw.conversations import (
 )
 from geo_draw.tutor import (
     DEEPER, GENERIC, SHOW_SOLUTION, SPECIFIC, drawing_request, is_geometry_problem,
-    record_canned_reply, run_tutor_turn, suggest_title,
+    record_canned_reply, run_tutor_turn, should_auto_draw_geometry, suggest_title,
 )
 from geo_draw.tutor_prompts import (
     ACCESSIBLE_QUESTION_RULE, FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN, GUARDRAIL,
@@ -290,6 +290,14 @@ class GeometryDetectionTests(unittest.TestCase):
                      "Một mảnh vườn hình chữ nhật có chu vi 34 m",
                      "Kể tên các số nguyên tố nhỏ hơn 20"):
             self.assertFalse(is_geometry_problem(text), text)
+
+    def test_followup_image_can_start_a_geometry_drawing(self):
+        self.assertTrue(should_auto_draw_geometry(TRIANGLE, first_turn=True, has_image=False))
+        self.assertTrue(should_auto_draw_geometry(TRIANGLE, first_turn=False, has_image=True))
+        self.assertFalse(should_auto_draw_geometry(TRIANGLE, first_turn=False, has_image=False))
+        self.assertFalse(should_auto_draw_geometry(
+            "Giải phương trình x + 1 = 0", first_turn=False, has_image=True,
+        ))
 
 
 if __name__ == "__main__":
