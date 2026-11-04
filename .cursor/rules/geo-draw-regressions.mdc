@@ -92,3 +92,6 @@ alwaysApply: true
 - Hình chóp, lăng trụ, hình hộp, tứ diện, hình nón, hình trụ và mặt cầu phải đi qua prompt hình
   không gian riêng, không dùng prompt hình học phẳng và không rơi về tam giác. Dùng phép chiếu 2D
   kiểu sách giáo khoa, cạnh khuất nét đứt, cạnh thấy nét liền, giữ đúng đỉnh/cạnh và không vẽ kết luận.
+- Ellipse/hyperbol, đường cong tham số hoặc cực và miền nghiệm bất phương trình hai ẩn phải được
+  định tuyến sang bộ vẽ đồ thị AI. Dùng tham số đúng cho đường ẩn/cực, giữ đúng miền tham số; với hệ
+  bất phương trình phải kiểm tra nửa mặt phẳng và chỉ tô giao miền nghiệm, không tự tô sai phía.

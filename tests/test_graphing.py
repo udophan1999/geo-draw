@@ -48,6 +48,16 @@ class DrawingKindTests(unittest.TestCase):
         ):
             self.assertEqual(drawing_kind(text), GRAPH, text)
 
+    def test_advanced_coordinate_curves_and_regions_are_graphs(self):
+        for text in (
+            "Vẽ elip (E): x²/9 + y²/4 = 1.",
+            "Khảo sát hypebol x²/4 - y²/9 = 1.",
+            "Vẽ đường cong tham số x = 2cos(t), y = sin(t), 0 ≤ t ≤ 2π.",
+            "Trong tọa độ cực, vẽ đường cong r = 2cos(3θ).",
+            "Biểu diễn miền nghiệm hệ bất phương trình hai ẩn x + y ≤ 3, x ≥ 0, y ≥ 0.",
+        ):
+            self.assertEqual(drawing_kind(text), GRAPH, text)
+
     def test_geometry_stays_geometry(self):
         for text in ["Cho tam giác ABC vuông tại A, đường cao AH.",
                      "Cho góc xOy, vẽ tia phân giác Oz.",
@@ -110,6 +120,9 @@ class GenerateGraphCodeTests(unittest.TestCase):
 
         self.assertIn("Statistical charts are not function plots", GRAPH_PROMPT)
         self.assertIn("proportional sectors", GRAPH_PROMPT)
+        self.assertIn("implicit conic", GRAPH_PROMPT)
+        self.assertIn("polar curve", GRAPH_PROMPT)
+        self.assertIn("common solution region", GRAPH_PROMPT)
 
 
 class GraphPipelineTests(unittest.TestCase):
