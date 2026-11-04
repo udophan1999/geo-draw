@@ -67,6 +67,14 @@ class DrawingKindTests(unittest.TestCase):
         ):
             self.assertEqual(drawing_kind(text), GRAPH, text)
 
+    def test_number_line_requests_are_drawable(self):
+        for text in (
+            "Biểu diễn tập nghiệm x < -1 hoặc x ≥ 3 trên trục số.",
+            "Vẽ trên trục số khoảng (-2; 5] và nửa khoảng [7; +∞).",
+            "Biểu diễn khoảng nghiệm của bất phương trình 2x + 1 ≤ 5.",
+        ):
+            self.assertEqual(drawing_kind(text), GRAPH, text)
+
     def test_geometry_stays_geometry(self):
         for text in ["Cho tam giác ABC vuông tại A, đường cao AH.",
                      "Cho góc xOy, vẽ tia phân giác Oz.",
@@ -135,6 +143,8 @@ class GenerateGraphCodeTests(unittest.TestCase):
         self.assertIn("five-number summary", GRAPH_PROMPT)
         self.assertIn("probability tree", GRAPH_PROMPT)
         self.assertIn("Venn diagram", GRAPH_PROMPT)
+        self.assertIn("filled endpoint", GRAPH_PROMPT)
+        self.assertIn("infinity is never a filled endpoint", GRAPH_PROMPT)
 
 
 class GraphPipelineTests(unittest.TestCase):
