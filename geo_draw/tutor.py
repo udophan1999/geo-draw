@@ -17,7 +17,7 @@ from .ai_codegen import AiSettings, _request_chat, extract_problem_from_images, 
 from .conversations import (
     ASSISTANT, CHAT, FIGURE, HINT, SOLUTION, USER, ConversationStore, Message,
 )
-from .tutor_prompts import FIGURE_NONE, build_system_prompt, clamp_level
+from .tutor_prompts import FIGURE_NONE, build_system_prompt, clamp_level, multiple_problem_count
 
 ASK = "ask"          # a normal message (the problem, or an answer to the tutor)
 DEEPER = "deeper"    # "Gợi ý sâu hơn": one hint level up
@@ -411,8 +411,10 @@ def is_solid_problem(text: str) -> bool:
 
 
 def should_auto_draw_geometry(text: str, *, first_turn: bool, has_image: bool) -> bool:
-    """Draw recognized geometry on the first turn or when a later photo introduces it."""
-    return (is_geometry_problem(text) or is_solid_problem(text)) and (first_turn or has_image)
+    """Draw one recognized geometry problem, never merge independent exercises into one scene."""
+    return (not multiple_problem_count(text)
+            and (is_geometry_problem(text) or is_solid_problem(text))
+            and (first_turn or has_image))
 
 
 # Drawing requests typed in the chat ------------------------------------------------------

@@ -8,6 +8,8 @@ mode is only used when the student explicitly asks for the worked solution.
 
 from __future__ import annotations
 
+import re
+
 from .conversations import HINT, SOLUTION
 from .math_symbols import THCS_MATH_SYMBOLS_VI
 
@@ -19,6 +21,41 @@ HINT_LEVELS = [
     "Chuẩn hóa trình bày",
 ]
 MAX_HINT_LEVEL = len(HINT_LEVELS)
+
+_NUMBERED_PROBLEM_HEADING = re.compile(
+    r"(?im)^[ \t]*(?:(?:bài|câu)\s*(?:số\s*)?\d+|\d{1,3}[.)])"
+    r"(?:\s*[:.)-]|\s+)"
+)
+
+
+def multiple_problem_count(text: str) -> int:
+    """Return the number of explicit top-level exercises, or zero for one problem.
+
+    Subparts such as ``a)`` and ``b)`` deliberately do not count as separate problems. The
+    distinction matters because their givens belong together, while ``Bài 1`` and ``Bài 2`` must
+    never leak facts or notation into each other.
+    """
+    count = len(_NUMBERED_PROBLEM_HEADING.findall(text or ""))
+    return count if count >= 2 else 0
+
+
+def _multiple_problem_rule(problem: str, mode: str) -> str | None:
+    count = multiple_problem_count(problem)
+    if not count:
+        return None
+    common = f"""=== NHIỀU BÀI TOÁN ĐỘC LẬP ({count} bài) ===
+- Giữ nguyên thứ tự và tiêu đề Bài/Câu của đề. Không trộn giả thiết, biến, ký hiệu, hình vẽ hay
+  kết quả của bài này sang bài khác. Các ý a), b), c) dưới cùng một Bài/Câu vẫn thuộc một bài.
+- Nếu học sinh chỉ rõ bài cần hỏi, ưu tiên đúng bài đó; nếu không, bắt đầu từ bài chưa hoàn thành
+  đầu tiên và nói rõ đang xét Bài/Câu nào."""
+    if mode == SOLUTION:
+        return common + """
+- Giải đủ từng bài theo thứ tự, mỗi bài có tiêu đề riêng và dòng **Kết luận:** riêng. Hoàn tất một
+  bài rồi mới sang bài tiếp theo; không dùng một kết luận chung mơ hồ cho cả danh sách."""
+    return common + """
+- Trong chế độ gợi ý, mỗi lượt chỉ dẫn dắt MỘT bài đang xét và vẫn kết thúc bằng đúng một câu hỏi
+  có ý nghĩa cho bài đó. Chỉ chuyển sang bài kế tiếp sau khi bài hiện tại đã xong.
+- Chỉ phát thẻ [[xong]] khi học sinh đã hoàn thành tất cả các bài, không phải mới xong một bài."""
 
 BASE_TUTOR_PROMPT = """
 Bạn là trợ giảng Toán cho học sinh Việt Nam (THCS và THPT), dạy mọi phân môn: số học,
@@ -183,14 +220,19 @@ def build_system_prompt(problem: str, mode: str = HINT, level: int = 1,
     prompts = prompts or {}
     problem_block = "=== ĐỀ BÀI ===\n" + (problem.strip() or "(Học sinh chưa đưa đề bài.)")
     figure_block = FIGURE_NOTES.get(figure, FIGURE_NOTES[FIGURE_NONE])
+    multi_problem_block = _multiple_problem_rule(problem, mode)
     if mode == SOLUTION:
-        return "\n\n".join([prompts.get(TUTOR_SOLUTION) or SOLUTION_PROMPT, problem_block,
-                            figure_block, THCS_MATH_SYMBOLS_VI])
+        blocks = [prompts.get(TUTOR_SOLUTION) or SOLUTION_PROMPT, problem_block]
+        if multi_problem_block:
+            blocks.append(multi_problem_block)
+        return "\n\n".join([*blocks, figure_block, THCS_MATH_SYMBOLS_VI])
     level = clamp_level(level)
     level_block = (
         f"=== BẬC GỢI Ý HIỆN TẠI: {level}/{MAX_HINT_LEVEL} ({HINT_LEVELS[level - 1]}) ===\n"
         f"Đưa gợi ý ở bậc {level}. Không gộp nhiều bậc trong một lượt."
     )
-    return "\n\n".join([prompts.get(TUTOR_HINT) or BASE_TUTOR_PROMPT, problem_block, figure_block,
-                         level_block, THCS_MATH_SYMBOLS_VI, ACCESSIBLE_QUESTION_RULE, GUARDRAIL,
-                         PROGRESS_RULE])
+    blocks = [prompts.get(TUTOR_HINT) or BASE_TUTOR_PROMPT, problem_block]
+    if multi_problem_block:
+        blocks.append(multi_problem_block)
+    return "\n\n".join([*blocks, figure_block, level_block, THCS_MATH_SYMBOLS_VI,
+                         ACCESSIBLE_QUESTION_RULE, GUARDRAIL, PROGRESS_RULE])
