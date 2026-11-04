@@ -90,6 +90,10 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   nonparallel, an unspecified triangle remains scalene and non-right, and independent groups use
   different marks. Request clarification only if unresolved alternatives change a named incidence
   or point order and no standard convention can choose safely.
+- If c cuts nonparallel lines a and b at A and B, draw a and b as separated, near-horizontal lines
+  with clearly different slopes and draw c as the diagonal transversal. When a∩b is not named or
+  requested, keep that extra intersection outside the visible construction so A, B and their labels
+  remain the only visual focus; never bunch all three carriers into one central knot.
 - Distinguish lowercase line names a, b, c from uppercase point names A, B, C by sentence context.
   If c cuts a at A and b at B, both A and B lie on c, while A lies on a and B lies on b. When four
   angle labels 1,2,3,4 are requested at vertices A and B, repeat the complete set around each
