@@ -57,3 +57,6 @@ alwaysApply: true
   thêm quan hệ thuộc, thứ tự, bằng nhau, song song, vuông góc hoặc dạng hình đặc biệt.
 - Chỉ yêu cầu làm rõ khi hai cách hiểu làm thay đổi quan hệ toán học có tên và không thể giải quyết
   bằng ngữ cảnh hoặc quy ước hình học THCS; không hỏi học sinh chọn bố cục hay số đo minh họa.
+- Parser nhanh chỉ được dựng các dạng mà nó nhận diện rõ và có bộ dựng tương ứng. Với ngũ giác,
+  hình không gian, elip, biểu đồ hoặc mọi dạng chưa hỗ trợ, phải từ chối bằng thông báo dễ hiểu và
+  đề nghị chuyển sang MathMate AI; tuyệt đối không âm thầm rơi về tam giác ABC mặc định.

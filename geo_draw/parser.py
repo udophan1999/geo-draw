@@ -7,6 +7,10 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 
+class UnsupportedProblemError(ValueError):
+    """The local parser cannot faithfully represent this kind of drawing."""
+
+
 @dataclass
 class Problem:
     figure: str = "triangle"  # triangle, square, rectangle, rhombus, parallelogram, trapezoid, circle
@@ -47,6 +51,7 @@ def parse_problem(text: str) -> Problem:
     original = text
     text = _norm(text)
     p = Problem(raw_text=original)
+    recognized_figure = False
 
     m = re.search(
         r"hình\s+vuông\s+([A-Z]{4})",
@@ -54,6 +59,7 @@ def parse_problem(text: str) -> Problem:
         re.I,
     ) or re.search(r"\bsquare\s+([A-Z]{4})\b", text, re.I)
     if m:
+        recognized_figure = True
         p.figure = "square"
         p.vertices = list(m.group(1).upper())
     else:
@@ -61,21 +67,25 @@ def parse_problem(text: str) -> Problem:
             r"\brectangle\s+([A-Z]{4})\b", text, re.I
         )
         if m:
+            recognized_figure = True
             p.figure = "rectangle"
             p.vertices = list(m.group(1).upper())
         else:
             m = re.search(r"hình\s+thoi\s+([A-Z]{4})", text, re.I)
             if m:
+                recognized_figure = True
                 p.figure = "rhombus"
                 p.vertices = list(m.group(1).upper())
             else:
                 m = re.search(r"hình\s+bình\s+hành\s+([A-Z]{4})", text, re.I)
                 if m:
+                    recognized_figure = True
                     p.figure = "parallelogram"
                     p.vertices = list(m.group(1).upper())
                 else:
                     m = re.search(r"hình\s+thang\s+([A-Z]{4})", text, re.I)
                     if m:
+                        recognized_figure = True
                         p.figure = "trapezoid"
                         p.vertices = list(m.group(1).upper())
                     else:
@@ -87,6 +97,7 @@ def parse_problem(text: str) -> Problem:
                             re.I,
                         )
                         if m:
+                            recognized_figure = True
                             p.figure = "circle"
                             p.circle_center = m.group(1).upper()
                             p.vertices = [p.circle_center]
@@ -97,8 +108,17 @@ def parse_problem(text: str) -> Problem:
                                 r"\btriangle\s+([A-Z]{3})\b", text, re.I
                             )
                             if m:
+                                recognized_figure = True
                                 p.figure = "triangle"
                                 p.vertices = list(m.group(1).upper())
+
+    if not recognized_figure:
+        raise UnsupportedProblemError(
+            "Parser nhanh chưa hỗ trợ dạng hình này. Hãy chuyển Cách vẽ hình sang "
+            "MathMate AI, hoặc ghi rõ một hình cơ bản như tam giác ABC, hình vuông ABCD, "
+            "hình chữ nhật ABCD, hình thoi ABCD, hình bình hành ABCD, hình thang ABCD "
+            "hay đường tròn tâm O."
+        )
 
     if re.search(r"\bđều\b|\bequilateral\b", text, re.I):
         p.equilateral = True
