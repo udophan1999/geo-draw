@@ -68,3 +68,6 @@ alwaysApply: true
   ký hiệu góc A2 không được làm phát sinh thêm một điểm A2 trên hình.
 - Ảnh hình học được gửi ở lượt sau phải được OCR rồi tự khởi động một lượt vẽ, ghép nội dung ảnh với
   đề gốc của cuộc trò chuyện. Ảnh đại số hoặc nội dung không phải hình học không được tự tạo hình.
+- OCR ảnh đề phải đọc mọi phân môn Toán THCS–THPT, không được mặc định ảnh là bài hình học. Phải giữ
+  nguyên biểu thức, phân số, căn, số mũ/chỉ số, tích phân, ma trận, bảng số liệu, đơn vị và các ý nhỏ;
+  chỉ bổ sung mô tả “Theo hình vẽ” khi trong ảnh thực sự có hình minh họa rõ ràng.

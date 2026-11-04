@@ -2976,7 +2976,7 @@ def extract_problem_from_image(
     mime_type: str,
     settings: AiSettings,
 ) -> str:
-    """Read one Vietnamese geometry exercise image with DeepSeek Vision."""
+    """Read one Vietnamese school-math exercise image with DeepSeek Vision."""
     supported = {"image/png", "image/jpeg", "image/webp", "image/gif"}
     mime_type = (mime_type or "").casefold()
     if mime_type not in supported:
@@ -2993,9 +2993,12 @@ def extract_problem_from_image(
             {
                 "type": "text",
                 "text": (
-                    "Đọc chính xác đề bài hình học trong ảnh. Chỉ trả về nguyên văn đề bài, "
+                    "Đọc chính xác đề bài Toán trong ảnh, thuộc bất kỳ phân môn THCS–THPT nào "
+                    "như số học, đại số, hình học, hàm số, giải tích, xác suất hoặc thống kê. "
+                    "Chỉ trả về nguyên văn đề bài, "
                     "không giải, không nhận xét, không thêm Markdown. Giữ nguyên tên điểm, số đo, "
-                    "đơn vị, ký hiệu bằng nhau, song song, vuông góc và thứ tự các ý a), b), c). "
+                    "đơn vị, biểu thức, phân số, căn, số mũ, chỉ số, dấu tích phân, ma trận, bảng "
+                    "số liệu, ký hiệu bằng nhau, song song, vuông góc và thứ tự các ý a), b), c). "
                     "Chuẩn hóa lỗi xuống dòng nhưng không tự bổ sung dữ kiện không nhìn thấy. "
                     "Nếu đề nhắc đến một Hình đánh số và hình đó cũng hiện rõ trong ảnh, "
                     "sau nguyên văn đề bài thêm một dòng bắt đầu bằng 'Theo hình vẽ:' "
