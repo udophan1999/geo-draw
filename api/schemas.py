@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from geo_draw.conversations import Conversation, Message
-from geo_draw.tutor import MAX_USER_MESSAGE_CHARS, is_geometry_problem
+from geo_draw.tutor import MAX_USER_MESSAGE_CHARS, is_geometry_problem, is_solid_problem
 
 MODELS = ("deepseek-v4-flash", "deepseek-v4-pro")
 
@@ -82,5 +82,5 @@ def conversation_json(conversation: Conversation, problem: str | None = None) ->
         "mode": conversation.mode,
         "hint_level": conversation.hint_level,
         "solved": conversation.solved,
-        "is_geometry": is_geometry_problem(problem),
+        "is_geometry": is_geometry_problem(problem) or is_solid_problem(problem),
     }

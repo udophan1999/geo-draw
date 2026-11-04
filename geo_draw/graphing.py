@@ -17,14 +17,18 @@ from .ai_codegen import (
     _request_chat, extract_python,
 )
 from .branding import APP_NAME
-from .tutor import _FIGURES, _RELATIONS, _SOLIDS, _mentions, _plain, is_geometry_problem
+from .tutor import (
+    _FIGURES, _RELATIONS, _SOLIDS, _mentions, _plain, is_geometry_problem, is_solid_problem,
+)
 
 GEOMETRY = "geometry"
 GRAPH = "graph"
+SOLID = "solid"
 
 NOT_DRAWABLE = ("Bài này không có hình hay đồ thị để vẽ. Khung hình dùng cho bài hình học và "
                 "bài hàm số, đồ thị, tích phân.")
 GRAPH_NEEDS_AI = f"Vẽ đồ thị cần chế độ {APP_NAME} AI (Cài đặt → Cách vẽ hình)."
+SOLID_NEEDS_AI = f"Vẽ hình không gian cần chế độ {APP_NAME} AI (Cài đặt → Cách vẽ hình)."
 GRAPH_INCOMPLETE = (f"{APP_NAME} chưa vẽ được đồ thị cho đề này. Hãy thử ghi rõ hàm số "
                     "và đoạn cần vẽ.")
 
@@ -46,6 +50,8 @@ def is_graph_problem(text: str) -> bool:
 
 def drawing_kind(text: str) -> str | None:
     """``"geometry"``, ``"graph"`` or ``None`` (nothing to draw: do not invent a figure)."""
+    if is_solid_problem(text):
+        return SOLID
     if is_geometry_problem(text):
         return GEOMETRY
     if is_graph_problem(text):

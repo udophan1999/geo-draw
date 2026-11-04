@@ -13,7 +13,7 @@ from geo_draw.conversations import (
 )
 from geo_draw.tutor import (
     DEEPER, GENERIC, SHOW_SOLUTION, SPECIFIC, drawing_request, is_geometry_problem,
-    editable_message_ids, record_canned_reply, run_tutor_turn, should_auto_draw_geometry,
+    editable_message_ids, is_solid_problem, record_canned_reply, run_tutor_turn, should_auto_draw_geometry,
     rerun_tutor_turn, suggest_title,
 )
 from geo_draw.tutor_prompts import (
@@ -346,6 +346,11 @@ class GeometryDetectionTests(unittest.TestCase):
                      "Một mảnh vườn hình chữ nhật có chu vi 34 m",
                      "Kể tên các số nguyên tố nhỏ hơn 20"):
             self.assertFalse(is_geometry_problem(text), text)
+
+    def test_solid_problems_are_detected_separately_and_auto_drawn(self):
+        solid = "Cho hình chóp S.ABCD có đáy là hình vuông"
+        self.assertTrue(is_solid_problem(solid))
+        self.assertTrue(should_auto_draw_geometry(solid, first_turn=True, has_image=False))
 
     def test_followup_image_can_start_a_geometry_drawing(self):
         self.assertTrue(should_auto_draw_geometry(TRIANGLE, first_turn=True, has_image=False))

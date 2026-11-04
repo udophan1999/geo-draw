@@ -89,3 +89,6 @@ alwaysApply: true
 - Chấp nhận PDF tối đa 4 trang và ảnh HEIC/HEIF từ điện thoại; luôn chuyển chúng thành các trang PNG
   có giới hạn độ phân giải trước khi gửi Vision. Từ chối rõ PDF có mật khẩu, tệp hỏng, quá 4 trang
   hoặc ảnh giải nén quá lớn; không chuyển dữ liệu không hợp lệ thẳng tới mô hình.
+- Hình chóp, lăng trụ, hình hộp, tứ diện, hình nón, hình trụ và mặt cầu phải đi qua prompt hình
+  không gian riêng, không dùng prompt hình học phẳng và không rơi về tam giác. Dùng phép chiếu 2D
+  kiểu sách giáo khoa, cạnh khuất nét đứt, cạnh thấy nét liền, giữ đúng đỉnh/cạnh và không vẽ kết luận.

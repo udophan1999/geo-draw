@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from geo_draw.ai_codegen import AiResult, AiSettings
 from geo_draw.graphing import (
-    GEOMETRY, GRAPH, drawing_kind, generate_graph_code, validate_graph_code,
+    GEOMETRY, GRAPH, SOLID, drawing_kind, generate_graph_code, validate_graph_code,
 )
 from geo_draw.pipeline import draw
 
@@ -54,6 +54,14 @@ class DrawingKindTests(unittest.TestCase):
                      "Một mảnh vườn hình chữ nhật có chu vi 40 m.",
                      "Cho đường tròn (O) và điểm M nằm ngoài đường tròn, kẻ tiếp tuyến MA."]:
             self.assertEqual(drawing_kind(text), GEOMETRY, text)
+
+    def test_solid_geometry_uses_its_own_drawing_kind(self):
+        for text in (
+            "Cho hình chóp S.ABCD có đáy là hình vuông.",
+            "Cho lăng trụ tam giác ABC.A'B'C'.",
+            "Một hình trụ có tâm hai đáy O và O'.",
+        ):
+            self.assertEqual(drawing_kind(text), SOLID, text)
 
     def test_problems_without_a_figure_are_not_drawn(self):
         for text in ["Giải phương trình x² - 5x + 6 = 0", "Tính 15% của 200",
