@@ -346,10 +346,21 @@ _FIGURE_VERTEX_RUN = re.compile(
     r"hinh thoi|hinh binh hanh|hinh thang)"
     r"(?:\s+(?:vuong|can|deu|thuong))*\s+([a-z]{3,12})\b",
 )
+_INDEXED_FIGURE_VERTEX_RUN = re.compile(
+    r"\b(?:tam\s+giác|tứ\s+giác|ngũ\s+giác|lục\s+giác|đa\s+giác|"
+    r"hình\s+(?:vuông|chữ\s+nhật|thoi|bình\s+hành|thang))"
+    r"(?:\s+(?:vuông|cân|đều|thường))*\s+"
+    r"(?:[A-Z](?:_?\d+|[₀-₉]+|['′])?){2,12}",
+    re.I,
+)
 
 
 def _has_named_geometry_points(text: str, plain: str | None = None) -> bool:
-    return bool(_NAMED_POINTS.search(text) or _FIGURE_VERTEX_RUN.search(plain or _plain(text)))
+    return bool(
+        _NAMED_POINTS.search(text)
+        or _FIGURE_VERTEX_RUN.search(plain or _plain(text))
+        or _INDEXED_FIGURE_VERTEX_RUN.search(text)
+    )
 
 
 def is_geometry_problem(text: str) -> bool:

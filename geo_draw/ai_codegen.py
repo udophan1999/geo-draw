@@ -218,6 +218,10 @@ Exact construction requirements:
   typed it in lowercase: "tam giác abc" means points A, B, C and "ngũ giác abcde" means
   A, B, C, D, E. Normalize those display labels to uppercase. Do not uppercase isolated lowercase
   letters, which may be line names or algebra variables.
+- Preserve indexed and primed point names exactly as display labels. Use safe Python identifiers:
+  point A1 may use variable `A1`, A₁ may use `A_1`, and A' may use `A_prime`; pass the original
+  text (`"A1"`, `"A₁"`, `"A'"`) to `safe_point_label`. A numbered angle such as A2 is not a
+  point unless the wording explicitly calls it a point/vertex or includes it in a polygon name.
 - For all mathematical markers and special lines, use the verified helpers from
   `geo_draw.geometry_primitives`: apply_light_theme, interior_angle_marker, equal_segment_marks,
   parallel_segment_marks, midpoint_marker, median_segment, altitude_segment,
@@ -332,6 +336,35 @@ def _fold_geometry_notation(text: str) -> str:
         char for char in unicodedata.normalize("NFD", _normalize_geometry_notation(text).upper())
         if unicodedata.category(char) != "Mn"
     ).replace("Đ", "D")
+
+
+_EXTENDED_POINT_LABEL = re.compile(r"[A-Z](?:_?\d+|[₀-₉]+|['′])", re.I)
+
+
+def _extended_point_labels(text: str) -> set[str]:
+    """Return explicit indexed/primed point labels without confusing numbered angles."""
+    labels = {
+        match.group(1).upper()
+        for match in re.finditer(
+            r"(?:điểm|tâm|đỉnh|tại|gọi|lấy)\s+"
+            r"([A-Z](?:_?\d+|[₀-₉]+|['′]))(?=\W|$)",
+            text,
+            re.I,
+        )
+    }
+    polygon_pattern = (
+        r"(?:tam\s+giác|tứ\s+giác|ngũ\s+giác|lục\s+giác|đa\s+giác|"
+        r"hình\s+(?:vuông|chữ\s+nhật|thoi|bình\s+hành|thang))"
+        r"(?:\s+(?:vuông|cân|đều|thường))*\s+"
+        r"((?:[A-Z](?:_?\d+|[₀-₉]+|['′])?){2,12})"
+    )
+    for match in re.finditer(polygon_pattern, text, re.I):
+        labels.update(
+            token.upper()
+            for token in re.findall(r"[A-Z](?:_?\d+|[₀-₉]+|['′])?", match.group(1), re.I)
+            if _EXTENDED_POINT_LABEL.fullmatch(token)
+        )
+    return labels
 
 
 def _has_positive_parallel_relation(text: str) -> bool:
@@ -1412,6 +1445,7 @@ def validate_code(code: str, problem: str | None = None) -> None:
             r"(?:góc|điểm|tâm|tại|gọi|lấy)\s+([A-Z])\b", problem, re.I
         )
         expected_points = {letter for token in point_tokens for letter in token.upper()}
+        expected_extended_labels = _extended_point_labels(problem)
 
         stated_equilateral_triangles = [
             match.group(1).upper()
@@ -1615,6 +1649,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
             value = node.value.strip()
             if re.fullmatch(r"[A-Z]{1,12}", value):
                 literal_labels.update(value)
+            elif _EXTENDED_POINT_LABEL.fullmatch(value):
+                literal_labels.add(value.upper())
         for node in ast.walk(construct):
             if not (
                 isinstance(node, ast.Call)
@@ -1623,12 +1659,15 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 and len(node.args) >= 2
                 and isinstance(node.args[1], ast.Constant)
                 and isinstance(node.args[1].value, str)
-                and len(node.args[1].value) == 1
-                and node.args[1].value.isupper()
+                and (
+                    (len(node.args[1].value) == 1 and node.args[1].value.isupper())
+                    or _EXTENDED_POINT_LABEL.fullmatch(node.args[1].value)
+                )
             ):
                 continue
-            defined_points.add(node.args[1].value)
-            literal_labels.add(node.args[1].value)
+            label = node.args[1].value.upper()
+            defined_points.add(label)
+            literal_labels.add(label)
         has_dot = any(
             isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
             and node.func.id == "Dot"
@@ -1642,7 +1681,7 @@ def validate_code(code: str, problem: str | None = None) -> None:
         if has_dot and has_label_drawing and expected_points <= literal_labels:
             defined_points.update(expected_points)
         missing_points = sorted(expected_points - defined_points)
-        missing_labels = sorted(expected_points - literal_labels)
+        missing_labels = sorted((expected_points | expected_extended_labels) - literal_labels)
         for node in ast.walk(construct):
             if isinstance(node, (ast.Assign, ast.AnnAssign)):
                 value = node.value

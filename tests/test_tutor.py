@@ -275,7 +275,8 @@ class GeometryDetectionTests(unittest.TestCase):
         for text in (TRIANGLE, "Cho đường tròn tâm O bán kính 3", "Kẻ AH vuông góc với BC tại H",
                      "Cho hình bình hành ABCD, AC cắt BD tại O",
                      "Cho ngũ giác ABCDE", "Cho lục giác abcdef",
-                     "Cho tam giác abc vuông tại a"):
+                     "Cho tam giác abc vuông tại a", "Cho tam giác A1B1C1",
+                     "Cho tam giác A'B'C'"):
             self.assertTrue(is_geometry_problem(text), text)
 
     def test_long_or_lowercase_vertex_runs_make_drawing_requests_specific(self):
