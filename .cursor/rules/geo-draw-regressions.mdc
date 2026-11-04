@@ -77,3 +77,6 @@ alwaysApply: true
 - Luôn cho phép sửa đề bài đầu tiên hoặc tin nhắn học sinh gần nhất. Khi sửa đề đầu tiên, phải xóa
   mọi lượt chat và hình vẽ phát sinh từ đề cũ, cập nhật đề/tên cuộc trò chuyện và chỉ tự vẽ lại nếu
   đề mới là hình học; không được để hình cũ tồn tại bên cạnh đề mới.
+- Trợ giảng phải giữ ít nhất 32 tin nhắn gần nhất để không quên các bước học sinh đã lập luận trong
+  hội thoại dài. Một tin nhắn quá dài được giới hạn riêng nhưng phải giữ cả phần mở đầu và kết luận;
+  không cắt toàn bộ phần cuối nơi thường chứa đáp án hoặc câu hỏi hiện tại.

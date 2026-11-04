@@ -24,7 +24,8 @@ DEEPER = "deeper"    # "Gợi ý sâu hơn": one hint level up
 SHOW_SOLUTION = "solution"  # switch to the worked solution
 BACK_TO_HINTS = "hint"      # switch back to hints
 ACTIONS = (ASK, DEEPER, SHOW_SOLUTION, BACK_TO_HINTS)
-HISTORY_LIMIT = 16  # recent chat messages sent to the model, as in MathLovers
+HISTORY_LIMIT = 32
+HISTORY_MESSAGE_CHARS = 3000
 
 DEFAULT_TEXT = {
     DEEPER: "Em vẫn chưa nghĩ ra, mình gợi ý sâu hơn một chút được không?",
@@ -35,6 +36,15 @@ DEFAULT_TEXT = {
 # on_event("progress", {...}) | ("delta", {"text"}) | ("message", Message)
 # | ("conversation", Conversation)
 EventCallback = Callable[[str, object], None]
+
+
+def _history_text(text: str) -> str:
+    """Bound one unusually long turn while retaining both its setup and conclusion."""
+    if len(text) <= HISTORY_MESSAGE_CHARS:
+        return text
+    head = HISTORY_MESSAGE_CHARS * 2 // 3
+    tail = HISTORY_MESSAGE_CHARS - head
+    return text[:head] + "\n[… phần giữa của tin nhắn dài đã lược bớt …]\n" + text[-tail:]
 
 
 def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *,
@@ -182,7 +192,7 @@ def _answer(store: ConversationStore, owner: str, conversation_id: str, *,
                                                       prompts)}]
     for message in history[-HISTORY_LIMIT:]:
         if message.text:
-            model_messages.append({"role": message.role, "content": message.text})
+            model_messages.append({"role": message.role, "content": _history_text(message.text)})
     model_messages.append({"role": "user", "content": _framed(request, problem, history, mode)})
 
     emit("progress", {"stage": "thinking",
