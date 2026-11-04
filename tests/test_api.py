@@ -474,16 +474,15 @@ class MessageEditTests(ApiTestCase):
         self.assertNotIn("x = 2", json.dumps(sent, ensure_ascii=False))
         self.assertEqual(client.get("/api/auth/me").json()["quota"]["used"], 3)
 
-    def test_only_the_last_message_of_the_student_can_be_edited(self):
+    def test_assistant_and_non_latest_followups_cannot_be_edited(self):
         client = self.client()
         self.register(client)
         conversation_id = self.start(client)
         read_events(client, self.send(client, "x = 2", conversation_id).json()["job_id"])
-        problem, reply = self.chat(client, conversation_id)[:2]
-        for message in (problem, reply):
-            response = self.edit(client, message["id"], "khác")
-            self.assertEqual(response.status_code, 409)
-            self.assertIn("gần nhất", response.json()["detail"])
+        _problem, reply = self.chat(client, conversation_id)[:2]
+        response = self.edit(client, reply["id"], "khác")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("đề bài ban đầu hoặc tin nhắn gần nhất", response.json()["detail"])
         last = self.chat(client, conversation_id)[-2]
         self.assertEqual(self.edit(client, last["id"], "   ").status_code, 422)
         # Someone else's message does not exist for this caller.
@@ -506,6 +505,8 @@ class MessageEditTests(ApiTestCase):
         client = self.client()
         self.register(client)
         conversation_id = self.start(client)
+        read_events(client, self.send(client, "Em đang thử chuyển vế", conversation_id)
+                    .json()["job_id"])
         problem = self.chat(client, conversation_id)[0]
         self.title_request.return_value = "Phương trình bậc nhất"
         events = read_events(client, self.edit(client, problem["id"], "Giải phương trình 2x = 6").json()["job_id"])
@@ -514,6 +515,7 @@ class MessageEditTests(ApiTestCase):
         self.assertEqual(conversation["title"], "Phương trình bậc nhất")
         sent = self.tutor_stream.call_args.args[1]
         self.assertIn("Giải phương trình 2x = 6", sent[-1]["content"])
+        self.assertEqual(len(self.chat(client, conversation_id)), 2)
 
     def test_editing_a_geometry_problem_draws_it_again(self):
         client = self.client()

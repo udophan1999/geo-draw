@@ -13,7 +13,8 @@ from geo_draw.conversations import (
 )
 from geo_draw.tutor import (
     DEEPER, GENERIC, SHOW_SOLUTION, SPECIFIC, drawing_request, is_geometry_problem,
-    record_canned_reply, run_tutor_turn, should_auto_draw_geometry, suggest_title,
+    editable_message_ids, record_canned_reply, run_tutor_turn, should_auto_draw_geometry,
+    rerun_tutor_turn, suggest_title,
 )
 from geo_draw.tutor_prompts import (
     ACCESSIBLE_QUESTION_RULE, FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN, GUARDRAIL,
@@ -207,6 +208,28 @@ class TutorTurnTests(unittest.TestCase):
         self.assertEqual(self.store.get("alice", self.conversation.id).problem, TRIANGLE)
         self.assertEqual(question.text, "Em không biết tính BC")
         self.assertIn(TRIANGLE, prompt[0]["content"])
+
+    def test_original_problem_remains_editable_and_resets_later_chat_and_figures(self):
+        self.turn(text=TRIANGLE)
+        self.turn(text="Em thử tính BC = 4")
+        chat = self.store.messages(self.conversation.id, CHAT)
+        first_user = chat[0]
+        last_user = chat[-2]
+        self.assertEqual(editable_message_ids(self.store, self.conversation.id),
+                         {first_user.id, last_user.id})
+        self.store.add_message(self.conversation.id, ASSISTANT, "Hình cũ", channel=FIGURE)
+
+        replacement = "Giải phương trình 2x = 6."
+        with patch("geo_draw.tutor.stream_chat", return_value=iter(["Em chia hai vế cho 2 nhé."])), \
+                patch("geo_draw.tutor._request_chat", return_value="Phương trình 2x = 6"):
+            rerun_tutor_turn(self.store, "alice", self.conversation.id, first_user.id,
+                             replacement, ai=AI)
+
+        updated = self.store.get("alice", self.conversation.id)
+        self.assertEqual(updated.problem, replacement)
+        self.assertEqual([m.text for m in self.store.messages(self.conversation.id, CHAT)],
+                         [replacement, "Em chia hai vế cho 2 nhé."])
+        self.assertEqual(self.store.messages(self.conversation.id, FIGURE), [])
 
 
 class FigureTurnTests(unittest.TestCase):

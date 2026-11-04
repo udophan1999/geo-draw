@@ -31,7 +31,7 @@ from geo_draw.conversations import ASSISTANT, CHAT, FIGURE, USER, Conversation, 
 from geo_draw.graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind
 from geo_draw.tutor import (
     ACTIONS, ASK, GENERIC, REPLY_DRAWING, REPLY_NOT_DRAWN, REPLY_SHOWN, SPECIFIC,
-    drawing_request, editable_message, is_geometry_problem, record_canned_reply,
+    drawing_request, editable_message_ids, is_geometry_problem, record_canned_reply,
     rerun_tutor_turn, run_tutor_turn, should_auto_draw_geometry,
 )
 from geo_draw.tutor_prompts import FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN
@@ -253,7 +253,7 @@ def _figure_state(state: AppState, owner: Owner, conversation: Conversation):
 @router.patch("/messages/{message_id}", status_code=202)
 def edit_message(message_id: str, body: MessageEdit, request: Request,
                  owner: Owner = Depends(get_owner)) -> dict:
-    """Edit the student's last chat message; the tutor's reply to it is written again.
+    """Edit the original problem or latest student message and regenerate from that point.
 
     Costs one AI turn. Editing the first message changes the problem, and a plane-geometry
     problem is drawn again.
@@ -264,11 +264,12 @@ def edit_message(message_id: str, body: MessageEdit, request: Request,
     text = body.text.strip()
     if not text:
         raise HTTPException(422, "Tin nhắn không được để trống.")
-    last = editable_message(owner.store, conversation.id)
-    if message.channel != CHAT or last is None or last.id != message.id:
-        raise HTTPException(409, "Chỉ sửa được tin nhắn gần nhất của bạn.")
-    if conversation.id in state.tutor_jobs:
-        raise HTTPException(409, "MathMate đang trả lời. Đợi trả lời xong rồi hãy sửa.")
+    if message.channel != CHAT or message.id not in editable_message_ids(
+        owner.store, conversation.id
+    ):
+        raise HTTPException(409, "Chỉ sửa được đề bài ban đầu hoặc tin nhắn gần nhất của bạn.")
+    if conversation.id in state.tutor_jobs or conversation.id in state.figure_jobs:
+        raise HTTPException(409, "MathMate đang trả lời hoặc vẽ hình. Đợi xong rồi hãy sửa.")
     if not state.ai_available:
         raise HTTPException(503, "Máy chủ chưa cấu hình khóa AI nên chưa giải toán được.")
     _consume_ai_turn(state, owner)

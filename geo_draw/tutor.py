@@ -15,7 +15,7 @@ from typing import Literal
 
 from .ai_codegen import AiSettings, _request_chat, extract_problem_from_image, stream_chat
 from .conversations import (
-    ASSISTANT, CHAT, HINT, SOLUTION, USER, ConversationStore, Message,
+    ASSISTANT, CHAT, FIGURE, HINT, SOLUTION, USER, ConversationStore, Message,
 )
 from .tutor_prompts import FIGURE_NONE, build_system_prompt, clamp_level
 
@@ -108,9 +108,15 @@ class EditNotAllowed(ValueError):
 
 
 def editable_message(store: ConversationStore, conversation_id: str) -> Message | None:
-    """The student's last chat message: the only one that can be edited."""
+    """Return the student's last chat message (legacy single-message helper)."""
     sent = [m for m in store.messages(conversation_id, CHAT) if m.role == USER]
     return sent[-1] if sent else None
+
+
+def editable_message_ids(store: ConversationStore, conversation_id: str) -> set[str]:
+    """The original problem and the latest student reply may be edited."""
+    sent = [m for m in store.messages(conversation_id, CHAT) if m.role == USER]
+    return {message.id for message in (sent[:1] + sent[-1:])}
 
 
 def rerun_tutor_turn(store: ConversationStore, owner: str, conversation_id: str,
@@ -131,10 +137,9 @@ def rerun_tutor_turn(store: ConversationStore, owner: str, conversation_id: str,
     if not text:
         raise EditNotAllowed("Tin nhắn không được để trống.")
     chat = store.messages(conversation_id, CHAT)
-    last = editable_message(store, conversation_id)
     index = next((i for i, m in enumerate(chat) if m.id == message_id), None)
-    if index is None or last is None or last.id != message_id:
-        raise EditNotAllowed("Chỉ sửa được tin nhắn gần nhất của bạn.")
+    if index is None or message_id not in editable_message_ids(store, conversation_id):
+        raise EditNotAllowed("Chỉ sửa được đề bài ban đầu hoặc tin nhắn gần nhất của bạn.")
     edited, history = chat[index], chat[:index]
     store.delete_messages([m.id for m in chat[index + 1:]])
 
@@ -149,6 +154,9 @@ def rerun_tutor_turn(store: ConversationStore, owner: str, conversation_id: str,
     first_turn = index == 0
     problem = store.problem_of(conversation)
     if first_turn:
+        # Every old drawing belongs to the old problem and must not remain visible if the
+        # replacement is algebraic or while a replacement geometry drawing is rendering.
+        store.delete_messages([m.id for m in store.messages(conversation_id, FIGURE)])
         problem = text
         store.update(owner, conversation_id, problem=problem)
         store.rename(owner, conversation_id, problem)
