@@ -14,7 +14,7 @@ from .ai_codegen import AiSettings, generate_manim_code, missing_reference_figur
 from .branding import APP_NAME
 from .engine import build_figure
 from .graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind, generate_graph_code
-from .parser import parse_problem
+from .parser import UnsupportedProblemError, parse_problem
 from .renderer import render_scene
 from .scene_builder import write_scene
 
@@ -114,7 +114,10 @@ def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l
         scene_path.write_text(generated.code, encoding="utf-8")
         summary = f"{APP_NAME} AI"
     else:
-        scene_path, summary = parser_scene(problem, animate, scene_path)
+        try:
+            scene_path, summary = parser_scene(problem, animate, scene_path)
+        except UnsupportedProblemError as exc:
+            return DrawingOutcome(False, str(exc))
 
     report(RENDERING, f"{APP_NAME} đang hoàn thiện hình vẽ...")
     result = render()
