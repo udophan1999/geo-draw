@@ -42,6 +42,7 @@ _GRAPH_WORDS = [
     "mien nghiem", "he bat phuong trinh hai an", "bat phuong trinh hai an",
     "bieu do hop", "box plot", "bieu do phan tan", "scatter plot",
     "cay xac suat", "so do cay", "bieu do venn", "so do venn",
+    "truc so", "bieu dien tap nghiem tren truc", "bieu dien khoang",
 ]
 _SHAPE_WORDS = ["goc", "canh", "diem", "hinh", "duong thang", "tia", "cung"]
 _GRAPH_SYMBOLS = re.compile(r"∫|\\int(?![A-Za-z])|\by\s*=|\bf\s*\(\s*x\s*\)")
@@ -121,7 +122,12 @@ Rules:
   interval. Do not reinterpret r as y or silently replace the polar curve with a Cartesian graph.
 - For a two-variable inequality or system, draw every boundary with the correct solid/dashed style,
   test a point to choose the correct half-plane, shade only the common solution region, and label
-  boundary equations. Never shade a region for a one-variable inequality that needs no plane plot.
+  boundary equations. Never shade a plane region for a one-variable inequality.
+- When the request explicitly asks for a number line, interval, or one-variable solution set, draw a
+  horizontal number line rather than Cartesian Axes. Use a filled endpoint for ≤/≥ or an included
+  interval end, an open endpoint for </> or an excluded end, and extend rays/unbounded intervals in
+  the correct direction with an arrow. Preserve unions, intersections, excluded points, and ±∞
+  exactly; infinity is never a filled endpoint.
 """
 
 _NO_LATEX_NAMES = {"MathTex", "Tex", "Title", "DecimalNumber", "Integer", "Variable", "Matrix",
