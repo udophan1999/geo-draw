@@ -638,7 +638,12 @@ class GeoScene(Scene):
         self.assertEqual(result, request_chat.return_value)
         _, messages = request_chat.call_args.args
         image_part = messages[0]["content"][1]
+        instruction = messages[0]["content"][0]["text"]
         self.assertTrue(image_part["image_url"]["url"].startswith("data:image/png;base64,"))
+        self.assertIn("bất kỳ phân môn THCS–THPT", instruction)
+        self.assertIn("xác suất hoặc thống kê", instruction)
+        self.assertIn("dấu tích phân, ma trận, bảng số liệu", instruction)
+        self.assertNotIn("Đọc chính xác đề bài hình học trong ảnh", instruction)
         self.assertEqual(
             request_chat.call_args.kwargs["model"],
             "deepseek-v4-flash-vision-exp",
