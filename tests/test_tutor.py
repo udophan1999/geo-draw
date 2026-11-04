@@ -273,8 +273,14 @@ class DrawingRequestTests(unittest.TestCase):
 class GeometryDetectionTests(unittest.TestCase):
     def test_plane_geometry_with_named_points(self):
         for text in (TRIANGLE, "Cho đường tròn tâm O bán kính 3", "Kẻ AH vuông góc với BC tại H",
-                     "Cho hình bình hành ABCD, AC cắt BD tại O"):
+                     "Cho hình bình hành ABCD, AC cắt BD tại O",
+                     "Cho ngũ giác ABCDE", "Cho lục giác abcdef",
+                     "Cho tam giác abc vuông tại a"):
             self.assertTrue(is_geometry_problem(text), text)
+
+    def test_long_or_lowercase_vertex_runs_make_drawing_requests_specific(self):
+        for text in ("Vẽ ngũ giác ABCDE", "Vẽ tam giác abc", "Dựng lục giác abcdef"):
+            self.assertEqual(drawing_request(text), SPECIFIC, text)
 
     def test_other_problems(self):
         for text in ("Giải phương trình $x^2 - 5x + 6 = 0$",

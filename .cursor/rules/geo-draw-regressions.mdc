@@ -60,3 +60,6 @@ alwaysApply: true
 - Parser nhanh chỉ được dựng các dạng mà nó nhận diện rõ và có bộ dựng tương ứng. Với ngũ giác,
   hình không gian, elip, biểu đồ hoặc mọi dạng chưa hỗ trợ, phải từ chối bằng thông báo dễ hiểu và
   đề nghị chuyển sang MathMate AI; tuyệt đối không âm thầm rơi về tam giác ABC mặc định.
+- Nhận diện tự động hình học phải chấp nhận chuỗi 2-12 đỉnh viết hoa, và chuỗi đỉnh viết thường khi
+  nó đứng ngay sau tên đa giác: “tam giác abc” là A,B,C; “ngũ giác abcde” là A,B,C,D,E. Không được
+  viết hoa chữ thường đứng riêng vì chúng có thể là tên đường thẳng hoặc biến đại số.
