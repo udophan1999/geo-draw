@@ -13,7 +13,7 @@ from geo_draw.conversations import (
 )
 from geo_draw.tutor import (
     DEEPER, GENERIC, SHOW_SOLUTION, SPECIFIC, drawing_request, is_geometry_problem,
-    record_canned_reply, run_tutor_turn, suggest_title,
+    record_canned_reply, run_tutor_turn, should_auto_draw_geometry, suggest_title,
 )
 from geo_draw.tutor_prompts import (
     ACCESSIBLE_QUESTION_RULE, FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN, GUARDRAIL,
@@ -53,6 +53,11 @@ class PromptTests(unittest.TestCase):
         self.assertIn("Mỗi lượt chỉ đặt đúng MỘT câu hỏi", prompt)
         self.assertIn("không tách một bước thành hàng loạt câu hỏi", prompt)
         self.assertIn("dữ kiện hoặc kết quả trước → định lý/tính chất → kết luận mới", prompt)
+        self.assertIn("không hỏi học sinh tự chọn hướng, tỉ lệ", prompt)
+        self.assertIn("Không biến lựa chọn trình bày thành tính chất mới", prompt)
+        self.assertIn("mỗi đỉnh có đủ một bộ số", prompt)
+        self.assertIn("không chia một", prompt)
+        self.assertIn("bộ số cho hai đỉnh", prompt)
         self.assertIn("[[bac:N]]", prompt)  # the tutor reports progress
         self.assertNotIn("[[bac:N]]", build_system_prompt(TRIANGLE, SOLUTION, 2))
 
@@ -268,8 +273,15 @@ class DrawingRequestTests(unittest.TestCase):
 class GeometryDetectionTests(unittest.TestCase):
     def test_plane_geometry_with_named_points(self):
         for text in (TRIANGLE, "Cho đường tròn tâm O bán kính 3", "Kẻ AH vuông góc với BC tại H",
-                     "Cho hình bình hành ABCD, AC cắt BD tại O"):
+                     "Cho hình bình hành ABCD, AC cắt BD tại O",
+                     "Cho ngũ giác ABCDE", "Cho lục giác abcdef",
+                     "Cho tam giác abc vuông tại a", "Cho tam giác A1B1C1",
+                     "Cho tam giác A'B'C'"):
             self.assertTrue(is_geometry_problem(text), text)
+
+    def test_long_or_lowercase_vertex_runs_make_drawing_requests_specific(self):
+        for text in ("Vẽ ngũ giác ABCDE", "Vẽ tam giác abc", "Dựng lục giác abcdef"):
+            self.assertEqual(drawing_request(text), SPECIFIC, text)
 
     def test_other_problems(self):
         for text in ("Giải phương trình $x^2 - 5x + 6 = 0$",
@@ -278,6 +290,14 @@ class GeometryDetectionTests(unittest.TestCase):
                      "Một mảnh vườn hình chữ nhật có chu vi 34 m",
                      "Kể tên các số nguyên tố nhỏ hơn 20"):
             self.assertFalse(is_geometry_problem(text), text)
+
+    def test_followup_image_can_start_a_geometry_drawing(self):
+        self.assertTrue(should_auto_draw_geometry(TRIANGLE, first_turn=True, has_image=False))
+        self.assertTrue(should_auto_draw_geometry(TRIANGLE, first_turn=False, has_image=True))
+        self.assertFalse(should_auto_draw_geometry(TRIANGLE, first_turn=False, has_image=False))
+        self.assertFalse(should_auto_draw_geometry(
+            "Giải phương trình x + 1 = 0", first_turn=False, has_image=True,
+        ))
 
 
 if __name__ == "__main__":

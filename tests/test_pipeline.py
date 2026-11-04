@@ -51,6 +51,27 @@ class PipelineTests(unittest.TestCase):
         self.assertFalse(outcome.ok)
         self.assertIn("khóa AI", outcome.message)
 
+    def test_parser_rejects_unsupported_figures_instead_of_drawing_a_triangle(self):
+        for problem in (
+            "Cho ngũ giác ABCDE.",
+            "Cho hình chóp S.ABCD.",
+        ):
+            with self.subTest(problem=problem):
+                outcome = draw(problem, self.folder, ai=None)
+                self.assertFalse(outcome.ok)
+                self.assertIn("Parser nhanh chưa hỗ trợ", outcome.message)
+                self.assertIsNone(outcome.image_path)
+
+    def test_parser_keeps_supported_basic_figures(self):
+        for problem in (
+            "Cho tam giác ABC.",
+            "Cho hình vuông ABCD cạnh 4.",
+            "Cho đường tròn tâm O bán kính 3.",
+        ):
+            with self.subTest(problem=problem):
+                outcome = draw(problem, self.folder, ai=None)
+                self.assertTrue(outcome.ok, outcome.message)
+
     def test_ai_follow_up_passes_previous_code_then_repairs(self):
         ok = AiResult(code="class GeoScene: pass\n", raw="", ok=True)
         image = Path(self._tmp.name) / "figure.png"

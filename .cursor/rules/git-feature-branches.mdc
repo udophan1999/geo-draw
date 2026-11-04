@@ -5,8 +5,13 @@ alwaysApply: true
 
 # Git Branch Workflow
 
-- Before implementing any new feature, update from `master` and create a dedicated branch from `master`.
-- Never implement a new feature directly on `master`.
+- Before implementing any new feature or fix, update `dev` and create a dedicated branch from `dev`.
+- Never create a working branch from `master` unless the user explicitly requests it.
+- Never implement a new feature or fix directly on `dev` or `master`.
 - Use a short descriptive branch name such as `feature/upright-layout`.
 - Keep `master` for reviewed or explicitly integrated work.
 - For fixes and maintenance, prefer a dedicated `fix/...` branch as well.
+- Never commit changes automatically. Leave completed changes uncommitted until the user explicitly requests a commit.
+- Never merge a working branch into `master` automatically.
+- Only commit or merge when the user explicitly requests that specific action.
+- Report the branch name and working-tree status when work is ready for review.

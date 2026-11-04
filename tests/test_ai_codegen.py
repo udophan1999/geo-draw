@@ -1,13 +1,18 @@
 import unittest
 from unittest.mock import patch
 
+import numpy as np
+
 from geo_draw.ai_codegen import (
     AiSettings,
     SYSTEM_PROMPT,
     _drawing_facts_text,
+    _explicit_congruent_triangles,
+    _explicit_segment_equality_pairs,
     _ensure_light_theme,
     _normalize_geometry_notation,
     _ordinary_polygons,
+    _transversal_numbered_angles_scene,
     extract_problem_from_image,
     extract_python,
     generate_manim_code,
@@ -21,6 +26,7 @@ from geo_draw.geometry_knowledge import (
     MIDDLE_SCHOOL_GEOMETRY_RULES,
     THCS_GEOMETRY_CURRICULUM_VI,
 )
+from geo_draw.geometry_primitives import ordinary_polygon_check
 
 
 SAFE_CODE = """from manim import *
@@ -34,6 +40,241 @@ class GeoScene(Scene):
 
 
 class AiCodegenTests(unittest.TestCase):
+    def test_prompt_normalizes_lowercase_polygon_vertices_only(self):
+        self.assertIn('"tam giác abc" means points A, B, C', SYSTEM_PROMPT)
+        self.assertIn("Do not uppercase isolated lowercase", SYSTEM_PROMPT)
+
+    def test_validator_requires_indexed_point_labels_without_treating_angle_a2_as_point(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A1 = np.array([0.0, 2.0, 0.0])
+        B1 = np.array([-2.0, 0.0, 0.0])
+        C1 = np.array([2.0, 0.0, 0.0])
+        self.add(Line(A1, B1), Line(B1, C1), Line(C1, A1))
+        self.add(Dot(A1), Dot(B1), Dot(C1))
+        self.add(safe_point_label(A1, "A1"), safe_point_label(B1, "B1"),
+                 safe_point_label(C1, "C1"))
+        fit_scene_to_frame(self)
+'''
+        validate_code(code, problem="Cho tam giác A1B1C1. Góc A2 = 60°.")
+        with self.assertRaisesRegex(ValueError, "Thiếu nhãn điểm trên hình: B1"):
+            validate_code(code.replace('safe_point_label(B1, "B1"),\n                 ', ""),
+                          problem="Cho tam giác A1B1C1.")
+
+    def test_transversal_numbered_angles_accepts_flexible_wording(self):
+        variants = (
+            "Vẽ hình: Cho đường thẳng c cắt đường thẳng a tại A, đường thẳng c cắt "
+            "đường thẳng b tại B, đánh dấu các góc ở đỉnh A và B lần lượt là 1, 2, 3, 4. "
+            "Các đường thẳng a và b không được vẽ song song.",
+            "c giao a tại A; c giao b tại B. Kí hiệu các góc 1, 2, 3, 4; "
+            "a không song song với b.",
+            "Đường thẳng a bị đường thẳng c cắt tại A, đường thẳng b bị c cắt tại B. "
+            "Ghi số các góc 1 2 3 4, hai đường thẳng a và b không song song.",
+        )
+        for problem in variants:
+            with self.subTest(problem=problem):
+                code = _transversal_numbered_angles_scene(problem, animate=False)
+                self.assertIsNotNone(code)
+                validate_code(code, problem=problem)
+                self.assertNotIn("Angle(", code)
+                for number in "1234":
+                    self.assertEqual(code.count(f'Text("{number}"'), 2)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_transversal_numbered_angles_are_drawn_without_ai(self, request_chat):
+        problem = (
+            "vẽ hình: Cho đường thẳng c cắt đường thẳng a tại A, đường thẳng c cắt "
+            "đường thẳng b tại B, đánh dấu các góc ở đỉnh A và B lần lượt là 1, 2, 3, 4. "
+            "Các đường thẳng a và b không được vẽ song song"
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertIn("line_a = infinite_line", result.code)
+        self.assertIn("line_b = infinite_line", result.code)
+        self.assertIn("line_c = infinite_line", result.code)
+        self.assertIn("labels_at_A = VGroup", result.code)
+        self.assertIn("labels_at_B = VGroup", result.code)
+        self.assertNotIn("Angle(", result.code)
+        self.assertIn('Text("A", font_size=24).move_to(A + np.array([0.0, -1.0, 0.0]))', result.code)
+        self.assertIn('Text("B", font_size=24).move_to(B + np.array([0.0, -1.0, 0.0]))', result.code)
+        # Point names stay near the dots but outside the numbered sectors.
+        self.assertNotIn('Text("A", font_size=24).move_to(A + np.array([0.0, -0.82, 0.0]))', result.code)
+        self.assertNotIn('Text("B", font_size=24).move_to(B + np.array([0.0, -0.82, 0.0]))', result.code)
+        self.assertNotIn('Text("A", font_size=24).move_to(A + np.array([0.0, -1.25, 0.0]))', result.code)
+        self.assertNotIn('Text("B", font_size=24).move_to(B + np.array([0.0, -1.25, 0.0]))', result.code)
+        for number in "1234":
+            self.assertEqual(result.code.count(f'Text("{number}"'), 2)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_parallel_transversal_separates_angle_number_and_degree_measure(self, request_chat):
+        problem = (
+            "Cho hai đường thẳng a và b song song với nhau, vẽ đường thẳng c cắt đường thẳng "
+            "a và b lần lượt tại A và B, đánh dấu 4 góc ở đỉnh A và B lần lượt là 1, 2, 3, 4 "
+            "thỏa mãn góc A₂ = 60°."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertIn("parallel_segment_marks", result.code)
+        self.assertIn("angle_A2 = Angle(", result.code)
+        self.assertIn('Text("2", font_size=22).move_to(A + 0.36 * angle_two_direction)', result.code)
+        self.assertIn('Text("60°", font_size=24).move_to(', result.code)
+        self.assertIn("A + 1.15 * angle_two_direction", result.code)
+        self.assertNotIn('Text("2", font_size=22).move_to(A + 1.15 * angle_two_direction)', result.code)
+        for number in "1234":
+            self.assertEqual(result.code.count(f'Text("{number}"'), 2)
+
+    def test_memory_explains_lowercase_lines_and_numbered_angle_default(self):
+        self.assertIn("lowercase line names a, b, c", DRAWING_ERROR_MEMORY)
+        self.assertIn("A1,A2,A3,A4 and B1,B2,B3,B4", DRAWING_ERROR_MEMORY)
+        self.assertIn("Không đồng nhất đường thẳng a với điểm A", THCS_GEOMETRY_CURRICULUM_VI)
+        self.assertIn("nearest collision-free empty sector", SYSTEM_PROMPT)
+        self.assertIn("0.45-0.70 Manim units", DRAWING_ERROR_MEMORY)
+        self.assertIn("dense numbered intersections may use up to about", MIDDLE_SCHOOL_GEOMETRY_RULES)
+        self.assertIn("1.0, but no farther", MIDDLE_SCHOOL_GEOMETRY_RULES)
+        self.assertIn("separate radial bands", SYSTEM_PROMPT)
+        self.assertIn("number nearest the vertex", DRAWING_ERROR_MEMORY)
+        self.assertIn("three collision regions", MIDDLE_SCHOOL_GEOMETRY_RULES)
+        self.assertIn("permanent regression contract", DRAWING_ERROR_MEMORY)
+        self.assertIn("sửa lỗi mới bằng cách làm tái xuất hiện một lỗi cũ", GEOMETRY_HELP_VI)
+        self.assertIn("balanced textbook composition", SYSTEM_PROMPT)
+        self.assertIn("a principal symmetry axis must be", DRAWING_ERROR_MEMORY)
+        self.assertIn("align a principal symmetry axis exactly", MIDDLE_SCHOOL_GEOMETRY_RULES)
+        self.assertIn("phải đặt một trục đối xứng chính xác", GEOMETRY_HELP_VI)
+
+    def test_congruent_triangle_correspondence_uses_written_vertex_order(self):
+        self.assertEqual(
+            _explicit_congruent_triangles("Vẽ hai tam giác ABC và DEF bằng nhau."),
+            [("ABC", "DEF")],
+        )
+        self.assertEqual(
+            _explicit_congruent_triangles(
+                "Cho tam giác ABC và DEF. Chứng minh hai tam giác ABC và DEF bằng nhau."
+            ),
+            [],
+        )
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_congruent_triangles_show_all_corresponding_side_and_angle_marks(self, request_chat):
+        problem = (
+            "Vẽ hai tam giác ABC và DEF bằng nhau, kí hiệu các cặp cạnh tương ứng "
+            "và các góc bằng nhau."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("A = np.array([-3.4, 1.5, 0.0])", result.code)
+        self.assertIn("B = np.array([-4.0, -1.5, 0.0])", result.code)
+        self.assertIn("C = np.array([0.0, -1.5, 0.0])", result.code)
+        ordinary_polygon_check(
+            (
+                np.array([-3.4, 1.5, 0.0]),
+                np.array([-4.0, -1.5, 0.0]),
+                np.array([0.0, -1.5, 0.0]),
+            ),
+            names="ABC",
+        )
+        for expected in (
+            "equal_segment_marks((A, B), (D, E), count=1)",
+            "equal_segment_marks((B, C), (E, F), count=2)",
+            "equal_segment_marks((C, A), (F, D), count=3)",
+            "interior_angle_marker([A, B, C], 0, mark_count=1)",
+            "interior_angle_marker([D, E, F], 0, mark_count=1)",
+            "interior_angle_marker([A, B, C], 1, mark_count=2)",
+            "interior_angle_marker([D, E, F], 1, mark_count=2)",
+            "interior_angle_marker([A, B, C], 2, mark_count=3)",
+            "interior_angle_marker([D, E, F], 2, mark_count=3)",
+        ):
+            self.assertIn(expected, result.code)
+
+    def test_segment_equality_chain_keeps_every_adjacent_relation(self):
+        self.assertEqual(
+            _explicit_segment_equality_pairs("Cho AD = DE = EB và MN bằng NP."),
+            [("AD", "DE"), ("DE", "EB"), ("MN", "NP")],
+        )
+
+    def test_side_equality_and_unrelated_midpoint_use_distinct_tick_counts(self):
+        code = '''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, midpoint_marker, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, 3.0, 0.0])
+        B = np.array([-2.0, 0.0, 0.0])
+        C = np.array([2.0, 0.0, 0.0])
+        M = (B + C) / 2.0
+        self.add(
+            Line(A, B), Line(B, C), Line(C, A), Line(A, M),
+            equal_segment_marks((A, B), (A, C), count=1),
+            midpoint_marker(M, B, C, other_points=(A,), count=1),
+            Dot(A), Dot(B), Dot(C), Dot(M),
+            safe_point_label(A, "A", B, C, M),
+            safe_point_label(B, "B", A, C, M),
+            safe_point_label(C, "C", A, B, M),
+            safe_point_label(M, "M", A, B, C),
+        )
+        fit_scene_to_frame(self)
+        self.wait(0.1)
+'''
+        problem = "Tam giác ABC có AB = AC. Gọi M là trung điểm cạnh BC."
+        with self.assertRaisesRegex(ValueError, "số vạch khác nhau"):
+            validate_code(code, problem=problem)
+
+        corrected = code.replace(
+            "midpoint_marker(M, B, C, other_points=(A,), count=1)",
+            "midpoint_marker(M, B, C, other_points=(A,), count=2)",
+        )
+        validate_code(corrected, problem=problem)
+
+    def test_memory_distinguishes_side_equality_from_midpoint_equality(self):
+        self.assertIn("AB=AC=BM=CM", MIDDLE_SCHOOL_GEOMETRY_RULES)
+        self.assertIn("AB=AC dùng một vạch", DRAWING_ERROR_MEMORY)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_triangle_median_and_trisected_side_are_built_exactly_without_ai(self, request_chat):
+        problem = (
+            "Cho tam giác ABC có trung tuyến AM (M∈BC). Lấy hai điểm D và E trên cạnh AB "
+            "sao cho AD = DE = EB và D nằm giữa hai điểm A, E."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("M = (B + C) / 2.0", result.code)
+        self.assertIn("D = A + (B - A) / 3.0", result.code)
+        self.assertIn("E = A + 2.0 * (B - A) / 3.0", result.code)
+        self.assertIn("median_segment(A, M, B, C)", result.code)
+        self.assertIn("midpoint_marker(M, B, C", result.code)
+        self.assertIn(
+            "equal_segment_marks((A, D), (D, E), (E, B), count=2)",
+            result.code,
+        )
+        self.assertIn("upright_polygon_check([A, B, C], names='ABC')", result.code)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_triangle_median_proof_segments_and_intersection_are_connected(self, request_chat):
+        problem = (
+            "Cho tam giác ABC có trung tuyến AM (M∈BC). Lấy hai điểm D và E trên cạnh AB "
+            "sao cho AD = DE = EB và D nằm giữa hai điểm A, E. "
+            "a) Chứng minh DC // EM. b) DC cắt AM tại I. "
+            "Chứng minh I là trung điểm của AM."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.error)
+        request_chat.assert_not_called()
+        self.assertIn("Line(D, C), Line(E, M)", result.code)
+        self.assertIn("I = ray_intersection(D, C - D, A, M - A)", result.code)
+        self.assertIn('safe_point_label(I, "I"', result.code)
+        self.assertNotIn("parallel_segment_marks((D, C), (E, M)", result.code)
+        self.assertNotIn("midpoint_marker(I, A, M", result.code)
+
     @patch("geo_draw.ai_codegen._request_chat")
     def test_triangle_point_with_two_parallels_is_built_upright_without_ai(self, request_chat):
         problem = (
@@ -144,7 +385,7 @@ class GeoScene(Scene):
             sanitized,
         )
 
-    def test_sanitizer_connects_every_edge_of_shapes_to_identify(self):
+    def test_sanitizer_connects_every_edge_of_named_and_proof_goal_shapes(self):
         code = '''from manim import *
 import numpy as np
 from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame
@@ -159,20 +400,28 @@ class GeoScene(Scene):
         O = np.array([0.5, 0.5, 0.0])
         H = np.array([1.0, 1.0, 0.0])
         E = np.array([0.5, 1.5, 0.0])
+        K = np.array([2.5, 1.0, 0.0])
         self.add(Line(A, B), Line(B, C), Line(A, O), Line(H, E),
                  Text("A"), Text("B"), Text("C"), Text("D"),
-                 Text("O"), Text("H"), Text("E"))
+                 Text("O"), Text("H"), Text("E"), Text("K"))
         fit_scene_to_frame(self)
 '''
         sanitized = sanitize_code(
             code,
             animate=False,
-            problem="a) Tứ giác ABCD là hình gì? b) Tứ giác AOHE là hình gì?",
+            problem=(
+                "a) Tứ giác ABCD là hình gì? b) Tứ giác AOHE là hình gì? "
+                "c) Chứng minh tứ giác ADEK là hình bình hành."
+            ),
         )
         self.assertIn("Line(C, D)", sanitized)
         self.assertIn("Line(D, A)", sanitized)
         self.assertIn("Line(O, H)", sanitized)
         self.assertIn("Line(E, A)", sanitized)
+        self.assertTrue("Line(A, D)" in sanitized or "Line(D, A)" in sanitized)
+        self.assertIn("Line(D, E)", sanitized)
+        self.assertIn("Line(E, K)", sanitized)
+        self.assertIn("Line(K, A)", sanitized)
 
     @patch("geo_draw.ai_codegen._request_chat")
     def test_midradius_chord_and_tangent_problem_is_built_without_ai(self, request_chat):
@@ -389,7 +638,12 @@ class GeoScene(Scene):
         self.assertEqual(result, request_chat.return_value)
         _, messages = request_chat.call_args.args
         image_part = messages[0]["content"][1]
+        instruction = messages[0]["content"][0]["text"]
         self.assertTrue(image_part["image_url"]["url"].startswith("data:image/png;base64,"))
+        self.assertIn("bất kỳ phân môn THCS–THPT", instruction)
+        self.assertIn("xác suất hoặc thống kê", instruction)
+        self.assertIn("dấu tích phân, ma trận, bảng số liệu", instruction)
+        self.assertNotIn("Đọc chính xác đề bài hình học trong ảnh", instruction)
         self.assertEqual(
             request_chat.call_args.kwargs["model"],
             "deepseek-v4-flash-vision-exp",
@@ -535,6 +789,7 @@ class GeoScene(Scene):
         ):
             self.assertIn(grade_nine_relation, MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("white canvas with black geometry", SYSTEM_PROMPT)
+        self.assertIn("differences visually obvious to a student", SYSTEM_PROMPT)
         self.assertIn("upright_polygon_check", SYSTEM_PROMPT)
         self.assertIn("exactly horizontal", SYSTEM_PROMPT)
         self.assertIn(DRAWING_ERROR_MEMORY, SYSTEM_PROMPT)
@@ -544,8 +799,23 @@ class GeoScene(Scene):
             "All explicitly equal segments share one tick style",
             "Use only solid strokes",
             "Define, dot, label, and connect every named point",
+            "each carrier may be drawn as one whole segment or as the two visible halves",
+            "connect those endpoints automatically so the student can use the segment",
+            "mark every corresponding part",
+            'unspecified or "arbitrary" measurements',
+            "Classify missing information before stopping",
+            "visual degrees of freedom",
+            "Request clarification only if unresolved alternatives change a named incidence",
         ):
             self.assertIn(remembered_rule, DRAWING_ERROR_MEMORY)
+
+        for flexible_reading_rule in (
+            "Separate mathematical facts from harmless drawing choices",
+            "choose any free visual parameter",
+            "Do not ask the student to decide these visual parameters",
+            "must never create an unstated mathematical fact",
+        ):
+            self.assertIn(flexible_reading_rule, SYSTEM_PROMPT)
 
     def test_complete_thcs_geometry_curriculum_is_shared_by_prompt_and_help(self):
         required_units = (
@@ -986,6 +1256,43 @@ class GeoScene(Scene):
             "self.add(line_through_intersection(A, B, E), Line(C, E))",
         )
         validate_code(complete, problem=problem)
+
+    def test_internal_intersection_accepts_split_carriers_and_median_helper(self):
+        code = """from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import median_segment, midpoint_marker, equal_segment_marks, safe_point_label, fit_scene_to_frame
+
+class GeoScene(Scene):
+    def construct(self):
+        A = np.array([-3.0, 2.0, 0.0])
+        B = np.array([-3.0, -2.0, 0.0])
+        C = np.array([3.0, -1.0, 0.0])
+        M = (B + C) / 2
+        D = A + (B - A) / 3
+        E = A + 2 * (B - A) / 3
+        I = (A + M) / 2
+        self.add(Line(A, B), Line(B, C), Line(C, A))
+        self.add(Line(D, I), Line(I, C), median_segment(A, M, B, C))
+        self.add(Line(E, M))
+        self.add(midpoint_marker(M, B, C, other_points=(A, D, E, I), count=1))
+        self.add(equal_segment_marks((A, D), (D, E), (E, B), count=2))
+        self.add(*[Dot(point) for point in (A, B, C, D, E, M, I)])
+        self.add(*[safe_point_label(point, name) for point, name in (
+            (A, "A"), (B, "B"), (C, "C"), (D, "D"), (E, "E"),
+            (M, "M"), (I, "I"),
+        )])
+        fit_scene_to_frame(self)
+"""
+        problem = (
+            "Cho tam giác ABC có trung tuyến AM. Lấy D và E trên AB sao cho "
+            "AD = DE = EB và D nằm giữa A, E. a) Chứng minh DC // EM. "
+            "b) DC cắt AM tại I. Chứng minh I là trung điểm của AM."
+        )
+        validate_code(code, problem=problem)
+
+        missing_half = code.replace("Line(D, I), Line(I, C)", "Line(D, I)")
+        with self.assertRaisesRegex(ValueError, "đầy đủ đoạn DC"):
+            validate_code(missing_half, problem=problem)
 
     def test_angle_bisector_does_not_require_whole_angle_marker(self):
         bisected = """from manim import *

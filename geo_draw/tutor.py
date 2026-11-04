@@ -335,8 +335,32 @@ def _mentions(plain: str, words: list[str]) -> bool:
     return any(re.search(rf"\b{re.escape(word)}\b", plain) for word in words)
 
 
-# A figure to draw names its points: "ABC", "AH", "tâm O", "điểm M".
-_NAMED_POINTS = re.compile(r"\b[A-Z]{2,4}\b|\b(?:điểm|tâm|đỉnh|tại)\s+[A-Z]\b")
+# A figure to draw names its points: "ABC", "ABCDE", "AH", "tâm O", "điểm M".
+# Lowercase compact names are accepted only immediately after a named polygon, so an
+# ordinary Vietnamese word never looks like a sequence of point names.
+_NAMED_POINTS = re.compile(
+    r"\b[A-Z]{2,12}\b|(?i:\b(?:điểm|tâm|đỉnh|tại)\s+[A-Z](?:_?\d+|[₀-₉]+|['′])?\b)",
+)
+_FIGURE_VERTEX_RUN = re.compile(
+    r"\b(?:tam giac|tu giac|ngu giac|luc giac|da giac|hinh vuong|hinh chu nhat|"
+    r"hinh thoi|hinh binh hanh|hinh thang)"
+    r"(?:\s+(?:vuong|can|deu|thuong))*\s+([a-z]{3,12})\b",
+)
+_INDEXED_FIGURE_VERTEX_RUN = re.compile(
+    r"\b(?:tam\s+giác|tứ\s+giác|ngũ\s+giác|lục\s+giác|đa\s+giác|"
+    r"hình\s+(?:vuông|chữ\s+nhật|thoi|bình\s+hành|thang))"
+    r"(?:\s+(?:vuông|cân|đều|thường))*\s+"
+    r"(?:[A-Z](?:_?\d+|[₀-₉]+|['′])?){2,12}",
+    re.I,
+)
+
+
+def _has_named_geometry_points(text: str, plain: str | None = None) -> bool:
+    return bool(
+        _NAMED_POINTS.search(text)
+        or _FIGURE_VERTEX_RUN.search(plain or _plain(text))
+        or _INDEXED_FIGURE_VERTEX_RUN.search(text)
+    )
 
 
 def is_geometry_problem(text: str) -> bool:
@@ -346,11 +370,16 @@ def is_geometry_problem(text: str) -> bool:
     so they are not drawn.
     """
     plain = _plain(text)
-    if _mentions(plain, _SOLIDS) or not _NAMED_POINTS.search(text):
+    if _mentions(plain, _SOLIDS) or not _has_named_geometry_points(text, plain):
         return False
     if _mentions(plain, _FIGURES):
         return True
     return _mentions(plain, _RELATIONS) and not _mentions(plain, _ALGEBRA)
+
+
+def should_auto_draw_geometry(text: str, *, first_turn: bool, has_image: bool) -> bool:
+    """Draw recognized geometry on the first turn or when a later photo introduces it."""
+    return is_geometry_problem(text) and (first_turn or has_image)
 
 
 # Drawing requests typed in the chat ------------------------------------------------------
@@ -382,6 +411,6 @@ def drawing_request(text: str) -> Literal["generic", "specific"] | None:
     lower = unicodedata.normalize("NFC", text.lower())
     if not _DRAW_VERB.search(lower):
         return None
-    if _NAMED_POINTS.search(text) or any(word in lower for word in _OBJECTS):
+    if _has_named_geometry_points(text) or any(word in lower for word in _OBJECTS):
         return SPECIFIC
     return GENERIC if _GENERIC_ASK.search(lower) else None

@@ -46,9 +46,17 @@ Rules:
   have clear negative space. Avoid skinny, excessively wide, or excessively tall shapes and
   near-coincident construction points. Aim for a main-figure bounding-box aspect ratio between
   about 1.2 and 1.8 (never above 2.0), normally 7-9 Manim units wide and 4.5-6.5 units high.
+- Use a balanced textbook composition: center the main construction, distribute negative space
+  evenly, and keep labels and marks visually grouped with their objects without crowding. When
+  orientation is free, align a principal symmetry axis exactly vertically or horizontally, never
+  diagonally or slightly tilted. Aesthetic choices must never alter a stated incidence, length,
+  angle, or relation; additional symmetry axes retain their mathematically required directions.
 - Keep the main figure upright in the conventional textbook orientation; never rotate the whole
   diagram arbitrarily. Every named triangle or quadrilateral must have at least one boundary side
-  exactly horizontal. Normally draw triangle base BC horizontally with A above it. For a right
+  exactly horizontal, except a non-square rhombus whose two symmetry diagonals must be exactly
+  vertical and horizontal. For rhombus ABCD in boundary order, normally put A above, B left, C
+  below, D right, and diagonal intersection O at the center. Normally draw triangle base BC
+  horizontally with A above it. For a right
   triangle, a horizontal leg and a vertical leg are also preferred. Draw trapezoid bases,
   rectangle/square top and bottom sides, chords described as horizontal, and principal baselines
   exactly horizontal. Compute every auxiliary point only after fixing this orientation, and call
@@ -74,6 +82,14 @@ Rules:
   feet/midpoints do not touch sides, diagonals, or right-angle marks. Example:
   `safe_point_label(H, "H", A, B, D, I, avoid_points=(C, K),`
   `avoid_segments=((A, B), (B, D), (C, D)))`.
+- Put each point name in the nearest collision-free empty sector around its dot. Normally keep the
+  label about 0.45-0.70 Manim units away; at a dense intersection with numbered angles, arcs, or
+  other markers, increase only as needed up to about 1.0. Never solve a collision by pushing the
+  label farther away when a nearer clear sector is available.
+- When one angle sector contains both its identifying number and a numerical degree measure, use
+  separate radial bands along the sector bisector: the number nearest the vertex, the arc next,
+  and the degree label beyond the arc. Never center the sector number and degree text at the same
+  or adjacent position, and keep both texts clear of the arc and boundary rays.
 - Follow the requested animation mode exactly.
 
 Exact construction requirements:
@@ -148,7 +164,8 @@ Exact construction requirements:
   is given.
 - A plain "tam giác ABC" must look scalene and non-right; a plain "tứ giác ABCD" must not
   accidentally look like a trapezoid, parallelogram, rectangle, or kite. Avoid near-equalities,
-  near-right angles, and near-parallel opposite sides unless the givens require them. The app
+  near-right angles, and near-parallel opposite sides unless the givens require them. Make the
+  differences visually obvious to a student; do not rely on tiny numerical differences. The app
   automatically checks the original named polygon with `ordinary_polygon_check` before render.
   If GEOMETRY_ACCIDENTAL_SPECIAL occurs, change the original vertex coordinates and recompute all
   dependent points. Do not change or delete a stated condition. A special auxiliary polygon that
@@ -169,6 +186,42 @@ Exact construction requirements:
   Never mark the same segment in two calls, never mix unrelated segments in a call, and give
   different equality classes different counts. Example: if AB=CD and EF=GH are separately stated,
   use count=1 for `(A,B),(C,D)` and count=2 for `(E,F),(G,H)`.
+- Midpoint ticks are equality marks too. Compare their count with every `equal_segment_marks`
+  group, not only with other midpoint groups. For example, if AB=AC and M is the midpoint of BC,
+  AB,AC may use count=1 while BM,CM must use count=2; identical ticks would falsely claim all four
+  segments are equal.
+- If the request explicitly gives or asks to draw congruent objects, show all corresponding data.
+  For `triangle ABC congruent to triangle DEF`, preserve the stated order A-D, B-E, C-F; draw
+  matching tick counts on AB-DE, BC-EF, CA-FD and matching arc counts on angles A-D, B-E, C-F.
+  Use a different count for each independent corresponding pair so students can read the mapping.
+  Do not add these congruence marks when congruence is only a conclusion to be proved.
+- For a basic drawing request with unspecified or "arbitrary" lengths/angles, choose a valid,
+  readable ordinary configuration automatically and finish the drawing. Do not ask the student
+  to choose measurements first. Keep unstated triangles clearly scalene and non-right and keep
+  every explicitly named object, equality, angle, segment, and marker from the request.
+- Separate mathematical facts from harmless drawing choices. Preserve every stated incidence,
+  order, equality, parallelism, perpendicularity, measurement, and shape condition. Automatically
+  choose any free visual parameter the problem leaves open: orientation, scale, representative
+  lengths/angles, which side of a carrier holds an otherwise unconstrained point, where an unnamed
+  line intersection appears, and which readable sectors receive listed labels. Prefer the standard
+  upright textbook layout. Do not ask the student to decide these visual parameters.
+- A free drawing choice must never create an unstated mathematical fact. Keep unrelated lines
+  visibly nonparallel, ordinary triangles scalene and non-right, and independent lengths/angles
+  visually distinct. Ask for clarification only when two interpretations change a named incidence
+  or order relation and neither wording nor a standard convention resolves it.
+- Lowercase letters a, b, c may name lines while uppercase A, B, C name points. Read relations from
+  grammar and context, not letter identity. For a numbered-angle request where transversal c meets
+  a at A and b at B, distribute labels in written order: 1,2 around A and 3,4 around B. If the
+  exact sectors are not specified, choose a consistent readable convention and draw instead of
+  asking the student to choose positions.
+- A compact vertex run immediately following a named polygon is a point list even when the student
+  typed it in lowercase: "tam giác abc" means points A, B, C and "ngũ giác abcde" means
+  A, B, C, D, E. Normalize those display labels to uppercase. Do not uppercase isolated lowercase
+  letters, which may be line names or algebra variables.
+- Preserve indexed and primed point names exactly as display labels. Use safe Python identifiers:
+  point A1 may use variable `A1`, A₁ may use `A_1`, and A' may use `A_prime`; pass the original
+  text (`"A1"`, `"A₁"`, `"A'"`) to `safe_point_label`. A numbered angle such as A2 is not a
+  point unless the wording explicitly calls it a point/vertex or includes it in a polygon name.
 - For all mathematical markers and special lines, use the verified helpers from
   `geo_draw.geometry_primitives`: apply_light_theme, interior_angle_marker, equal_segment_marks,
   parallel_segment_marks, midpoint_marker, median_segment, altitude_segment,
@@ -283,6 +336,246 @@ def _fold_geometry_notation(text: str) -> str:
         char for char in unicodedata.normalize("NFD", _normalize_geometry_notation(text).upper())
         if unicodedata.category(char) != "Mn"
     ).replace("Đ", "D")
+
+
+_EXTENDED_POINT_LABEL = re.compile(r"[A-Z](?:_?\d+|[₀-₉]+|['′])", re.I)
+
+
+def _extended_point_labels(text: str) -> set[str]:
+    """Return explicit indexed/primed point labels without confusing numbered angles."""
+    labels = {
+        match.group(1).upper()
+        for match in re.finditer(
+            r"(?:điểm|tâm|đỉnh|tại|gọi|lấy)\s+"
+            r"([A-Z](?:_?\d+|[₀-₉]+|['′]))(?=\W|$)",
+            text,
+            re.I,
+        )
+    }
+    polygon_pattern = (
+        r"(?:tam\s+giác|tứ\s+giác|ngũ\s+giác|lục\s+giác|đa\s+giác|"
+        r"hình\s+(?:vuông|chữ\s+nhật|thoi|bình\s+hành|thang))"
+        r"(?:\s+(?:vuông|cân|đều|thường))*\s+"
+        r"((?:[A-Z](?:_?\d+|[₀-₉]+|['′])?){2,12})"
+    )
+    for match in re.finditer(polygon_pattern, text, re.I):
+        labels.update(
+            token.upper()
+            for token in re.findall(r"[A-Z](?:_?\d+|[₀-₉]+|['′])?", match.group(1), re.I)
+            if _EXTENDED_POINT_LABEL.fullmatch(token)
+        )
+    return labels
+
+
+def _has_positive_parallel_relation(text: str) -> bool:
+    """Return whether text states parallelism, ignoring explicitly negated mentions."""
+    folded = _fold_geometry_notation(text)
+    for match in re.finditer(r"//|∥|SONG SONG|PARALLEL", folded):
+        prefix = folded[max(0, match.start() - 40):match.start()]
+        if re.search(
+            r"(?:KHONG|KO|NOT)(?:\s+(?:DUOC|PHAI|VE|THE|CAN|LA)){0,5}\s*$",
+            prefix,
+        ):
+            continue
+        return True
+    return False
+
+
+def _explicit_segment_equality_pairs(text: str) -> list[tuple[str, str]]:
+    """Return every adjacent pair in stated chains such as AD = DE = EB."""
+    facts = _drawing_facts_text(text)
+    pairs: list[tuple[str, str]] = []
+    for match in re.finditer(
+        r"\b([A-Z]{2}(?:\s*(?:=|bằng)\s*[A-Z]{2})+)\b",
+        facts,
+        re.I,
+    ):
+        segments = [
+            segment.upper()
+            for segment in re.split(r"\s*(?:=|bằng)\s*", match.group(1), flags=re.I)
+        ]
+        pairs.extend(zip(segments, segments[1:]))
+    return list(dict.fromkeys(pairs))
+
+
+def _explicit_congruent_triangles(text: str) -> list[tuple[str, str]]:
+    """Return ordered triangle-name pairs explicitly stated or requested as congruent."""
+    folded = _fold_geometry_notation(_drawing_facts_text(text))
+    patterns = (
+        r"(?:VE\s+)?(?:HAI\s+)?TAM\s+GIAC\s+([A-Z]{3})\s+VA\s+([A-Z]{3})\s+BANG\s+NHAU",
+        r"TAM\s+GIAC\s+([A-Z]{3})\s*(?:=|≅)\s*TAM\s+GIAC\s+([A-Z]{3})",
+    )
+    pairs: list[tuple[str, str]] = []
+    for pattern in patterns:
+        for match in re.finditer(pattern, folded):
+            first, second = match.groups()
+            if len(set(first + second)) == 6:
+                pairs.append((first, second))
+    return list(dict.fromkeys(pairs))
+
+
+def _transversal_numbered_angles_scene(problem: str, animate: bool) -> str | None:
+    """Build two lines cut by a transversal, numbering all four angles at each vertex."""
+    folded = _fold_geometry_notation(problem)
+    normalized = re.sub(r"[,:;.]", " ", folded)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    normalized_numbers = normalized.translate(str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789"))
+    normalized_numbers = normalized_numbers.replace("_", "")
+
+    def line_meets(first: str, second: str, point: str) -> bool:
+        patterns = (
+            rf"(?:DUONG THANG )?{first} CAT (?:DUONG THANG )?{second} TAI {point}",
+            rf"(?:DUONG THANG )?{second} BI (?:DUONG THANG )?{first} CAT TAI {point}",
+            rf"{first} GIAO {second} TAI {point}",
+        )
+        return any(re.search(pattern, normalized) for pattern in patterns)
+
+    combined_meets = bool(re.search(
+        r"(?:DUONG THANG )?C CAT (?:DUONG THANG )?A VA (?:DUONG THANG )?B "
+        r"LAN LUOT TAI A VA B",
+        normalized,
+    ))
+    c_meets_a = line_meets("C", "A", "A") or combined_meets
+    c_meets_b = line_meets("C", "B", "B") or combined_meets
+    nonparallel = bool(re.search(
+        r"(?:A VA B|A B|HAI DUONG(?: THANG)? A VA B).{0,24}KHONG(?: DUOC VE)? SONG SONG"
+        r"|A KHONG SONG SONG(?: VOI)? B",
+        normalized,
+    ))
+    parallel = _has_positive_parallel_relation(problem)
+    numbered = all(re.search(rf"(?<!\d){number}(?!\d)", normalized) for number in range(1, 5))
+    asks_angles = "GOC" in normalized and any(
+        phrase in normalized for phrase in ("DANH DAU", "KY HIEU", "KI HIEU", "GHI SO", "GHI TEN")
+    )
+    if not (c_meets_a and c_meets_b and (nonparallel or parallel) and numbered and asks_angles):
+        return None
+
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    if parallel:
+        measure_match = re.search(
+            r"(?:GOC\s*)?A\s*2\s*(?:=|BANG)\s*(\d+(?:[.,]\d+)?)\s*(?:°|DO)?",
+            normalized_numbers,
+        )
+        measure = float(measure_match.group(1).replace(",", ".")) if measure_match else None
+        if measure is not None and not 15.0 <= measure <= 165.0:
+            return None
+        if measure is not None and abs(measure - 90.0) <= 0.75:
+            return None
+        drawing_angle = measure if measure is not None else 60.0
+        measured_marker = ""
+        measured_objects = ""
+        if measure is not None:
+            measured_marker = f'''
+        angle_A2 = Angle(
+            Line(A, c_positive), Line(A, a_positive),
+            radius=0.68, color=BLACK, other_angle=False,
+        )
+        degree_A2 = Text("{measure:g}°", font_size=24).move_to(
+            A + 1.15 * angle_two_direction
+        )
+'''
+            measured_objects = "\n            angle_A2, degree_A2,"
+        return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, infinite_line, parallel_segment_marks
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        theta = np.deg2rad({drawing_angle:g})
+        a_direction = np.array([1.0, 0.0, 0.0])
+        b_direction = np.array([1.0, 0.0, 0.0])
+        c_direction = np.array([np.cos(theta), -np.sin(theta), 0.0])
+        A = np.array([-0.8, 1.4, 0.0])
+        B = A + (2.8 / np.sin(theta)) * c_direction
+        a_positive, a_negative = A + a_direction, A - a_direction
+        b_positive, b_negative = B + b_direction, B - b_direction
+        c_positive, c_negative = A + c_direction, A - c_direction
+        line_a = infinite_line(a_negative, a_positive, half_length=4.2)
+        line_b = infinite_line(b_negative, b_positive, half_length=4.2)
+        line_c = infinite_line(c_negative, c_positive, half_length=4.5)
+        angle_one_direction = np.array([
+            np.cos(np.pi - theta / 2), np.sin(np.pi - theta / 2), 0.0
+        ])
+        angle_two_direction = np.array([
+            np.cos(-theta / 2), np.sin(-theta / 2), 0.0
+        ])
+        angle_three_direction = np.array([
+            np.cos(1.5 * np.pi - theta / 2), np.sin(1.5 * np.pi - theta / 2), 0.0
+        ])
+        angle_four_direction = np.array([
+            np.cos((np.pi - theta) / 2), np.sin((np.pi - theta) / 2), 0.0
+        ])
+        labels_at_A = VGroup(
+            Text("1", font_size=22).move_to(A + 0.60 * angle_one_direction),
+            Text("2", font_size=22).move_to(A + 0.36 * angle_two_direction),
+            Text("3", font_size=22).move_to(A + 0.64 * angle_three_direction),
+            Text("4", font_size=22).move_to(A + 0.64 * angle_four_direction),
+        )
+        labels_at_B = VGroup(
+            Text("1", font_size=22).move_to(B + 0.60 * angle_one_direction),
+            Text("2", font_size=22).move_to(B + 0.60 * angle_two_direction),
+            Text("3", font_size=22).move_to(B + 0.64 * angle_three_direction),
+            Text("4", font_size=22).move_to(B + 0.64 * angle_four_direction),
+        )
+{measured_marker}        self.add(
+            line_a, line_b, line_c,
+            parallel_segment_marks((a_negative, a_positive), (b_negative, b_positive), count=1),
+            labels_at_A, labels_at_B,{measured_objects}
+            Text("a", font_size=25).next_to(line_a.get_end(), RIGHT, buff=0.08),
+            Text("b", font_size=25).next_to(line_b.get_end(), RIGHT, buff=0.08),
+            Text("c", font_size=25).next_to(line_c.get_end(), RIGHT, buff=0.08),
+            Dot(A), Dot(B),
+            Text("A", font_size=24).move_to(A + np.array([0.0, 0.95, 0.0])),
+            Text("B", font_size=24).move_to(B + np.array([0.0, 0.95, 0.0])),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, infinite_line
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-2.0, 0.0, 0.0])
+        B = np.array([2.0, 0.0, 0.0])
+        a_direction = np.array([1.0, 2.2, 0.0])
+        b_direction = np.array([-1.0, 1.6, 0.0])
+        c_direction = np.array([1.0, 0.0, 0.0])
+        a_positive, a_negative = A + a_direction, A - a_direction
+        b_positive, b_negative = B + b_direction, B - b_direction
+        c_left, c_right = A - c_direction, B + c_direction
+        line_a = infinite_line(a_negative, a_positive, half_length=3.4)
+        line_b = infinite_line(b_negative, b_positive, half_length=3.4)
+        line_c = infinite_line(c_left, c_right, half_length=4.3)
+        labels_at_A = VGroup(
+            Text("1", font_size=22).move_to(A + np.array([0.51, 0.23, 0.0])),
+            Text("2", font_size=22).move_to(A + np.array([-0.30, 0.54, 0.0])),
+            Text("3", font_size=22).move_to(A + np.array([-0.51, -0.23, 0.0])),
+            Text("4", font_size=22).move_to(A + np.array([0.30, -0.54, 0.0])),
+        )
+        labels_at_B = VGroup(
+            Text("1", font_size=22).move_to(B + np.array([0.30, 0.54, 0.0])),
+            Text("2", font_size=22).move_to(B + np.array([-0.51, 0.23, 0.0])),
+            Text("3", font_size=22).move_to(B + np.array([-0.30, -0.54, 0.0])),
+            Text("4", font_size=22).move_to(B + np.array([0.51, -0.23, 0.0])),
+        )
+        self.add(
+            line_a, line_b, line_c,
+            labels_at_A, labels_at_B,
+            Text("a", font_size=25).next_to(line_a.get_end(), UP, buff=0.08),
+            Text("b", font_size=25).next_to(line_b.get_end(), UP, buff=0.08),
+            Text("c", font_size=25).next_to(line_c.get_end(), RIGHT, buff=0.08),
+            Dot(A), Dot(B),
+            Text("A", font_size=24).move_to(A + np.array([0.0, -1.0, 0.0])),
+            Text("B", font_size=24).move_to(B + np.array([0.0, -1.0, 0.0])),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
 
 
 def _radius_chord_external_point_scene(problem: str, animate: bool) -> str | None:
@@ -522,6 +815,121 @@ class GeoScene(Scene):
             safe_point_label(D, "D", B, C, E, F),
             safe_point_label(E, "E", A, C, D),
             safe_point_label(F, "F", A, B, D),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
+def _triangle_median_with_trisected_side_scene(
+    problem: str, animate: bool,
+) -> str | None:
+    """Build a triangle with median AM and A-D-E-B trisecting side AB exactly."""
+    compact = re.sub(r"[^A-Z0-9]+", "", _fold_geometry_notation(problem))
+    if not (
+        "TAMGIACABC" in compact
+        and "TRUNGTUYENAM" in compact
+        and ("HAIDIEMDVAETRENCANHAB" in compact or "DIEMDVAETRENCANHAB" in compact)
+        and "ADDEEB" in compact
+        and "DNAMGIUAHAIDIEMAE" in compact
+    ):
+        return None
+
+    draws_dc_em = "DCEM" in compact
+    draws_intersection_i = "DCCATAMTAII" in compact
+    auxiliary_definitions = ""
+    auxiliary_lines = ""
+    auxiliary_points = ""
+    auxiliary_labels = ""
+    other_points = "(A, D, E)"
+    if draws_dc_em or draws_intersection_i:
+        auxiliary_lines = "            Line(D, C), Line(E, M),\n"
+    if draws_intersection_i:
+        auxiliary_definitions = "        I = ray_intersection(D, C - D, A, M - A)\n"
+        auxiliary_points = " Dot(I),"
+        auxiliary_labels = (
+            '            safe_point_label(I, "I", A, C, D, M, distance=0.34),\n'
+        )
+        other_points = "(A, D, E, I)"
+
+    # Keep BC horizontal and use affine division so all incidences and equalities are exact.
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, median_segment, midpoint_marker, ray_intersection, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-1.0, 3.2, 0.0])
+        B = np.array([-4.0, 0.0, 0.0])
+        C = np.array([4.5, 0.0, 0.0])
+        M = (B + C) / 2.0
+        D = A + (B - A) / 3.0
+        E = A + 2.0 * (B - A) / 3.0
+{auxiliary_definitions}        self.add(
+{auxiliary_lines}            Line(A, B), Line(B, C), Line(C, A),
+            median_segment(A, M, B, C),
+            midpoint_marker(M, B, C, other_points={other_points}, count=1),
+            equal_segment_marks((A, D), (D, E), (E, B), count=2),
+            Dot(A), Dot(B), Dot(C), Dot(M), Dot(D), Dot(E),{auxiliary_points}
+            safe_point_label(A, "A", B, C, M, D, E),
+            safe_point_label(B, "B", A, C, M, D, E),
+            safe_point_label(C, "C", A, B, M),
+            safe_point_label(M, "M", A, B, C, distance=0.38),
+            safe_point_label(D, "D", A, B, E, distance=0.34),
+            safe_point_label(E, "E", A, B, D, distance=0.34),
+{auxiliary_labels}        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
+def _congruent_triangles_scene(problem: str, animate: bool) -> str | None:
+    """Draw two explicitly requested congruent triangles with full correspondence marks."""
+    congruent_pairs = _explicit_congruent_triangles(problem)
+    if not congruent_pairs:
+        return None
+    first, second = congruent_pairs[0]
+
+    A, B, C = first
+    D, E, F = second
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, interior_angle_marker, safe_point_label, upright_polygon_check
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        {A} = np.array([-3.4, 1.5, 0.0])
+        {B} = np.array([-4.0, -1.5, 0.0])
+        {C} = np.array([0.0, -1.5, 0.0])
+        offset = np.array([4.8, 0.0, 0.0])
+        {D} = {A} + offset
+        {E} = {B} + offset
+        {F} = {C} + offset
+        upright_polygon_check([{A}, {B}, {C}], names="{first}")
+        upright_polygon_check([{D}, {E}, {F}], names="{second}")
+        self.add(
+            Line({A}, {B}), Line({B}, {C}), Line({C}, {A}),
+            Line({D}, {E}), Line({E}, {F}), Line({F}, {D}),
+            equal_segment_marks(({A}, {B}), ({D}, {E}), count=1),
+            equal_segment_marks(({B}, {C}), ({E}, {F}), count=2),
+            equal_segment_marks(({C}, {A}), ({F}, {D}), count=3),
+            interior_angle_marker([{A}, {B}, {C}], 0, mark_count=1),
+            interior_angle_marker([{D}, {E}, {F}], 0, mark_count=1),
+            interior_angle_marker([{A}, {B}, {C}], 1, mark_count=2),
+            interior_angle_marker([{D}, {E}, {F}], 1, mark_count=2),
+            interior_angle_marker([{A}, {B}, {C}], 2, mark_count=3),
+            interior_angle_marker([{D}, {E}, {F}], 2, mark_count=3),
+            *[Dot(point) for point in ({A}, {B}, {C}, {D}, {E}, {F})],
+            safe_point_label({A}, "{A}", {B}, {C}),
+            safe_point_label({B}, "{B}", {A}, {C}),
+            safe_point_label({C}, "{C}", {A}, {B}),
+            safe_point_label({D}, "{D}", {E}, {F}),
+            safe_point_label({E}, "{E}", {D}, {F}),
+            safe_point_label({F}, "{F}", {D}, {E}),
         )
         fit_scene_to_frame(self)
         {wait}
@@ -974,6 +1382,14 @@ def validate_code(code: str, problem: str | None = None) -> None:
             },
         })
 
+    for segment_keys, equality_count in equality_groups:
+        for midpoint_info in midpoint_call_info:
+            if segment_keys and equality_count == midpoint_info["count"]:
+                raise ValueError(
+                    "Nhóm cạnh bằng nhau và hai nửa của một đoạn có trung điểm phải dùng "
+                    "số vạch khác nhau; cùng kiểu vạch sẽ khẳng định sai rằng mọi đoạn đều bằng nhau."
+                )
+
     perpendicular_marker_keys = set()
     for call in perpendicular_intersection_calls:
         first, second, intersection = call.args[:3]
@@ -1017,11 +1433,19 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 "Không được vẽ đường tròn chỉ xuất hiện trong phần cần chứng minh; "
                 "chỉ vẽ đường tròn khi nó thuộc giả thiết hoặc phép dựng của đề."
             )
-        point_tokens = re.findall(r"(?<![A-Z])([A-Z]{2,6})(?![A-Z])", problem)
+        point_tokens = re.findall(r"(?<![A-Z])([A-Z]{2,12})(?![A-Z])", problem)
+        point_tokens += re.findall(
+            r"(?:tam\s+giác|tứ\s+giác|ngũ\s+giác|lục\s+giác|đa\s+giác|"
+            r"hình\s+(?:vuông|chữ\s+nhật|thoi|bình\s+hành|thang))"
+            r"(?:\s+(?:vuông|cân|đều|thường))*\s+([a-z]{2,12})\b",
+            problem,
+            re.I,
+        )
         point_tokens += re.findall(
             r"(?:góc|điểm|tâm|tại|gọi|lấy)\s+([A-Z])\b", problem, re.I
         )
         expected_points = {letter for token in point_tokens for letter in token.upper()}
+        expected_extended_labels = _extended_point_labels(problem)
 
         stated_equilateral_triangles = [
             match.group(1).upper()
@@ -1106,14 +1530,16 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 )
 
         stated_equalities = [
-            (tuple(sorted(match.group(1).upper())), tuple(sorted(match.group(2).upper())))
-            for match in re.finditer(
-                r"\b([A-Z]{2})\s*=\s*([A-Z]{2})\b",
-                drawing_facts,
-                re.I,
-            )
+            (tuple(sorted(left)), tuple(sorted(right)))
+            for left, right in _explicit_segment_equality_pairs(drawing_facts)
         ]
         given_equal_pairs = list(stated_equalities)
+        for first, second in _explicit_congruent_triangles(drawing_facts):
+            given_equal_pairs.extend((
+                (tuple(sorted((first[0], first[1]))), tuple(sorted((second[0], second[1])))),
+                (tuple(sorted((first[1], first[2]))), tuple(sorted((second[1], second[2])))),
+                (tuple(sorted((first[2], first[0]))), tuple(sorted((second[2], second[0])))),
+            ))
         parent_equalities = {frozenset((left, right)) for left, right in stated_equalities}
         for match in re.finditer(
             r"tam\s+giác\s+([A-Z]{3})\s+(?:vuông\s+)?cân\s+tại\s+([A-Z])",
@@ -1223,6 +1649,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
             value = node.value.strip()
             if re.fullmatch(r"[A-Z]{1,12}", value):
                 literal_labels.update(value)
+            elif _EXTENDED_POINT_LABEL.fullmatch(value):
+                literal_labels.add(value.upper())
         for node in ast.walk(construct):
             if not (
                 isinstance(node, ast.Call)
@@ -1231,12 +1659,15 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 and len(node.args) >= 2
                 and isinstance(node.args[1], ast.Constant)
                 and isinstance(node.args[1].value, str)
-                and len(node.args[1].value) == 1
-                and node.args[1].value.isupper()
+                and (
+                    (len(node.args[1].value) == 1 and node.args[1].value.isupper())
+                    or _EXTENDED_POINT_LABEL.fullmatch(node.args[1].value)
+                )
             ):
                 continue
-            defined_points.add(node.args[1].value)
-            literal_labels.add(node.args[1].value)
+            label = node.args[1].value.upper()
+            defined_points.add(label)
+            literal_labels.add(label)
         has_dot = any(
             isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
             and node.func.id == "Dot"
@@ -1250,7 +1681,7 @@ def validate_code(code: str, problem: str | None = None) -> None:
         if has_dot and has_label_drawing and expected_points <= literal_labels:
             defined_points.update(expected_points)
         missing_points = sorted(expected_points - defined_points)
-        missing_labels = sorted(expected_points - literal_labels)
+        missing_labels = sorted((expected_points | expected_extended_labels) - literal_labels)
         for node in ast.walk(construct):
             if isinstance(node, (ast.Assign, ast.AnnAssign)):
                 value = node.value
@@ -1545,12 +1976,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
             for segment in (relation.group(1).upper(), relation.group(2).upper())
         }
         stated_equalities = [
-            (tuple(sorted(match.group(1).upper())), tuple(sorted(match.group(2).upper())))
-            for match in re.finditer(
-                r"\b([A-Z]{2})\s*=\s*([A-Z]{2})\b",
-                drawing_facts,
-                re.I,
-            )
+            (tuple(sorted(left)), tuple(sorted(right)))
+            for left, right in _explicit_segment_equality_pairs(drawing_facts)
         ]
         if stated_equalities:
             if "equal_segment_marks" not in called_names:
@@ -1583,8 +2010,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
                         "Không tự đánh dấu cạnh bằng nhau của hình bình hành, hình chữ nhật, "
                         "hình vuông hoặc hình thoi khi đề không cho đẳng thức đó."
                     )
-        if ("//" in drawing_request or "song song" in drawing_request
-                or "parallel" in drawing_request) and "parallel_segment_marks" not in called_names:
+        if (_has_positive_parallel_relation(drawing_facts)
+                and "parallel_segment_marks" not in called_names):
             raise ValueError(
                 "Thiếu kiểm tra quan hệ song song được nêu trực tiếp trong đề bằng "
                 "parallel_segment_marks((A, B), (C, D))."
@@ -1639,6 +2066,7 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 )
 
         def carrier_is_drawn(carrier: str, intersection: str) -> bool:
+            drawn_line_pairs = set()
             for assignment in ast.walk(construct):
                 if not isinstance(assignment, ast.Assign):
                     continue
@@ -1648,7 +2076,6 @@ def validate_code(code: str, problem: str | None = None) -> None:
                     and assignment.value.func.id in {"Line", "line_through_intersection"}
                     and len(assignment.value.args) >= 2
                     and all(isinstance(value, ast.Name) for value in assignment.value.args[:2])
-                    and {assignment.value.args[0].id, assignment.value.args[1].id} == set(carrier)
                 ):
                     continue
                 assigned_names = {
@@ -1657,8 +2084,13 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 if not assigned_names & added_names:
                     continue
                 if assignment.value.func.id == "Line":
-                    return True
-                if (len(assignment.value.args) >= 3
+                    drawn_line_pairs.add(tuple(sorted((
+                        assignment.value.args[0].id,
+                        assignment.value.args[1].id,
+                    ))))
+                    continue
+                if ({assignment.value.args[0].id, assignment.value.args[1].id} == set(carrier)
+                        and len(assignment.value.args) >= 3
                         and isinstance(assignment.value.args[2], ast.Name)
                         and assignment.value.args[2].id == intersection):
                     return True
@@ -1679,14 +2111,38 @@ def validate_code(code: str, problem: str | None = None) -> None:
                             and child.func.id in {"Line", "line_through_intersection"}
                             and len(child.args) >= 2
                             and all(isinstance(value, ast.Name) for value in child.args[:2])
-                            and {child.args[0].id, child.args[1].id} == set(carrier)
                         ):
                             continue
                         if child.func.id == "Line":
-                            return True
-                        if (len(child.args) >= 3 and isinstance(child.args[2], ast.Name)
+                            drawn_line_pairs.add(tuple(sorted((
+                                child.args[0].id,
+                                child.args[1].id,
+                            ))))
+                            continue
+                        if ({child.args[0].id, child.args[1].id} == set(carrier)
+                                and len(child.args) >= 3 and isinstance(child.args[2], ast.Name)
                                 and child.args[2].id == intersection):
                             return True
+            full_carrier = tuple(sorted(carrier))
+            if full_carrier in drawn_line_pairs:
+                return True
+            first_half = tuple(sorted((carrier[0], intersection)))
+            second_half = tuple(sorted((intersection, carrier[1])))
+            if first_half in drawn_line_pairs and second_half in drawn_line_pairs:
+                return True
+            for node in ast.walk(construct):
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id in {"median_segment", "altitude_segment"}
+                    and len(node.args) >= 2
+                    and all(isinstance(argument, ast.Name) for argument in node.args[:2])
+                    and {node.args[0].id, node.args[1].id} == set(carrier)
+                ):
+                    continue
+                assigned_name = assigned_visible_helpers.get(id(node))
+                if id(node) in added_call_ids or assigned_name in added_names:
+                    return True
             return False
 
         for left, right, intersection in paired_intersections:
@@ -2110,14 +2566,14 @@ def _ensure_stated_right_angle_markers(code: str, problem: str | None) -> str:
 
 
 def _classification_shapes(problem: str | None) -> list[str]:
-    """Return polygons explicitly named in a 'what shape is ...?' proof goal."""
+    """Return every explicitly named polygon whose boundary must be visible."""
     if not problem:
         return []
     folded = _fold_geometry_notation(problem)
     found: list[str] = []
     patterns = (
-        r"TU\s+GIAC\s+([A-Z]{4})\s+(?:LA\s+)?HINH\s+GI",
-        r"TAM\s+GIAC\s+([A-Z]{3})\s+(?:LA\s+)?(?:TAM\s+GIAC|HINH)\s+GI",
+        r"\bTU\s+GIAC\s+([A-Z]{4})(?![A-Z])",
+        r"\bTAM\s+GIAC\s+([A-Z]{3})(?![A-Z])",
     )
     for pattern in patterns:
         for match in re.finditer(pattern, folded):
@@ -2208,7 +2664,7 @@ def _ensure_upright_polygon_checks(code: str, problem: str | None) -> str:
 
 
 def _ensure_classification_shape_edges(code: str, problem: str | None) -> str:
-    """Draw every boundary edge of a polygon whose type students must identify."""
+    """Draw every boundary edge of each triangle/quadrilateral explicitly named in the task."""
     shapes = _classification_shapes(problem)
     if not shapes:
         return code
@@ -2311,12 +2767,7 @@ def _ensure_ordinary_polygon_checks(code: str, problem: str | None) -> str:
         return code
 
     facts = _drawing_facts_text(problem or "")
-    equality_pairs = [
-        (match.group(1).upper(), match.group(2).upper())
-        for match in re.finditer(
-            r"\b([A-Z]{2})\s*(?:=|bằng)\s*([A-Z]{2})\b", facts, re.I,
-        )
-    ]
+    equality_pairs = _explicit_segment_equality_pairs(facts)
     measured = [
         (match.group(1).upper(), float(match.group(2).replace(",", ".")))
         for match in re.finditer(
@@ -2525,7 +2976,7 @@ def extract_problem_from_image(
     mime_type: str,
     settings: AiSettings,
 ) -> str:
-    """Read one Vietnamese geometry exercise image with DeepSeek Vision."""
+    """Read one Vietnamese school-math exercise image with DeepSeek Vision."""
     supported = {"image/png", "image/jpeg", "image/webp", "image/gif"}
     mime_type = (mime_type or "").casefold()
     if mime_type not in supported:
@@ -2542,9 +2993,12 @@ def extract_problem_from_image(
             {
                 "type": "text",
                 "text": (
-                    "Đọc chính xác đề bài hình học trong ảnh. Chỉ trả về nguyên văn đề bài, "
+                    "Đọc chính xác đề bài Toán trong ảnh, thuộc bất kỳ phân môn THCS–THPT nào "
+                    "như số học, đại số, hình học, hàm số, giải tích, xác suất hoặc thống kê. "
+                    "Chỉ trả về nguyên văn đề bài, "
                     "không giải, không nhận xét, không thêm Markdown. Giữ nguyên tên điểm, số đo, "
-                    "đơn vị, ký hiệu bằng nhau, song song, vuông góc và thứ tự các ý a), b), c). "
+                    "đơn vị, biểu thức, phân số, căn, số mũ, chỉ số, dấu tích phân, ma trận, bảng "
+                    "số liệu, ký hiệu bằng nhau, song song, vuông góc và thứ tự các ý a), b), c). "
                     "Chuẩn hóa lỗi xuống dòng nhưng không tự bổ sung dữ kiện không nhìn thấy. "
                     "Nếu đề nhắc đến một Hình đánh số và hình đó cũng hiện rõ trong ảnh, "
                     "sau nguyên văn đề bài thêm một dòng bắt đầu bằng 'Theo hình vẽ:' "
@@ -2581,8 +3035,11 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
-        _right_isosceles_altitude_midpoints_scene(problem, animate)
+        _transversal_numbered_angles_scene(problem, animate)
+        or _congruent_triangles_scene(problem, animate)
+        or _right_isosceles_altitude_midpoints_scene(problem, animate)
         or _triangle_point_with_two_parallels_scene(problem, animate)
+        or _triangle_median_with_trisected_side_scene(problem, animate)
         or _midradius_perpendicular_chord_tangent_scene(problem, animate)
         or _radius_chord_external_point_scene(problem, animate)
         or _right_trapezoid_with_perpendicular_diagonal_scene(problem, animate)

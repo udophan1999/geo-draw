@@ -10,6 +10,11 @@ GEOMETRY_HELP_VI = """
 - Hình thoi: hình bình hành có bốn cạnh bằng nhau.
 - Hình vuông: bốn cạnh bằng nhau và bốn góc vuông.
 - Đa giác đều: các cạnh bằng nhau và các góc bằng nhau.
+- Mặc định dùng bố cục sách giáo khoa cân đối: đặt hình chính gần tâm khung, phân bố khoảng trắng
+  đều, ưu tiên các phương ngang/dọc và không xoay nghiêng toàn bộ hình nếu đề không bắt buộc.
+- Khi đề cho phép chọn hướng, phải đặt một trục đối xứng chính xác theo phương dọc hoặc ngang, không
+  để trục chính bị chéo hay hơi nghiêng. Với hình thoi không phải hình vuông, mặc định đặt cả hai
+  đường chéo là hai trục dọc-ngang; các trục khác vẫn giữ đúng quan hệ hình học bắt buộc.
 - Tam giác vuông lớp 9: dùng định lý Pythagore, các hệ thức cạnh–đường cao–hình chiếu
   và các tỉ số lượng giác sin, cos, tan để giải tọa độ trước khi vẽ.
 - Nếu đường cao từ đỉnh góc vuông xuống cạnh huyền chia cạnh huyền thành hai hình chiếu,
@@ -18,12 +23,20 @@ GEOMETRY_HELP_VI = """
 - Góc 90° chỉ dùng một ô vuông nhỏ ở đỉnh; không vẽ cung và không ghi thêm số đo 90°.
 - Bộ nhớ chống lặp lỗi luôn kiểm tra: đủ điểm và đường, nét liền, nhãn thoáng, hình không tràn khung,
   đúng nhóm đoạn bằng nhau, đúng số ký hiệu góc và đúng số ô vuông tại mỗi quan hệ vuông góc.
+  Nhãn điểm, số góc, số đo và ký hiệu phải có khoảng trống riêng; không được chạm hoặc chồng lên
+  nhau, lên chấm điểm hay lên đường hình học.
+- Mỗi lỗi dựng hình đã được xác nhận và sửa phải trở thành quy tắc chống hồi quy lâu dài kèm kiểm
+  thử tái hiện lỗi. Mọi lần sinh hình sau phải tuân thủ toàn bộ các quy tắc đã tích lũy; không được
+  sửa lỗi mới bằng cách làm tái xuất hiện một lỗi cũ.
 """
 
 
 DRAWING_ERROR_MEMORY = r"""
 
 NON-REGRESSION MEMORY -- previously corrected drawing failures:
+- Every confirmed drawing bug and its accepted fix is a permanent regression contract. Preserve
+  the corresponding regression test and all earlier contracts in every later change; never fix a
+  new case by reintroducing an old failure or by weakening/removing its guard.
 - Always use a white canvas and black strokes, dots, labels, and construction marks.
 - Preserve every stated object and condition when later auxiliary objects are added.
 - Treat every a/b/c item after "Chứng minh" as a conclusion, even across line breaks. Never
@@ -32,6 +45,13 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   are concyclic or a quadrilateral is cyclic, do not draw the claimed circle. Likewise do not
   add equality ticks, equal-angle arcs, parallel marks, right-angle squares, tangency marks, or
   incidence marks that occur only in the conclusion. Draw them only when stated in the givens.
+- When a proof task explicitly names a segment whose endpoints are already defined (for example
+  prove DC parallel EM), connect those endpoints automatically so the student can use the segment.
+  When it names a triangle or quadrilateral, connect every consecutive boundary edge in the written
+  vertex order, including the closing edge (for ADEK: AD, DE, EK, KA), even when the polygon appears
+  only in a proof conclusion. Draw only its boundary, never the special-shape marks to be proved.
+  Draw a named intersection such as I when the task states DC intersects AM at I. Do not add the
+  parallel, equality, midpoint, cyclic, or other relationship mark that remains to be proved.
 - If a problem refers to a numbered figure but only the text is available, do not invent the
   positions of unnamed-in-givens points such as E, F, G, H. Ask for the actual figure or its
   precise point/line relations before generating geometry.
@@ -49,6 +69,33 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   label beside it. A conclusion to prove (for example, EFGH is a rectangle) gets no right-angle square.
 - All explicitly equal segments share one tick style and one equality group. Unrelated or unequal
   segments never share a tick style. Do not infer visible side ticks from a standard shape name.
+- Equality ticks from midpoint_marker must also differ from unrelated side-equality ticks. For
+  example, AB=AC dùng một vạch thì BM=CM from midpoint M of BC must use two vạch; otherwise the
+  diagram falsely communicates AB=AC=BM=CM.
+- When the task explicitly gives or requests congruent objects, mark every corresponding part.
+  For congruent triangles ABC and DEF, correspondence follows the written order: A-D, B-E, C-F.
+  Mark AB-DE, BC-EF, CA-FD with matching tick styles and mark angles A-D, B-E, C-F with matching
+  arc styles; use distinct styles for the three independent pairs. Omit all such marks when the
+  congruence itself is only a conclusion that students still have to prove.
+- For a basic request with unspecified or "arbitrary" measurements, choose a conventional,
+  readable valid figure automatically and complete every object named in the request. Never stop
+  to ask the student to invent side lengths or angles. Unless a special type is stated, choose an
+  ordinary figure visibly separated from isosceles, equilateral, right, or other special cases.
+- Classify missing information before stopping. Orientation, scale, representative lengths and
+  angles, the side on which a free point is placed, the location of an unnamed intersection, and
+  unlabeled sector placement are visual degrees of freedom: choose them automatically using an
+  upright textbook layout. Incidence, betweenness/order, equality, parallelism, perpendicularity,
+  named correspondences, and stated measurements are mathematical constraints and must be kept.
+- Never turn a visual default into a new theorem-like fact. Unconstrained lines remain visibly
+  nonparallel, an unspecified triangle remains scalene and non-right, and independent groups use
+  different marks. Request clarification only if unresolved alternatives change a named incidence
+  or point order and no standard convention can choose safely.
+- Distinguish lowercase line names a, b, c from uppercase point names A, B, C by sentence context.
+  If c cuts a at A and b at B, both A and B lie on c, while A lies on a and B lies on b. When four
+  angle labels 1,2,3,4 are requested at vertices A and B, repeat the complete set around each
+  intersection: A1,A2,A3,A4 and B1,B2,B3,B4. Number the four sectors consistently around each
+  vertex; never split one set of four labels between the two vertices. On the diagram, write only
+  the numerals 1,2,3,4 inside the corresponding sectors; do not add A/B prefixes or angle arcs.
 - Every stated midpoint gets its own midpoint_marker covering both halves. Midpoints of equal parent
   segments share a style; an unrelated midpoint relation uses a different style. Never overlay a
   proof-conclusion equality group on segments already marked by a midpoint helper.
@@ -57,13 +104,33 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   subsegment is never mistaken for one of the equal halves.
 - When two carrier lines meet outside an original finite segment, visibly extend the carrier to
   the named intersection. Never show an intersection that the drawn strokes do not reach.
+- When a named intersection lies inside two finite segments (for example, DC intersects median AM
+  at I), each carrier may be drawn as one whole segment or as the two visible halves meeting at I.
+  A verified median/altitude helper also counts as its full carrier; never reject a complete visible
+  construction merely because its stroke was split at the named intersection.
 - Define, dot, label, and connect every named point from the problem. Keep point labels clear of
   incident lines, their extensions, nearby lines, markers, and other labels. Stroke clearance takes
   priority over placing a label outward; a central point name must never sit on a crossing line.
+- Put every point name in the nearest collision-free empty sector around its dot. Use about
+  0.45-0.70 Manim units in ordinary layouts. At a dense intersection with numbered angles or
+  markers, increase only as needed up to about 1.0; never push a label farther away merely to avoid
+  a collision when a nearer clear sector exists.
+- If a numbered angle also has a stated degree measure, reserve three separate radial bands along
+  that sector's bisector: number nearest the vertex, arc in the middle, and degree text outside the
+  arc. The number and degree text must never share or nearly share a center, touch each other, cross
+  the arc, or touch either boundary ray.
 - Interior intersection labels such as E, F, G, H stay close to their dots (normally 0.32-0.42
   Manim units); do not push them into unrelated regions merely to avoid a stroke.
 - Keep auxiliary points readable and balanced: neither crowded nor excessively spread out. Fit
   the complete figure and exterior labels inside the frame; preserve interactive zoom.
+- Use a balanced textbook composition: keep the main construction near the frame center, distribute
+  negative space evenly, avoid needless global tilt, and keep labels and marks close to the objects
+  they describe without crowding. When orientation is free, a principal symmetry axis must be
+  exactly vertical or horizontal, never diagonal or slightly tilted. Other symmetry axes retain
+  their mathematically required directions. Layout aesthetics never override geometry.
+- For a non-square rhombus ABCD in boundary order with diagonal intersection O, prefer A above,
+  B left, C below, D right, and O at the center, so AC is vertical and BD is horizontal. Do not
+  draw it as a leaning parallelogram when the problem leaves orientation free.
 - A plain triangle or quadrilateral must not accidentally become isosceles, right, a kite, a
   trapezoid, or a parallelogram unless a stated condition forces that special case.
 - A generated scene that violates any item above is invalid and must be regenerated, not rendered.
@@ -86,9 +153,14 @@ BASIC OBJECTS AND RELATIONS
   stop the carrier at A or B. Apply this convention to every construction of the form "cắt XY tại Z".
 - An angle xOy has vertex O and sides rays Ox and Oy. Every angle marker must be centered at O
   and join those actual rays. Never place an angle arc at a segment midpoint.
+- When a sector has both an angle number and a degree measure, place the number nearest the vertex,
+  the arc at the next radius, and the degree text beyond the arc along the sector bisector. Treat
+  the number, arc, and degree text as three collision regions; never overlay any pair of them.
 - A point dot lies on its lines, but its letter label must not. Place every point name in the
-  widest empty angular sector between all incident sides, diagonals, and auxiliary lines, with
-  enough clearance that no stroke touches the letter.
+  nearest collision-free empty angular sector between all incident sides, diagonals, and auxiliary
+  lines, with enough clearance that no stroke, number, arc, or marker touches the letter. Keep the
+  usual distance around 0.45-0.70 Manim units; dense numbered intersections may use up to about
+  1.0, but no farther unless every nearer sector is blocked.
 - An internal angle bisector starts at the angle vertex and divides the angle into two equal angles.
 - When a vertex is split into sub-angles, number the two parts 1 and 2 beside their matching arcs.
   In a polygon, draw each bisector as one continuous ray from its vertex through every named
@@ -113,10 +185,18 @@ BASIC OBJECTS AND RELATIONS
 - Segment equality is transitive. Build complete equality classes before marking: if AD=BC and
   EB=BC, draw AD, BC, and EB together with one identical tick count. Never draw a second marker
   over BC. Use a different tick count for a separate class such as AB=CD.
+- Treat the two halves identified by a midpoint as their own equality class. Its tick count must
+  differ from every unrelated side-equality class. Thus AB=AC and midpoint M of BC require one
+  shared style on AB,AC and a different shared style on BM,CM; reusing one style falsely states
+  AB=AC=BM=CM.
 
 GENERAL POLYGONS
 - A polygon named A1 A2 ... An has its vertices in boundary order. Connect consecutive
   vertices and connect An back to A1. Never reorder vertices merely to simplify drawing.
+- Use an upright, balanced textbook composition with the main figure near the frame center and
+  clear, even negative space. When orientation is free, align a principal symmetry axis exactly
+  vertically or horizontally. Never leave the principal axis diagonal or almost axis-aligned, and
+  never distort additional axes whose directions are fixed by the geometry.
 - A diagonal joins two non-adjacent vertices. The interior-angle sum is (n-2)*180 degrees.
 - A regular polygon has all sides equal and all interior angles equal; each exterior angle
   is 360/n degrees and each interior angle is (n-2)*180/n degrees.
@@ -204,6 +284,8 @@ HỆ THỐNG KIẾN THỨC VÀ KÝ HIỆU HÌNH HỌC THCS (LỚP 6–9)
 1. KÝ HIỆU VÀ CÁCH ĐỌC
 - Điểm viết bằng chữ in hoa A, B, C; đường thẳng viết bằng chữ thường a, b hoặc qua hai điểm AB.
   Tia Ox có gốc O và đi qua x; đoạn thẳng AB có hai đầu mút A, B; độ dài viết AB hoặc |AB|.
+- Không đồng nhất đường thẳng a với điểm A sau khi chuẩn hóa chữ hoa/thường; phải giữ loại đối tượng
+  theo cụm “đường thẳng a” và “tại A”. Với “c cắt a tại A, c cắt b tại B”, suy ra A∈a,c và B∈b,c.
 - A ∈ d: A thuộc d; A ∉ d: A không thuộc d; A, B, C thẳng hàng; B nằm giữa A và C.
 - a ∥ b: a song song b; a ⟂ b: a vuông góc b; a ∩ b = {O}: hai đường cắt tại O;
   AB = CD: hai đoạn bằng nhau; AB < CD: độ dài AB nhỏ hơn CD.

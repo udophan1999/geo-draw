@@ -119,10 +119,15 @@ def build_figure(problem: Problem) -> Figure:
     elif problem.figure == "rhombus":
         a, b, c, d = problem.vertices
         side = _side(problem, a, b, 4.0)
-        pts[a] = (0.0, 0.0)
-        pts[b] = (side, 0.0)
-        pts[d] = _rotate((side, 0.0), 60)
-        pts[c] = _add(pts[b], pts[d])
+        # Use a centered textbook layout.  The 3-4-5 proportions keep every
+        # side equal while making the two symmetry axes exactly vertical and
+        # horizontal instead of presenting the rhombus as a leaning strip.
+        horizontal_half = side * 0.6
+        vertical_half = side * 0.8
+        pts[a] = (0.0, vertical_half)
+        pts[b] = (-horizontal_half, 0.0)
+        pts[c] = (0.0, -vertical_half)
+        pts[d] = (horizontal_half, 0.0)
         fig.segments = _ring_segments([a, b, c, d])
     elif problem.figure == "parallelogram":
         a, b, c, d = problem.vertices
