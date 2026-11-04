@@ -1,6 +1,7 @@
 import { EditorContent } from '@tiptap/react'
 import { ArrowUp, ImagePlus, Loader2, Omega, Sigma, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import { SymbolBar } from '@/components/chat/MathInput'
 import { useMathEditor } from '@/components/chat/useMathEditor'
@@ -43,8 +44,13 @@ export function Composer({ image, onImage, onSend, busy, placeholder, header, ac
 
   const submit = async () => {
     if (!canSend || !editor) return
+    const text = toMessageText(editor.state.doc).trim()
+    if (text.length > 20_000) {
+      toast.error('Tin nhắn dài hơn 20.000 ký tự; hãy chia thành các phần ngắn hơn.')
+      return
+    }
     setSubmitting(true)
-    const ok = await onSend(toMessageText(editor.state.doc).trim(), image)
+    const ok = await onSend(text, image)
     setSubmitting(false)
     if (ok) {
       editor.commands.clearContent(true)

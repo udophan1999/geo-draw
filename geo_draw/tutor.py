@@ -26,6 +26,8 @@ BACK_TO_HINTS = "hint"      # switch back to hints
 ACTIONS = (ASK, DEEPER, SHOW_SOLUTION, BACK_TO_HINTS)
 HISTORY_LIMIT = 32
 HISTORY_MESSAGE_CHARS = 3000
+MAX_USER_MESSAGE_CHARS = 20_000
+MESSAGE_TOO_LONG = "Tin nhắn dài hơn 20.000 ký tự; hãy chia đề hoặc câu hỏi thành các phần ngắn hơn."
 
 DEFAULT_TEXT = {
     DEEPER: "Em vẫn chưa nghĩ ra, mình gợi ý sâu hơn một chút được không?",
@@ -91,6 +93,9 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
             return _save_pair(store, conversation_id, emit, text, image_path, user_message_id,
                               str(exc), mode, level)
         request = recognized + (f"\n\n{text}" if text else "")
+        if len(request) > MAX_USER_MESSAGE_CHARS:
+            return _save_pair(store, conversation_id, emit, text, image_path, user_message_id,
+                              MESSAGE_TOO_LONG, mode, level)
 
     first_turn = not problem
     if first_turn:

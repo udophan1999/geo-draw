@@ -31,6 +31,7 @@ from geo_draw.conversations import ASSISTANT, CHAT, FIGURE, USER, Conversation, 
 from geo_draw.graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind
 from geo_draw.tutor import (
     ACTIONS, ASK, GENERIC, REPLY_DRAWING, REPLY_NOT_DRAWN, REPLY_SHOWN, SPECIFIC,
+    MAX_USER_MESSAGE_CHARS, MESSAGE_TOO_LONG,
     drawing_request, editable_message_ids, is_geometry_problem, record_canned_reply,
     rerun_tutor_turn, run_tutor_turn, should_auto_draw_geometry,
 )
@@ -166,6 +167,8 @@ async def send_message(
     """Start one tutor turn. Returns at once with the job to follow at ``/api/jobs/{id}/events``."""
     state = app_state(request)
     text = text.strip()
+    if len(text) > MAX_USER_MESSAGE_CHARS:
+        raise HTTPException(422, MESSAGE_TOO_LONG)
     if action not in ACTIONS:
         raise HTTPException(422, "Thao tác không hợp lệ.")
     image_bytes, image_type = None, None

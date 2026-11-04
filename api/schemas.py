@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from geo_draw.conversations import Conversation, Message
-from geo_draw.tutor import is_geometry_problem
+from geo_draw.tutor import MAX_USER_MESSAGE_CHARS, is_geometry_problem
 
 MODELS = ("deepseek-v4-flash", "deepseek-v4-pro")
 
@@ -34,7 +34,7 @@ class TitleUpdate(BaseModel):
 
 
 class MessageEdit(BaseModel):
-    text: str = Field(min_length=1, max_length=20000)
+    text: str = Field(min_length=1, max_length=MAX_USER_MESSAGE_CHARS)
 
 
 class FigureRequest(BaseModel):

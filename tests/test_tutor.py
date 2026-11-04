@@ -218,6 +218,13 @@ class TutorTurnTests(unittest.TestCase):
         self.assertTrue(question.image_path.is_file())
         self.assertEqual(self.store.get("alice", self.conversation.id).problem, TRIANGLE)
 
+    def test_ocr_result_over_the_message_limit_is_rejected_cleanly(self):
+        with patch("geo_draw.tutor.extract_problem_from_image", return_value="x" * 20_001):
+            (question, reply), _ = self.turn(text="", image=b"png", image_type="image/png")
+        self.assertEqual(question.text, "")
+        self.assertIn("20.000 ký tự", reply.text)
+        self.assertTrue(reply.meta["error"])
+
     def test_old_drawing_only_conversations_keep_their_problem(self):
         self.store.add_message(self.conversation.id, USER, TRIANGLE)  # legacy figure request
         (question, _), prompt = self.turn(text="Em không biết tính BC")
