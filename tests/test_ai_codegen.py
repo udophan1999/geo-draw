@@ -40,6 +40,10 @@ class GeoScene(Scene):
 
 
 class AiCodegenTests(unittest.TestCase):
+    def test_prompt_normalizes_lowercase_polygon_vertices_only(self):
+        self.assertIn('"tam giác abc" means points A, B, C', SYSTEM_PROMPT)
+        self.assertIn("Do not uppercase isolated lowercase", SYSTEM_PROMPT)
+
     def test_transversal_numbered_angles_accepts_flexible_wording(self):
         variants = (
             "Vẽ hình: Cho đường thẳng c cắt đường thẳng a tại A, đường thẳng c cắt "

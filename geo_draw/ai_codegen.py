@@ -214,6 +214,10 @@ Exact construction requirements:
   a at A and b at B, distribute labels in written order: 1,2 around A and 3,4 around B. If the
   exact sectors are not specified, choose a consistent readable convention and draw instead of
   asking the student to choose positions.
+- A compact vertex run immediately following a named polygon is a point list even when the student
+  typed it in lowercase: "tam giác abc" means points A, B, C and "ngũ giác abcde" means
+  A, B, C, D, E. Normalize those display labels to uppercase. Do not uppercase isolated lowercase
+  letters, which may be line names or algebra variables.
 - For all mathematical markers and special lines, use the verified helpers from
   `geo_draw.geometry_primitives`: apply_light_theme, interior_angle_marker, equal_segment_marks,
   parallel_segment_marks, midpoint_marker, median_segment, altitude_segment,
@@ -1396,7 +1400,14 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 "Không được vẽ đường tròn chỉ xuất hiện trong phần cần chứng minh; "
                 "chỉ vẽ đường tròn khi nó thuộc giả thiết hoặc phép dựng của đề."
             )
-        point_tokens = re.findall(r"(?<![A-Z])([A-Z]{2,6})(?![A-Z])", problem)
+        point_tokens = re.findall(r"(?<![A-Z])([A-Z]{2,12})(?![A-Z])", problem)
+        point_tokens += re.findall(
+            r"(?:tam\s+giác|tứ\s+giác|ngũ\s+giác|lục\s+giác|đa\s+giác|"
+            r"hình\s+(?:vuông|chữ\s+nhật|thoi|bình\s+hành|thang))"
+            r"(?:\s+(?:vuông|cân|đều|thường))*\s+([a-z]{2,12})\b",
+            problem,
+            re.I,
+        )
         point_tokens += re.findall(
             r"(?:góc|điểm|tâm|tại|gọi|lấy)\s+([A-Z])\b", problem, re.I
         )
