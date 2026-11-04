@@ -108,3 +108,8 @@ alwaysApply: true
   không chép lại đề hay diễn giải lặp. Chỉ dùng ⇔ cho tương đương và ⇒ cho suy ra; không được rút gọn
   bằng cách bỏ điều kiện, trường hợp, đơn vị, căn cứ chứng minh hoặc ý nhỏ mà đề yêu cầu. Quy tắc này
   là khối bắt buộc, không bị prompt quản trị tùy chỉnh ghi đè.
+- Không được thêm “Hướng giải”, “Bước 1/2/3” hoặc “Lưu ý” vào lời giải chi tiết. Với đề nhiều ý chỉ
+  dùng tiêu đề a), b), c); mỗi ý thường gồm 2–5 dòng công thức/suy luận. Không viết lại cùng một dữ
+  kiện dưới dạng định nghĩa, đẳng thức và câu văn riêng; tên định lý/căn cứ chỉ ghi trong cụm ngắn.
+  Trước khi xuất, phải tự kiểm tra mọi phép tính, suy luận, trường hợp và ý nhỏ; không dùng kết luận
+  làm giả thiết. Khi có nhiều cách, chọn cách ngắn nhất vẫn chặt chẽ như bài giải của giáo viên.

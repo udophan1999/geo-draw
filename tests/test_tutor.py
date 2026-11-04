@@ -12,9 +12,9 @@ from geo_draw.conversations import (
     ASSISTANT, CHAT, FIGURE, HINT, SOLUTION, USER, ConversationStore,
 )
 from geo_draw.tutor import (
-    DEEPER, GENERIC, SHOW_SOLUTION, SPECIFIC, drawing_request, is_geometry_problem,
-    editable_message_ids, is_solid_problem, record_canned_reply, run_tutor_turn, should_auto_draw_geometry,
-    rerun_tutor_turn, suggest_title,
+    DEEPER, GENERIC, SHOW_SOLUTION, SOLUTION_MAX_TOKENS, SPECIFIC, drawing_request,
+    editable_message_ids, is_geometry_problem, is_solid_problem, record_canned_reply,
+    rerun_tutor_turn, run_tutor_turn, should_auto_draw_geometry, suggest_title,
 )
 from geo_draw.tutor_prompts import (
     ACCESSIBLE_QUESTION_RULE, CONCISE_SOLUTION_RULE, FIGURE_DRAWING, FIGURE_NONE,
@@ -78,8 +78,15 @@ class PromptTests(unittest.TestCase):
         self.assertIn("**Kết luận:**", prompt)
         self.assertIn(CONCISE_SOLUTION_RULE, prompt)
         self.assertIn("Ưu tiên công thức, phép biến đổi và ký hiệu toán học", prompt)
-        self.assertIn("không chép lại nguyên đề", prompt)
+        self.assertIn("không chép lại đề", prompt)
         self.assertIn("Chỉ dùng ⇔", prompt)
+        self.assertIn("Không viết các mục “Hướng giải”, “Bước 1”", prompt)
+        self.assertIn("Mỗi ý a), b), c) thường chỉ gồm 2–5 dòng", prompt)
+        self.assertIn("lời giải phải chính xác, đủ căn cứ", prompt)
+        self.assertIn("tự kiểm tra âm thầm từng phép tính và suy luận", prompt)
+        self.assertIn("điều cần chứng minh làm giả thiết", prompt)
+        self.assertIn("chọn cách ngắn nhất mà vẫn chặt chẽ", prompt)
+        self.assertNotIn("thêm một mục ngắn **Lưu ý**", prompt)
         self.assertNotIn("KHÔNG THỂ GHI ĐÈ", prompt)
         self.assertNotIn(ACCESSIBLE_QUESTION_RULE, prompt)
 
@@ -173,6 +180,15 @@ class TutorTurnTests(unittest.TestCase):
         self.assertEqual((conversation.mode, conversation.hint_level), (SOLUTION, 2))
         self.assertNotIn("KHÔNG THỂ GHI ĐÈ", prompt[0]["content"])
         self.assertEqual(len(self.store.messages(self.conversation.id, CHAT)), 6)
+
+    def test_detailed_solution_has_a_bounded_output_budget(self):
+        self.turn(text=TRIANGLE)
+        with patch("geo_draw.tutor.stream_chat", return_value=iter(["**Kết luận:** $BC=5$. "])) as stream, \
+                patch("geo_draw.tutor._request_chat", side_effect=ValueError("offline")):
+            run_tutor_turn(
+                self.store, "alice", self.conversation.id, action=SHOW_SOLUTION, ai=AI,
+            )
+        self.assertEqual(stream.call_args.kwargs["max_tokens"], SOLUTION_MAX_TOKENS)
 
     def test_the_tutor_moves_the_level_as_the_student_progresses(self):
         self.turn(text=TRIANGLE, replies=("Đúng rồi. Em nhớ định lý nào?\n", "[[ba", "c:2]]"))

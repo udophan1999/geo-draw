@@ -27,6 +27,7 @@ ACTIONS = (ASK, DEEPER, SHOW_SOLUTION, BACK_TO_HINTS)
 HISTORY_LIMIT = 32
 HISTORY_MESSAGE_CHARS = 3000
 MAX_USER_MESSAGE_CHARS = 20_000
+SOLUTION_MAX_TOKENS = 3000
 MESSAGE_TOO_LONG = "Tin nhắn dài hơn 20.000 ký tự; hãy chia đề hoặc câu hỏi thành các phần ngắn hơn."
 
 DEFAULT_TEXT = {
@@ -210,7 +211,8 @@ def _answer(store: ConversationStore, owner: str, conversation_id: str, *,
     reply_text, reply_meta = "", dict(meta)
     hidden = _ProgressTagFilter()
     try:
-        for piece in stream_chat(ai, model_messages, max_tokens=6000 if mode == SOLUTION else 1500):
+        for piece in stream_chat(
+                ai, model_messages, max_tokens=SOLUTION_MAX_TOKENS if mode == SOLUTION else 1500):
             reply_text += piece
             shown = hidden.feed(piece)
             if shown:
