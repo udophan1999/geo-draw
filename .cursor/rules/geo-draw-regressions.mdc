@@ -74,3 +74,6 @@ alwaysApply: true
 - Các yêu cầu “biểu đồ cột”, “biểu đồ tròn”, “biểu đồ đường”, tần số/tần suất và histogram phải
   được định tuyến sang bộ vẽ biểu đồ AI. Giữ đủ nhãn và số liệu, đúng loại biểu đồ được yêu cầu;
   không trả lời rằng không có gì để vẽ và không thay biểu đồ bằng một đồ thị hàm số.
+- Luôn cho phép sửa đề bài đầu tiên hoặc tin nhắn học sinh gần nhất. Khi sửa đề đầu tiên, phải xóa
+  mọi lượt chat và hình vẽ phát sinh từ đề cũ, cập nhật đề/tên cuộc trò chuyện và chỉ tự vẽ lại nếu
+  đề mới là hình học; không được để hình cũ tồn tại bên cạnh đề mới.
