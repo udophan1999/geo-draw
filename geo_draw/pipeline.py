@@ -13,10 +13,13 @@ from pathlib import Path
 from .ai_codegen import AiSettings, generate_manim_code, missing_reference_figure_points
 from .branding import APP_NAME
 from .engine import build_figure
-from .graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind, generate_graph_code
+from .graphing import (
+    GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, SOLID, SOLID_NEEDS_AI, drawing_kind, generate_graph_code,
+)
 from .parser import UnsupportedProblemError, parse_problem
 from .renderer import render_scene
 from .scene_builder import write_scene
+from .solid_codegen import generate_solid_code
 
 REPAIR_ATTEMPTS = 3
 
@@ -83,8 +86,11 @@ def draw(problem: str, folder: Path, *, ai: AiSettings | None, quality: str = "l
         return DrawingOutcome(False, NOT_DRAWABLE)
     if kind == GRAPH and ai is None:
         return DrawingOutcome(False, GRAPH_NEEDS_AI)
+    if kind == SOLID and ai is None:
+        return DrawingOutcome(False, SOLID_NEEDS_AI)
     # Functions and integrals get axes and curves; the geometry prompt would invent a triangle.
-    generate = generate_graph_code if kind == GRAPH else generate_manim_code
+    generate = (generate_graph_code if kind == GRAPH else
+                generate_solid_code if kind == SOLID else generate_manim_code)
     if ai is not None:
         if not ai.api_key:
             return DrawingOutcome(False, "Máy chủ chưa cấu hình khóa AI.")
