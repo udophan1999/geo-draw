@@ -212,18 +212,28 @@ class TutorTurnTests(unittest.TestCase):
         self.assertEqual(self.store.get("alice", self.conversation.id).hint_level, 1)
 
     def test_a_photo_is_read_into_the_problem(self):
-        with patch("geo_draw.tutor.extract_problem_from_image", return_value=TRIANGLE):
+        with patch("geo_draw.tutor.extract_problem_from_images", return_value=TRIANGLE):
             (question, _), _ = self.turn(text="", image=b"png", image_type="image/png")
         self.assertEqual(question.text, TRIANGLE)
         self.assertTrue(question.image_path.is_file())
         self.assertEqual(self.store.get("alice", self.conversation.id).problem, TRIANGLE)
 
     def test_ocr_result_over_the_message_limit_is_rejected_cleanly(self):
-        with patch("geo_draw.tutor.extract_problem_from_image", return_value="x" * 20_001):
+        with patch("geo_draw.tutor.extract_problem_from_images", return_value="x" * 20_001):
             (question, reply), _ = self.turn(text="", image=b"png", image_type="image/png")
         self.assertEqual(question.text, "")
         self.assertIn("20.000 ký tự", reply.text)
         self.assertTrue(reply.meta["error"])
+
+    def test_multiple_problem_images_are_saved_and_read_together(self):
+        with patch("geo_draw.tutor.extract_problem_from_images", return_value=TRIANGLE) as ocr:
+            (question, _), _ = self.turn(
+                text="", image=b"page-one", image_type="image/png",
+                additional_images=[(b"page-two", "image/jpeg")],
+            )
+        self.assertEqual(len(ocr.call_args.args[0]), 2)
+        self.assertTrue(question.image_path.is_file())
+        self.assertTrue((question.image_path.parent / "problem-2.jpg").is_file())
 
     def test_old_drawing_only_conversations_keep_their_problem(self):
         self.store.add_message(self.conversation.id, USER, TRIANGLE)  # legacy figure request

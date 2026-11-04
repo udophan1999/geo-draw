@@ -310,7 +310,7 @@ class ChatTests(ApiTestCase):
         read_events(client, started["job_id"])
         conversation_id = started["conversation"]["id"]
 
-        with patch("geo_draw.tutor.extract_problem_from_image", return_value=TRIANGLE):
+        with patch("geo_draw.tutor.extract_problem_from_images", return_value=TRIANGLE):
             response = client.post(
                 "/api/messages",
                 data={"text": "", "conversation_id": conversation_id},
@@ -321,6 +321,21 @@ class ChatTests(ApiTestCase):
         figure_job = next(data["job_id"] for kind, data in events if kind == "figure_job")
         drawing = [data for kind, data in read_events(client, figure_job) if kind == "message"][-1]
         self.assertTrue(drawing["has_drawing"])
+
+    def test_up_to_four_problem_images_are_accepted_together(self):
+        client = self.client()
+        self.register(client)
+        with patch("geo_draw.tutor.extract_problem_from_images", return_value=EQUATION) as ocr:
+            response = client.post(
+                "/api/messages",
+                data={"text": ""},
+                files=[
+                    ("images", ("page1.png", b"one", "image/png")),
+                    ("images", ("page2.jpg", b"two", "image/jpeg")),
+                ],
+            )
+            read_events(client, response.json()["job_id"])
+        self.assertEqual(len(ocr.call_args.args[0]), 2)
 
     def test_problems_without_a_figure_are_never_drawn(self):
         client = self.client()

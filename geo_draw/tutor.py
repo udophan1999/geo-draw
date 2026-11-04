@@ -13,7 +13,7 @@ import unicodedata
 from collections.abc import Callable
 from typing import Literal
 
-from .ai_codegen import AiSettings, _request_chat, extract_problem_from_image, stream_chat
+from .ai_codegen import AiSettings, _request_chat, extract_problem_from_images, stream_chat
 from .conversations import (
     ASSISTANT, CHAT, FIGURE, HINT, SOLUTION, USER, ConversationStore, Message,
 )
@@ -51,6 +51,7 @@ def _history_text(text: str) -> str:
 
 def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *,
                    text: str = "", image: bytes | None = None, image_type: str | None = None,
+                   additional_images: list[tuple[bytes, str]] | None = None,
                    action: str = ASK, ai: AiSettings,
                    figure: Callable[[], str] = lambda: FIGURE_NONE,
                    prompts: dict[str, str] | None = None,
@@ -82,13 +83,17 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
     user_message_id, user_dir = store.new_message_dir(owner, conversation_id)
     image_path = None
     request = text
-    if image:
-        suffix = mimetypes.guess_extension(image_type or "") or ".png"
-        image_path = user_dir / f"problem{suffix}"
-        image_path.write_bytes(image)
+    image_items = ([(image, image_type or "")] if image else []) + (additional_images or [])
+    if image_items:
+        for index, (image_bytes, mime_type) in enumerate(image_items):
+            suffix = mimetypes.guess_extension(mime_type or "") or ".png"
+            path = user_dir / (f"problem{suffix}" if index == 0 else f"problem-{index + 1}{suffix}")
+            path.write_bytes(image_bytes)
+            if index == 0:
+                image_path = path
         emit("progress", {"stage": "ocr", "label": "Đang đọc đề bài trong ảnh..."})
         try:
-            recognized = extract_problem_from_image(image, image_type or "", ai)
+            recognized = extract_problem_from_images(image_items, ai)
         except ValueError as exc:
             return _save_pair(store, conversation_id, emit, text, image_path, user_message_id,
                               str(exc), mode, level)

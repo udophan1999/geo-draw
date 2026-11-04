@@ -83,3 +83,6 @@ alwaysApply: true
 - Tin nhắn nhập, tin nhắn chỉnh sửa và kết quả OCR dùng chung giới hạn 20.000 ký tự. Giao diện và API
   phải báo rõ để học sinh chia nội dung thành phần nhỏ hơn; không gửi âm thầm nội dung quá dài tới AI
   và không trừ lượt AI cho văn bản bị từ chối ngay ở API.
+- Một lượt được nhận tối đa 4 ảnh theo đúng thứ tự để đọc đề nhiều trang hoặc đề và hình minh họa
+  tách riêng. OCR phải ghép liên tục, loại phần chụp trùng giữa các trang và không trộn thứ tự; mỗi
+  ảnh tối đa 20 MB, tổng tối đa 40 MB, chỉ dùng các định dạng ảnh đã cho phép.

@@ -13,7 +13,7 @@ from geo_draw.ai_codegen import (
     _normalize_geometry_notation,
     _ordinary_polygons,
     _transversal_numbered_angles_scene,
-    extract_problem_from_image,
+    extract_problem_from_image, extract_problem_from_images,
     extract_python,
     generate_manim_code,
     missing_reference_figure_points,
@@ -649,11 +649,30 @@ class GeoScene(Scene):
             "deepseek-v4-flash-vision-exp",
         )
 
+    @patch("geo_draw.ai_codegen._request_chat", return_value="Đề ghép từ hai trang")
+    def test_extract_problem_from_multiple_images_preserves_order(self, request_chat):
+        result = extract_problem_from_images(
+            [(b"page-one", "image/png"), (b"page-two", "image/jpeg")],
+            AiSettings(api_key="test-key"),
+        )
+        self.assertEqual(result, "Đề ghép từ hai trang")
+        content = request_chat.call_args.args[1][0]["content"]
+        self.assertEqual([part["type"] for part in content],
+                         ["text", "image_url", "image_url"])
+        self.assertIn("theo đúng thứ tự đã gửi", content[0]["text"])
+        self.assertTrue(content[1]["image_url"]["url"].startswith("data:image/png;base64,"))
+        self.assertTrue(content[2]["image_url"]["url"].startswith("data:image/jpeg;base64,"))
+
     def test_extract_problem_from_image_rejects_unsupported_files(self):
         with self.assertRaisesRegex(ValueError, "định dạng"):
             extract_problem_from_image(
                 b"not-an-image",
                 "application/pdf",
+                AiSettings(api_key="test-key"),
+            )
+        with self.assertRaisesRegex(ValueError, "tối đa 4 ảnh"):
+            extract_problem_from_images(
+                [(b"x", "image/png")] * 5,
                 AiSettings(api_key="test-key"),
             )
 
