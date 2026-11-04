@@ -95,3 +95,6 @@ alwaysApply: true
 - Ellipse/hyperbol, đường cong tham số hoặc cực và miền nghiệm bất phương trình hai ẩn phải được
   định tuyến sang bộ vẽ đồ thị AI. Dùng tham số đúng cho đường ẩn/cực, giữ đúng miền tham số; với hệ
   bất phương trình phải kiểm tra nửa mặt phẳng và chỉ tô giao miền nghiệm, không tự tô sai phía.
+- Khi một đầu vào chứa nhiều Bài/Câu đánh số độc lập, trợ giảng phải giữ nguyên thứ tự và giải hoặc
+  gợi ý từng bài riêng; không trộn giả thiết, biến, ký hiệu, hình vẽ hay kết quả giữa các bài. Các ý
+  a), b), c) vẫn thuộc cùng một bài. Không ghép nhiều bài hình học độc lập vào một bản vẽ duy nhất.

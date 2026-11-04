@@ -18,7 +18,7 @@ from geo_draw.tutor import (
 )
 from geo_draw.tutor_prompts import (
     ACCESSIBLE_QUESTION_RULE, FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN, GUARDRAIL,
-    MAX_HINT_LEVEL, build_system_prompt,
+    MAX_HINT_LEVEL, build_system_prompt, multiple_problem_count,
 )
 
 AI = AiSettings(api_key="test-key")
@@ -77,6 +77,27 @@ class PromptTests(unittest.TestCase):
         self.assertIn("**Kết luận:**", prompt)
         self.assertNotIn("KHÔNG THỂ GHI ĐÈ", prompt)
         self.assertNotIn(ACCESSIBLE_QUESTION_RULE, prompt)
+
+    def test_numbered_independent_problems_are_kept_separate(self):
+        problems = """Bài 1. Giải phương trình x + 2 = 5.
+Bài 2: Cho tam giác ABC vuông tại A. Tính BC.
+Bài 3 - Tính xác suất lấy được bi đỏ."""
+        self.assertEqual(multiple_problem_count(problems), 3)
+
+        hint = build_system_prompt(problems, HINT, 1)
+        self.assertIn("NHIỀU BÀI TOÁN ĐỘC LẬP (3 bài)", hint)
+        self.assertIn("Không trộn giả thiết, biến, ký hiệu, hình vẽ", hint)
+        self.assertIn("mỗi lượt chỉ dẫn dắt MỘT bài", hint)
+        self.assertIn("tất cả các bài", hint)
+
+        solution = build_system_prompt(problems, SOLUTION, 1)
+        self.assertIn("mỗi bài có tiêu đề riêng", solution)
+        self.assertIn("**Kết luận:** riêng", solution)
+
+    def test_subparts_are_not_mistaken_for_separate_problems(self):
+        problem = "Cho tam giác ABC.\na) Chứng minh AB = AC.\nb) Tính góc B."
+        self.assertEqual(multiple_problem_count(problem), 0)
+        self.assertNotIn("NHIỀU BÀI TOÁN ĐỘC LẬP", build_system_prompt(problem))
 
 
 class StreamChatTests(unittest.TestCase):
@@ -359,6 +380,13 @@ class GeometryDetectionTests(unittest.TestCase):
         self.assertFalse(should_auto_draw_geometry(
             "Giải phương trình x + 1 = 0", first_turn=False, has_image=True,
         ))
+
+    def test_multiple_independent_problems_are_not_merged_into_one_drawing(self):
+        problems = (
+            "Câu 1. Cho tam giác ABC vuông tại A, tính BC.\n"
+            "Câu 2. Cho hình chóp S.ABCD có đáy là hình vuông."
+        )
+        self.assertFalse(should_auto_draw_geometry(problems, first_turn=True, has_image=False))
 
 
 if __name__ == "__main__":
