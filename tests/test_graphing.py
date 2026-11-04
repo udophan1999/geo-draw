@@ -39,6 +39,15 @@ class DrawingKindTests(unittest.TestCase):
                      "Tính diện tích hình phẳng giới hạn bởi y = x² và y = x."]:
             self.assertEqual(drawing_kind(text), GRAPH, text)
 
+    def test_statistical_charts_are_drawable_graphs(self):
+        for text in (
+            "Vẽ biểu đồ cột số học sinh của bốn lớp: 35, 40, 38, 42.",
+            "Lập biểu đồ tròn thể hiện tần suất 20%, 30%, 50%.",
+            "Vẽ biểu đồ đường thống kê nhiệt độ trong 7 ngày.",
+            "Dựng histogram cho bảng tần số ghép nhóm.",
+        ):
+            self.assertEqual(drawing_kind(text), GRAPH, text)
+
     def test_geometry_stays_geometry(self):
         for text in ["Cho tam giác ABC vuông tại A, đường cao AH.",
                      "Cho góc xOy, vẽ tia phân giác Oz.",
@@ -87,6 +96,12 @@ class GenerateGraphCodeTests(unittest.TestCase):
         self.assertIn("Axes", first_messages[0]["content"])
         self.assertNotIn("safe_point_label", first_messages[0]["content"])
         self.assertIn("MathTex", chat.call_args_list[1].args[1][-1]["content"])
+
+    def test_graph_prompt_distinguishes_statistical_charts_from_functions(self):
+        from geo_draw.graphing import GRAPH_PROMPT
+
+        self.assertIn("Statistical charts are not function plots", GRAPH_PROMPT)
+        self.assertIn("proportional sectors", GRAPH_PROMPT)
 
 
 class GraphPipelineTests(unittest.TestCase):

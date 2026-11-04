@@ -31,7 +31,9 @@ GRAPH_INCOMPLETE = (f"{APP_NAME} chưa vẽ được đồ thị cho đề này.
 _GRAPH_WORDS = [
     "ham so", "do thi", "tich phan", "nguyen ham", "parabol", "dao ham", "cuc tri", "tiem can",
     "dien tich hinh phang", "khao sat", "dong bien", "nghich bien", "gia tri lon nhat",
-    "gia tri nho nhat", "logarit", "ham mu", "luong giac",
+    "gia tri nho nhat", "logarit", "ham mu", "luong giac", "bieu do cot", "bieu do tron",
+    "bieu do duong", "bieu do doan thang", "bieu do tan so", "bieu do tan suat",
+    "histogram", "bieu do thong ke",
 ]
 _SHAPE_WORDS = ["goc", "canh", "diem", "hinh", "duong thang", "tia", "cung"]
 _GRAPH_SYMBOLS = re.compile(r"∫|\\int(?![A-Za-z])|\by\s*=|\bf\s*\(\s*x\s*\)")
@@ -85,6 +87,12 @@ Rules:
 - Black and gray only; do not set other colors.
 - Draw only what the problem states or clearly implies. Never add triangles, polygons, or points
   that the problem does not mention.
+- Statistical charts are not function plots. When the request says biểu đồ cột, tròn, đường,
+  tần số, tần suất, or histogram, preserve every category and value from the table/text and draw
+  the requested chart type. For bars use Rectangles with a labeled baseline and value Text; for a
+  line chart use labeled axes, Dots, and connecting Lines; for a pie chart use proportional sectors
+  totaling 360° with category and percentage Text. Never invent a missing observation or silently
+  replace one chart type with another.
 """
 
 _NO_LATEX_NAMES = {"MathTex", "Tex", "Title", "DecimalNumber", "Integer", "Variable", "Matrix",

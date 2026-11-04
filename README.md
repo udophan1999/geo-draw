@@ -146,7 +146,7 @@ Hai lựa chọn model (chọn trong **Cài đặt**):
   - Ở chế độ **Gợi ý**, trợ giảng không bao giờ đưa lời giải hay đáp số, kể cả khi bị yêu cầu.
   - Chuyển sang **Lời giải chi tiết** (có hỏi xác nhận) để xem lời giải đầy đủ từng bước. Bấm **Gợi ý** để quay lại.
   - Công thức toán hiển thị bằng KaTeX.
-- **Vẽ hình**: bài hình học phẳng (có điểm được đặt tên như ABC, tâm O) được **tự vẽ** ở khung bên phải. Bài khác thì bấm **Vẽ hình** nếu cần. Muốn chỉnh hình, nhập vào ô **Yêu cầu chỉnh hình** trong khung hình, ví dụ *"vẽ thêm đường cao AH"*; ứng dụng vẽ lại và giữ bố cục của hình trước.
+- **Vẽ hình**: bài hình học phẳng (có điểm được đặt tên như ABC, tâm O) được **tự vẽ** ở khung bên phải. Đồ thị hàm số, miền tích phân và biểu đồ thống kê dạng cột, tròn hoặc đường có thể vẽ bằng MathMate AI. Bài khác thì bấm **Vẽ hình** nếu cần. Muốn chỉnh hình, nhập vào ô **Yêu cầu chỉnh hình** trong khung hình, ví dụ *"vẽ thêm đường cao AH"*; ứng dụng vẽ lại và giữ bố cục của hình trước.
 - **Ảnh đề bài**: dán ảnh bằng **Ctrl+V**, kéo thả vào khung chat, hoặc bấm nút đính kèm. DeepSeek đọc đề trong ảnh; đề đọc được hiện trong khung chat để bạn kiểm tra.
 - **Khung hình**: zoom và kéo ảnh, chọn lại các phiên bản trước, xem mã Manim và log.
 - **Chỉnh hình thủ công**: dịch hoặc ẩn tên điểm, ẩn chấm điểm, thêm, ẩn hoặc làm đậm đoạn thẳng. Tab **Dựng hình** hạ đường vuông góc, dựng tia phân giác, đường trung trực hoặc trung tuyến. Mọi thao tác chỉ render lại trên máy chủ, không gọi DeepSeek. Chỉ áp dụng cho hình do DeepSeek tạo.

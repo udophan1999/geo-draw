@@ -71,3 +71,6 @@ alwaysApply: true
 - OCR ảnh đề phải đọc mọi phân môn Toán THCS–THPT, không được mặc định ảnh là bài hình học. Phải giữ
   nguyên biểu thức, phân số, căn, số mũ/chỉ số, tích phân, ma trận, bảng số liệu, đơn vị và các ý nhỏ;
   chỉ bổ sung mô tả “Theo hình vẽ” khi trong ảnh thực sự có hình minh họa rõ ràng.
+- Các yêu cầu “biểu đồ cột”, “biểu đồ tròn”, “biểu đồ đường”, tần số/tần suất và histogram phải
+  được định tuyến sang bộ vẽ biểu đồ AI. Giữ đủ nhãn và số liệu, đúng loại biểu đồ được yêu cầu;
+  không trả lời rằng không có gì để vẽ và không thay biểu đồ bằng một đồ thị hàm số.
