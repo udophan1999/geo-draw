@@ -86,3 +86,6 @@ alwaysApply: true
 - Một lượt được nhận tối đa 4 ảnh theo đúng thứ tự để đọc đề nhiều trang hoặc đề và hình minh họa
   tách riêng. OCR phải ghép liên tục, loại phần chụp trùng giữa các trang và không trộn thứ tự; mỗi
   ảnh tối đa 20 MB, tổng tối đa 40 MB, chỉ dùng các định dạng ảnh đã cho phép.
+- Chấp nhận PDF tối đa 4 trang và ảnh HEIC/HEIF từ điện thoại; luôn chuyển chúng thành các trang PNG
+  có giới hạn độ phân giải trước khi gửi Vision. Từ chối rõ PDF có mật khẩu, tệp hỏng, quá 4 trang
+  hoặc ảnh giải nén quá lớn; không chuyển dữ liệu không hợp lệ thẳng tới mô hình.

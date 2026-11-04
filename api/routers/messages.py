@@ -29,6 +29,7 @@ from geo_draw.ai_codegen import AiSettings
 from geo_draw.chat import run_figure_turn
 from geo_draw.conversations import ASSISTANT, CHAT, FIGURE, USER, Conversation, Message
 from geo_draw.graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind
+from geo_draw.image_inputs import UPLOAD_TYPES, normalize_problem_file
 from geo_draw.tutor import (
     ACTIONS, ASK, GENERIC, REPLY_DRAWING, REPLY_NOT_DRAWN, REPLY_SHOWN, SPECIFIC,
     MAX_USER_MESSAGE_CHARS, MESSAGE_TOO_LONG,
@@ -46,7 +47,7 @@ from .settings import load_settings
 
 router = APIRouter(tags=["messages"])
 
-IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+IMAGE_TYPES = UPLOAD_TYPES
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_IMAGES = 4
 MAX_IMAGES_TOTAL_BYTES = 40 * 1024 * 1024
@@ -183,11 +184,16 @@ async def send_message(
     for upload in uploads:
         image_type = (upload.content_type or "").lower()
         if image_type not in IMAGE_TYPES:
-            raise HTTPException(415, "Ảnh phải có định dạng PNG, JPG, WEBP hoặc GIF.")
+            raise HTTPException(415, "Tệp phải là PNG, JPG, WEBP, GIF, HEIC, HEIF hoặc PDF.")
         image_bytes = await upload.read()
         if len(image_bytes) > MAX_IMAGE_BYTES:
-            raise HTTPException(413, "Mỗi ảnh tối đa 20 MB; hãy cắt gọn vùng chứa đề bài.")
-        image_items.append((image_bytes, image_type))
+            raise HTTPException(413, "Mỗi tệp tối đa 20 MB; hãy cắt gọn vùng chứa đề bài.")
+        try:
+            image_items.extend(normalize_problem_file(image_bytes, image_type))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+    if len(image_items) > MAX_IMAGES:
+        raise HTTPException(413, "Mỗi lượt nhận tối đa 4 ảnh hoặc trang PDF.")
     if sum(len(data) for data, _mime in image_items) > MAX_IMAGES_TOTAL_BYTES:
         raise HTTPException(413, "Tổng dung lượng ảnh lớn hơn 40 MB; hãy cắt gọn rồi thử lại.")
     if action == ASK and not text and not image_items:
