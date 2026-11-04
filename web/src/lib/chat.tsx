@@ -23,7 +23,7 @@ type ChatContextValue = {
   pending: Record<string, PendingTurn>
   figures: Record<string, PendingFigure>
   /** Resolves true once the server accepted the message (the job then runs on). */
-  send: (input: { text: string; image?: File | null; conversationId?: string; action?: TutorAction }) => Promise<boolean>
+  send: (input: { text: string; images?: File[]; conversationId?: string; action?: TutorAction }) => Promise<boolean>
   /** Edit the student's last message; the tutor's reply to it is written again. */
   edit: (conversationId: string, messageId: string, text: string) => Promise<boolean>
   drawFigure: (conversationId: string, text?: string) => Promise<boolean>
@@ -128,11 +128,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   )
 
   const send = useCallback<ChatContextValue['send']>(
-    async ({ text, image, conversationId, action }) => {
+    async ({ text, images = [], conversationId, action }) => {
       setSending(true)
       let started
       try {
-        started = await api.sendMessage({ text, image, conversationId, action })
+        started = await api.sendMessage({ text, images, conversationId, action })
       } catch (error) {
         toast.error(error instanceof ApiError ? error.message : 'Không gửi được tin nhắn.')
         return false
@@ -140,7 +140,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         setSending(false)
       }
       const id = started.conversation.id
-      const preview = image ? URL.createObjectURL(image) : null
+      const preview = images[0] ? URL.createObjectURL(images[0]) : null
       updateTurn(id, { text, imagePreview: preview, label: 'Đang gửi...', userSaved: false, reply: '' })
       if (!conversationId) {
         client.setQueryData<ConversationDetail>(keys.conversation(id), { conversation: started.conversation, messages: [] })

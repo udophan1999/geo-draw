@@ -2971,49 +2971,54 @@ def stream_chat(
         raise ValueError("Mất kết nối với máy chủ AI khi đang trả lời. Hãy thử lại.") from exc
 
 
-def extract_problem_from_image(
-    image_bytes: bytes,
-    mime_type: str,
+def extract_problem_from_images(
+    images: list[tuple[bytes, str]],
     settings: AiSettings,
 ) -> str:
-    """Read one Vietnamese school-math exercise image with DeepSeek Vision."""
+    """Read up to four ordered images belonging to one Vietnamese math exercise."""
     supported = {"image/png", "image/jpeg", "image/webp", "image/gif"}
-    mime_type = (mime_type or "").casefold()
-    if mime_type not in supported:
-        raise ValueError("Ảnh phải có định dạng PNG, JPG, JPEG, WEBP hoặc GIF.")
-    if not image_bytes:
+    if not images:
         raise ValueError("Tệp ảnh đang trống.")
-    if len(image_bytes) > 20 * 1024 * 1024:
-        raise ValueError("Ảnh lớn hơn 20 MB; hãy cắt gọn vùng chứa đề bài rồi thử lại.")
+    if len(images) > 4:
+        raise ValueError("Mỗi lượt nhận tối đa 4 ảnh; hãy chia đề thành nhiều lượt nếu cần.")
+    if sum(len(image_bytes) for image_bytes, _mime_type in images) > 40 * 1024 * 1024:
+        raise ValueError("Tổng dung lượng ảnh lớn hơn 40 MB; hãy cắt gọn rồi thử lại.")
+    normalized = []
+    for image_bytes, mime_type in images:
+        mime_type = (mime_type or "").casefold()
+        if mime_type not in supported:
+            raise ValueError("Ảnh phải có định dạng PNG, JPG, JPEG, WEBP hoặc GIF.")
+        if not image_bytes:
+            raise ValueError("Tệp ảnh đang trống.")
+        if len(image_bytes) > 20 * 1024 * 1024:
+            raise ValueError("Ảnh lớn hơn 20 MB; hãy cắt gọn vùng chứa đề bài rồi thử lại.")
+        normalized.append((image_bytes, mime_type))
 
-    encoded = base64.b64encode(image_bytes).decode("ascii")
+    content = [{
+        "type": "text",
+        "text": (
+            "Đọc chính xác một đề bài Toán từ các ảnh theo đúng thứ tự đã gửi; các ảnh có thể là "
+            "nhiều trang của cùng một đề hoặc một ảnh đề kèm một ảnh hình minh họa. Ghép nội dung "
+            "liên tục nhưng không lặp lại phần giao nhau giữa hai ảnh. Đề thuộc bất kỳ phân môn "
+            "THCS–THPT nào như số học, đại số, hình học, hàm số, giải tích, xác suất hoặc thống kê. "
+            "Chỉ trả về nguyên văn đề bài, không giải, không nhận xét, không thêm Markdown. Giữ "
+            "nguyên tên điểm, số đo, đơn vị, biểu thức, phân số, căn, số mũ, chỉ số, dấu tích phân, "
+            "ma trận, bảng số liệu, ký hiệu bằng nhau, song song, vuông góc và thứ tự các ý a), b), "
+            "c). Chuẩn hóa lỗi xuống dòng nhưng không tự bổ sung dữ kiện không nhìn thấy. Nếu đề "
+            "nhắc đến một Hình đánh số và hình đó cũng hiện rõ trong một ảnh, sau nguyên văn đề bài "
+            "thêm một dòng bắt đầu bằng 'Theo hình vẽ:' mô tả vị trí các điểm, đoạn và quan hệ nhìn "
+            "thấy được. Không suy đoán quan hệ bị khuất hoặc hình không có trong ảnh."
+        ),
+    }]
+    for image_bytes, mime_type in normalized:
+        encoded = base64.b64encode(image_bytes).decode("ascii")
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime_type};base64,{encoded}", "detail": "original"},
+        })
     messages = [{
         "role": "user",
-        "content": [
-            {
-                "type": "text",
-                "text": (
-                    "Đọc chính xác đề bài Toán trong ảnh, thuộc bất kỳ phân môn THCS–THPT nào "
-                    "như số học, đại số, hình học, hàm số, giải tích, xác suất hoặc thống kê. "
-                    "Chỉ trả về nguyên văn đề bài, "
-                    "không giải, không nhận xét, không thêm Markdown. Giữ nguyên tên điểm, số đo, "
-                    "đơn vị, biểu thức, phân số, căn, số mũ, chỉ số, dấu tích phân, ma trận, bảng "
-                    "số liệu, ký hiệu bằng nhau, song song, vuông góc và thứ tự các ý a), b), c). "
-                    "Chuẩn hóa lỗi xuống dòng nhưng không tự bổ sung dữ kiện không nhìn thấy. "
-                    "Nếu đề nhắc đến một Hình đánh số và hình đó cũng hiện rõ trong ảnh, "
-                    "sau nguyên văn đề bài thêm một dòng bắt đầu bằng 'Theo hình vẽ:' "
-                    "mô tả vị trí các điểm, đoạn và quan hệ nhìn thấy được. "
-                    "Không suy đoán quan hệ bị khuất hoặc hình không có trong ảnh."
-                ),
-            },
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{mime_type};base64,{encoded}",
-                    "detail": "original",
-                },
-            },
-        ],
+        "content": content,
     }]
     text = _request_chat(
         settings,
@@ -3025,6 +3030,15 @@ def extract_problem_from_image(
     if len(text) < 5:
         raise ValueError("Không đọc được đề bài rõ ràng từ ảnh; hãy dùng ảnh nét và cắt sát phần đề.")
     return text
+
+
+def extract_problem_from_image(
+    image_bytes: bytes,
+    mime_type: str,
+    settings: AiSettings,
+) -> str:
+    """Backward-compatible single-image wrapper."""
+    return extract_problem_from_images([(image_bytes, mime_type)], settings)
 
 
 DRAWING_INCOMPLETE = (f"{APP_NAME} chưa dựng được hình khớp với mọi dữ kiện của đề. Hãy thử yêu cầu "
