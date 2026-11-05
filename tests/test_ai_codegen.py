@@ -204,6 +204,8 @@ class GeoScene(Scene):
     def test_congruent_triangles_accept_words_and_equivalent_symbols_with_shared_side(self):
         variants = (
             "Vẽ hai tam giác ABC và DBC bằng nhau.",
+            "Vẽ tam giác ABC bằng tam giác DBC, lưu ý: BC là cạnh chung của hai tam giác.",
+            "Tam giác ABC bằng với tam giác DBC.",
             "△ABC ≅ △DBC",
             "ΔABC = ΔDBC",
             r"\triangle ABC \cong \triangle DBC",
@@ -214,7 +216,11 @@ class GeoScene(Scene):
 
     @patch("geo_draw.ai_codegen._request_chat")
     def test_shared_side_congruent_triangles_are_drawn_without_ai(self, request_chat):
-        for problem in ("Vẽ hai tam giác ABC và DBC bằng nhau", "△ABC ≅ △DBC"):
+        for problem in (
+            "Vẽ hai tam giác ABC và DBC bằng nhau",
+            "Vẽ tam giác ABC bằng tam giác DBC, lưu ý: BC là cạnh chung của hai tam giác",
+            "△ABC ≅ △DBC",
+        ):
             with self.subTest(problem=problem):
                 result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
                 self.assertTrue(result.ok, result.detail or result.error)
