@@ -417,6 +417,8 @@ def _explicit_congruent_triangles(text: str) -> list[tuple[str, str]]:
     patterns = (
         rf"(?:VE\s+)?(?:HAI\s+)?{triangle}([A-Z]{{3}})\s+VA\s+"
         rf"(?:{triangle})?([A-Z]{{3}})\s+BANG\s+NHAU",
+        rf"(?:VE\s+)?{triangle}([A-Z]{{3}})\s+BANG(?:\s+VOI)?\s+"
+        rf"{triangle}([A-Z]{{3}})",
         rf"{triangle}([A-Z]{{3}})\s*(?:=|≅)\s*(?:{triangle})?([A-Z]{{3}})",
     )
     pairs: list[tuple[str, str]] = []

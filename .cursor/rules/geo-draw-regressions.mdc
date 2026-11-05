@@ -60,6 +60,8 @@ alwaysApply: true
 - Hai tam giác bằng nhau có thể chung đỉnh hoặc chung cạnh. `△ABC ≅ △DBC` có thứ tự tương ứng
   A-D, B-B, C-C và chung cạnh BC; không được đòi đủ sáu đỉnh phân biệt hoặc vẽ BC hai lần/chồng
   hai bộ vạch lên cạnh chung.
+- Các cách viết “hai tam giác ABC và DBC bằng nhau”, “tam giác ABC bằng tam giác DBC” và
+  `△ABC ≅ △DBC` là tương đương; cả ba phải kích hoạt cùng bộ dựng tam giác bằng nhau.
 - Mặc định tự chọn mọi tham số trình bày chưa nêu: hướng hình, tỉ lệ, độ dài/góc minh họa, phía đặt
   điểm tự do, vị trí giao điểm không tên và miền đặt nhãn. Không được dùng các lựa chọn này để tự
   thêm quan hệ thuộc, thứ tự, bằng nhau, song song, vuông góc hoặc dạng hình đặc biệt.
