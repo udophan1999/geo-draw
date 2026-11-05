@@ -52,6 +52,16 @@ alwaysApply: true
   A, c cắt b tại B” đã đủ để dựng. Nếu đề yêu cầu đánh số các góc tại A và B là 1,2,3,4 thì mỗi
   đỉnh phải có đủ bốn góc: A1,A2,A3,A4 và B1,B2,B3,B4; không chia một bộ số cho hai đỉnh. Trên
   hình chỉ ghi các số 1,2,3,4 trong từng miền góc, không thêm tiền tố A/B và không vẽ cung góc.
+- Cùng một dữ kiện viết bằng chữ hoặc ký hiệu phải được nhận diện như nhau: bằng nhau/≅, song
+  song/∥//, vuông góc/⊥, thuộc/∈, góc ABC/∠ABC. Không được chỉ hỗ trợ một cách viết.
+- `aa'`, `bb'`, `cc'` là tên các đường thẳng đầy đủ, không phải các điểm rời. Nếu `cc'` cắt `aa'`
+  và `bb'` tại A, B thì phải vẽ một nét `cc'` liên tục đi qua cả A và B và kéo rõ ra hai phía;
+  cấm đoạn ngắn lơ lửng, cụt trước giao điểm hoặc chỉ nối một trong hai giao điểm.
+- Hai tam giác bằng nhau có thể chung đỉnh hoặc chung cạnh. `△ABC ≅ △DBC` có thứ tự tương ứng
+  A-D, B-B, C-C và chung cạnh BC; không được đòi đủ sáu đỉnh phân biệt hoặc vẽ BC hai lần/chồng
+  hai bộ vạch lên cạnh chung.
+- Các cách viết “hai tam giác ABC và DBC bằng nhau”, “tam giác ABC bằng tam giác DBC” và
+  `△ABC ≅ △DBC` là tương đương; cả ba phải kích hoạt cùng bộ dựng tam giác bằng nhau.
 - Mặc định tự chọn mọi tham số trình bày chưa nêu: hướng hình, tỉ lệ, độ dài/góc minh họa, phía đặt
   điểm tự do, vị trí giao điểm không tên và miền đặt nhãn. Không được dùng các lựa chọn này để tự
   thêm quan hệ thuộc, thứ tự, bằng nhau, song song, vuông góc hoặc dạng hình đặc biệt.
@@ -71,3 +81,48 @@ alwaysApply: true
 - OCR ảnh đề phải đọc mọi phân môn Toán THCS–THPT, không được mặc định ảnh là bài hình học. Phải giữ
   nguyên biểu thức, phân số, căn, số mũ/chỉ số, tích phân, ma trận, bảng số liệu, đơn vị và các ý nhỏ;
   chỉ bổ sung mô tả “Theo hình vẽ” khi trong ảnh thực sự có hình minh họa rõ ràng.
+- Các yêu cầu “biểu đồ cột”, “biểu đồ tròn”, “biểu đồ đường”, tần số/tần suất và histogram phải
+  được định tuyến sang bộ vẽ biểu đồ AI. Giữ đủ nhãn và số liệu, đúng loại biểu đồ được yêu cầu;
+  không trả lời rằng không có gì để vẽ và không thay biểu đồ bằng một đồ thị hàm số.
+- Luôn cho phép sửa đề bài đầu tiên hoặc tin nhắn học sinh gần nhất. Khi sửa đề đầu tiên, phải xóa
+  mọi lượt chat và hình vẽ phát sinh từ đề cũ, cập nhật đề/tên cuộc trò chuyện và chỉ tự vẽ lại nếu
+  đề mới là hình học; không được để hình cũ tồn tại bên cạnh đề mới.
+- Trợ giảng phải giữ ít nhất 32 tin nhắn gần nhất để không quên các bước học sinh đã lập luận trong
+  hội thoại dài. Một tin nhắn quá dài được giới hạn riêng nhưng phải giữ cả phần mở đầu và kết luận;
+  không cắt toàn bộ phần cuối nơi thường chứa đáp án hoặc câu hỏi hiện tại.
+- Tin nhắn nhập, tin nhắn chỉnh sửa và kết quả OCR dùng chung giới hạn 20.000 ký tự. Giao diện và API
+  phải báo rõ để học sinh chia nội dung thành phần nhỏ hơn; không gửi âm thầm nội dung quá dài tới AI
+  và không trừ lượt AI cho văn bản bị từ chối ngay ở API.
+- Một lượt được nhận tối đa 4 ảnh theo đúng thứ tự để đọc đề nhiều trang hoặc đề và hình minh họa
+  tách riêng. OCR phải ghép liên tục, loại phần chụp trùng giữa các trang và không trộn thứ tự; mỗi
+  ảnh tối đa 20 MB, tổng tối đa 40 MB, chỉ dùng các định dạng ảnh đã cho phép.
+- Chấp nhận PDF tối đa 4 trang và ảnh HEIC/HEIF từ điện thoại; luôn chuyển chúng thành các trang PNG
+  có giới hạn độ phân giải trước khi gửi Vision. Từ chối rõ PDF có mật khẩu, tệp hỏng, quá 4 trang
+  hoặc ảnh giải nén quá lớn; không chuyển dữ liệu không hợp lệ thẳng tới mô hình.
+- Hình chóp, lăng trụ, hình hộp, tứ diện, hình nón, hình trụ và mặt cầu phải đi qua prompt hình
+  không gian riêng, không dùng prompt hình học phẳng và không rơi về tam giác. Dùng phép chiếu 2D
+  kiểu sách giáo khoa, cạnh khuất nét đứt, cạnh thấy nét liền, giữ đúng đỉnh/cạnh và không vẽ kết luận.
+- Ellipse/hyperbol, đường cong tham số hoặc cực và miền nghiệm bất phương trình hai ẩn phải được
+  định tuyến sang bộ vẽ đồ thị AI. Dùng tham số đúng cho đường ẩn/cực, giữ đúng miền tham số; với hệ
+  bất phương trình phải kiểm tra nửa mặt phẳng và chỉ tô giao miền nghiệm, không tự tô sai phía.
+- Khi một đầu vào chứa nhiều Bài/Câu đánh số độc lập, trợ giảng phải giữ nguyên thứ tự và giải hoặc
+  gợi ý từng bài riêng; không trộn giả thiết, biến, ký hiệu, hình vẽ hay kết quả giữa các bài. Các ý
+  a), b), c) vẫn thuộc cùng một bài. Không ghép nhiều bài hình học độc lập vào một bản vẽ duy nhất.
+- Biểu đồ hộp, biểu đồ phân tán, cây xác suất và sơ đồ Venn phải được nhận diện là nội dung có thể
+  vẽ. Giữ đúng bộ năm số, mọi cặp dữ liệu, xác suất có điều kiện và quan hệ tập hợp; không tự thêm
+  đường xu thế, xác suất, phần tử, quan hệ rời nhau hoặc vùng tô mà đề không yêu cầu.
+- Yêu cầu biểu diễn khoảng hoặc tập nghiệm một ẩn trên trục số phải được định tuyến sang bộ vẽ. Đầu
+  mút thuộc tập dùng chấm kín, đầu mút không thuộc dùng chấm rỗng, tia kéo đúng chiều; giữ nguyên hợp,
+  giao, điểm loại trừ và vô cực. Không vẽ vô cực thành một đầu mút kín hay tô thành miền phẳng Oxy.
+- Lời giải chi tiết phải ngắn gọn nhưng đủ ý: đi thẳng vào phép giải, ưu tiên công thức và ký hiệu,
+  không chép lại đề hay diễn giải lặp. Chỉ dùng ⇔ cho tương đương và ⇒ cho suy ra; không được rút gọn
+  bằng cách bỏ điều kiện, trường hợp, đơn vị, căn cứ chứng minh hoặc ý nhỏ mà đề yêu cầu. Quy tắc này
+  là khối bắt buộc, không bị prompt quản trị tùy chỉnh ghi đè.
+- Không được thêm “Hướng giải”, “Bước 1/2/3” hoặc “Lưu ý” vào lời giải chi tiết. Với đề nhiều ý chỉ
+  dùng tiêu đề a), b), c); mỗi ý thường gồm 2–5 dòng công thức/suy luận. Không viết lại cùng một dữ
+  kiện dưới dạng định nghĩa, đẳng thức và câu văn riêng; tên định lý/căn cứ chỉ ghi trong cụm ngắn.
+  Trước khi xuất, phải tự kiểm tra mọi phép tính, suy luận, trường hợp và ý nhỏ; không dùng kết luận
+  làm giả thiết. Khi có nhiều cách, chọn cách ngắn nhất vẫn chặt chẽ như bài giải của giáo viên.
+- Với c cắt hai đường thẳng không song song a, b lần lượt tại A, B: mặc định đặt a và b gần ngang,
+  tách thoáng và có độ dốc khác nhau rõ ràng; c là đường cắt chéo. Nếu giao điểm a∩b không được gọi
+  tên hay yêu cầu, phải đặt nó ngoài vùng hình chính, không dồn ba đường thành một nút giữa A và B.

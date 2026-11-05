@@ -310,7 +310,7 @@ class ChatTests(ApiTestCase):
         read_events(client, started["job_id"])
         conversation_id = started["conversation"]["id"]
 
-        with patch("geo_draw.tutor.extract_problem_from_image", return_value=TRIANGLE):
+        with patch("geo_draw.tutor.extract_problem_from_images", return_value=TRIANGLE):
             response = client.post(
                 "/api/messages",
                 data={"text": "", "conversation_id": conversation_id},
@@ -321,6 +321,21 @@ class ChatTests(ApiTestCase):
         figure_job = next(data["job_id"] for kind, data in events if kind == "figure_job")
         drawing = [data for kind, data in read_events(client, figure_job) if kind == "message"][-1]
         self.assertTrue(drawing["has_drawing"])
+
+    def test_up_to_four_problem_images_are_accepted_together(self):
+        client = self.client()
+        self.register(client)
+        with patch("geo_draw.tutor.extract_problem_from_images", return_value=EQUATION) as ocr:
+            response = client.post(
+                "/api/messages",
+                data={"text": ""},
+                files=[
+                    ("images", ("page1.png", b"one", "image/png")),
+                    ("images", ("page2.jpg", b"two", "image/jpeg")),
+                ],
+            )
+            read_events(client, response.json()["job_id"])
+        self.assertEqual(len(ocr.call_args.args[0]), 2)
 
     def test_problems_without_a_figure_are_never_drawn(self):
         client = self.client()
@@ -414,6 +429,9 @@ class ChatTests(ApiTestCase):
         bad = client.post("/api/messages", data={"text": "x"},
                           files={"image": ("de.txt", b"hello", "text/plain")})
         self.assertEqual(bad.status_code, 415)
+        too_long = self.send(client, "x" * 20_001)
+        self.assertEqual(too_long.status_code, 422)
+        self.assertIn("20.000 ký tự", too_long.json()["detail"])
 
     def test_a_crashing_turn_ends_with_failed(self):
         client = self.client()
@@ -474,16 +492,15 @@ class MessageEditTests(ApiTestCase):
         self.assertNotIn("x = 2", json.dumps(sent, ensure_ascii=False))
         self.assertEqual(client.get("/api/auth/me").json()["quota"]["used"], 3)
 
-    def test_only_the_last_message_of_the_student_can_be_edited(self):
+    def test_assistant_and_non_latest_followups_cannot_be_edited(self):
         client = self.client()
         self.register(client)
         conversation_id = self.start(client)
         read_events(client, self.send(client, "x = 2", conversation_id).json()["job_id"])
-        problem, reply = self.chat(client, conversation_id)[:2]
-        for message in (problem, reply):
-            response = self.edit(client, message["id"], "khác")
-            self.assertEqual(response.status_code, 409)
-            self.assertIn("gần nhất", response.json()["detail"])
+        _problem, reply = self.chat(client, conversation_id)[:2]
+        response = self.edit(client, reply["id"], "khác")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("đề bài ban đầu hoặc tin nhắn gần nhất", response.json()["detail"])
         last = self.chat(client, conversation_id)[-2]
         self.assertEqual(self.edit(client, last["id"], "   ").status_code, 422)
         # Someone else's message does not exist for this caller.
@@ -506,6 +523,8 @@ class MessageEditTests(ApiTestCase):
         client = self.client()
         self.register(client)
         conversation_id = self.start(client)
+        read_events(client, self.send(client, "Em đang thử chuyển vế", conversation_id)
+                    .json()["job_id"])
         problem = self.chat(client, conversation_id)[0]
         self.title_request.return_value = "Phương trình bậc nhất"
         events = read_events(client, self.edit(client, problem["id"], "Giải phương trình 2x = 6").json()["job_id"])
@@ -514,6 +533,7 @@ class MessageEditTests(ApiTestCase):
         self.assertEqual(conversation["title"], "Phương trình bậc nhất")
         sent = self.tutor_stream.call_args.args[1]
         self.assertIn("Giải phương trình 2x = 6", sent[-1]["content"])
+        self.assertEqual(len(self.chat(client, conversation_id)), 2)
 
     def test_editing_a_geometry_problem_draws_it_again(self):
         client = self.client()

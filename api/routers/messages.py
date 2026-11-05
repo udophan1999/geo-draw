@@ -29,9 +29,11 @@ from geo_draw.ai_codegen import AiSettings
 from geo_draw.chat import run_figure_turn
 from geo_draw.conversations import ASSISTANT, CHAT, FIGURE, USER, Conversation, Message
 from geo_draw.graphing import GRAPH, GRAPH_NEEDS_AI, NOT_DRAWABLE, drawing_kind
+from geo_draw.image_inputs import UPLOAD_TYPES, normalize_problem_file
 from geo_draw.tutor import (
     ACTIONS, ASK, GENERIC, REPLY_DRAWING, REPLY_NOT_DRAWN, REPLY_SHOWN, SPECIFIC,
-    drawing_request, editable_message, is_geometry_problem, record_canned_reply,
+    MAX_USER_MESSAGE_CHARS, MESSAGE_TOO_LONG,
+    drawing_request, editable_message_ids, is_geometry_problem, record_canned_reply,
     rerun_tutor_turn, run_tutor_turn, should_auto_draw_geometry,
 )
 from geo_draw.tutor_prompts import FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN
@@ -45,8 +47,10 @@ from .settings import load_settings
 
 router = APIRouter(tags=["messages"])
 
-IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+IMAGE_TYPES = UPLOAD_TYPES
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
+MAX_IMAGES = 4
+MAX_IMAGES_TOTAL_BYTES = 40 * 1024 * 1024
 KEEPALIVE_SECONDS = 15
 
 
@@ -161,29 +165,45 @@ async def send_message(
     conversation_id: str | None = Form(None),
     action: str = Form(ASK),
     image: UploadFile | None = File(None),
+    images: list[UploadFile] | None = File(None),
     owner: Owner = Depends(get_owner),
 ) -> dict:
     """Start one tutor turn. Returns at once with the job to follow at ``/api/jobs/{id}/events``."""
     state = app_state(request)
     text = text.strip()
+    if len(text) > MAX_USER_MESSAGE_CHARS:
+        raise HTTPException(422, MESSAGE_TOO_LONG)
     if action not in ACTIONS:
         raise HTTPException(422, "Thao tác không hợp lệ.")
-    image_bytes, image_type = None, None
-    if image is not None and image.filename:
-        image_type = (image.content_type or "").lower()
+    uploads = ([image] if image is not None and image.filename else []) + [
+        item for item in (images or []) if item.filename
+    ]
+    if len(uploads) > MAX_IMAGES:
+        raise HTTPException(413, "Mỗi lượt nhận tối đa 4 ảnh.")
+    image_items: list[tuple[bytes, str]] = []
+    for upload in uploads:
+        image_type = (upload.content_type or "").lower()
         if image_type not in IMAGE_TYPES:
-            raise HTTPException(415, "Ảnh phải có định dạng PNG, JPG, WEBP hoặc GIF.")
-        image_bytes = await image.read()
+            raise HTTPException(415, "Tệp phải là PNG, JPG, WEBP, GIF, HEIC, HEIF hoặc PDF.")
+        image_bytes = await upload.read()
         if len(image_bytes) > MAX_IMAGE_BYTES:
-            raise HTTPException(413, "Ảnh lớn hơn 20 MB; hãy cắt gọn vùng chứa đề bài.")
-    if action == ASK and not text and not image_bytes:
+            raise HTTPException(413, "Mỗi tệp tối đa 20 MB; hãy cắt gọn vùng chứa đề bài.")
+        try:
+            image_items.extend(normalize_problem_file(image_bytes, image_type))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+    if len(image_items) > MAX_IMAGES:
+        raise HTTPException(413, "Mỗi lượt nhận tối đa 4 ảnh hoặc trang PDF.")
+    if sum(len(data) for data, _mime in image_items) > MAX_IMAGES_TOTAL_BYTES:
+        raise HTTPException(413, "Tổng dung lượng ảnh lớn hơn 40 MB; hãy cắt gọn rồi thử lại.")
+    if action == ASK and not text and not image_items:
         raise HTTPException(422, "Hãy nhập đề bài hoặc đính kèm ảnh.")
     # Check ownership before counting quota, so a bad id never costs a turn.
     conversation = owned_conversation(owner, conversation_id) if conversation_id else None
     if conversation is None and action != ASK:
         raise HTTPException(422, "Hãy gửi đề bài trước.")
     first_turn = conversation is None or not owner.store.messages(conversation.id, CHAT)
-    wants_drawing = (drawing_request(text) if action == ASK and not first_turn and not image_bytes
+    wants_drawing = (drawing_request(text) if action == ASK and not first_turn and not image_items
                      else None)
     if wants_drawing == GENERIC:
         return _answer_drawing_request(state, owner, conversation, text)
@@ -213,7 +233,7 @@ async def send_message(
                 return
             # Once the problem is known (typed or read from a photo), draw plane geometry.
             if should_auto_draw_geometry(
-                payload.text, first_turn=first_turn, has_image=bool(image_bytes)
+                payload.text, first_turn=first_turn, has_image=bool(image_items)
             ):
                 # On the first turn the OCR text is already the conversation problem. On a
                 # later turn it is a new figure request and must be composed with that problem.
@@ -223,7 +243,9 @@ async def send_message(
 
         with _answering(state, conversation.id):
             run_tutor_turn(owner.store, owner.store_owner, conversation.id, text=text,
-                           image=image_bytes, image_type=image_type, action=action, ai=ai,
+                           image=image_items[0][0] if image_items else None,
+                           image_type=image_items[0][1] if image_items else None,
+                           additional_images=image_items[1:], action=action, ai=ai,
                            figure=figure_state, prompts=state.config.values(), on_event=on_event)
 
     job = state.jobs.submit(owner.identity, work,
@@ -253,7 +275,7 @@ def _figure_state(state: AppState, owner: Owner, conversation: Conversation):
 @router.patch("/messages/{message_id}", status_code=202)
 def edit_message(message_id: str, body: MessageEdit, request: Request,
                  owner: Owner = Depends(get_owner)) -> dict:
-    """Edit the student's last chat message; the tutor's reply to it is written again.
+    """Edit the original problem or latest student message and regenerate from that point.
 
     Costs one AI turn. Editing the first message changes the problem, and a plane-geometry
     problem is drawn again.
@@ -264,11 +286,12 @@ def edit_message(message_id: str, body: MessageEdit, request: Request,
     text = body.text.strip()
     if not text:
         raise HTTPException(422, "Tin nhắn không được để trống.")
-    last = editable_message(owner.store, conversation.id)
-    if message.channel != CHAT or last is None or last.id != message.id:
-        raise HTTPException(409, "Chỉ sửa được tin nhắn gần nhất của bạn.")
-    if conversation.id in state.tutor_jobs:
-        raise HTTPException(409, "MathMate đang trả lời. Đợi trả lời xong rồi hãy sửa.")
+    if message.channel != CHAT or message.id not in editable_message_ids(
+        owner.store, conversation.id
+    ):
+        raise HTTPException(409, "Chỉ sửa được đề bài ban đầu hoặc tin nhắn gần nhất của bạn.")
+    if conversation.id in state.tutor_jobs or conversation.id in state.figure_jobs:
+        raise HTTPException(409, "MathMate đang trả lời hoặc vẽ hình. Đợi xong rồi hãy sửa.")
     if not state.ai_available:
         raise HTTPException(503, "Máy chủ chưa cấu hình khóa AI nên chưa giải toán được.")
     _consume_ai_turn(state, owner)

@@ -12,12 +12,14 @@ from geo_draw.conversations import (
     ASSISTANT, CHAT, FIGURE, HINT, SOLUTION, USER, ConversationStore,
 )
 from geo_draw.tutor import (
-    DEEPER, GENERIC, SHOW_SOLUTION, SPECIFIC, drawing_request, is_geometry_problem,
-    record_canned_reply, run_tutor_turn, should_auto_draw_geometry, suggest_title,
+    DEEPER, GENERIC, SHOW_SOLUTION, SOLUTION_MAX_TOKENS, SPECIFIC, drawing_request,
+    editable_message_ids, is_geometry_problem, is_solid_problem, record_canned_reply,
+    rerun_tutor_turn, run_tutor_turn, should_auto_draw_geometry, suggest_title,
 )
 from geo_draw.tutor_prompts import (
-    ACCESSIBLE_QUESTION_RULE, FIGURE_DRAWING, FIGURE_NONE, FIGURE_SHOWN, GUARDRAIL,
-    MAX_HINT_LEVEL, build_system_prompt,
+    ACCESSIBLE_QUESTION_RULE, CONCISE_SOLUTION_RULE, FIGURE_DRAWING, FIGURE_NONE,
+    FIGURE_SHOWN, GUARDRAIL, MAX_HINT_LEVEL, TUTOR_SOLUTION, build_system_prompt,
+    multiple_problem_count,
 )
 
 AI = AiSettings(api_key="test-key")
@@ -74,8 +76,48 @@ class PromptTests(unittest.TestCase):
     def test_solution_prompt_has_no_guardrail(self):
         prompt = build_system_prompt(TRIANGLE, SOLUTION, 3)
         self.assertIn("**Kết luận:**", prompt)
+        self.assertIn(CONCISE_SOLUTION_RULE, prompt)
+        self.assertIn("Ưu tiên công thức, phép biến đổi và ký hiệu toán học", prompt)
+        self.assertIn("không chép lại đề", prompt)
+        self.assertIn("Chỉ dùng ⇔", prompt)
+        self.assertIn("Không viết các mục “Hướng giải”, “Bước 1”", prompt)
+        self.assertIn("Mỗi ý a), b), c) thường chỉ gồm 2–5 dòng", prompt)
+        self.assertIn("lời giải phải chính xác, đủ căn cứ", prompt)
+        self.assertIn("tự kiểm tra âm thầm từng phép tính và suy luận", prompt)
+        self.assertIn("điều cần chứng minh làm giả thiết", prompt)
+        self.assertIn("chọn cách ngắn nhất mà vẫn chặt chẽ", prompt)
+        self.assertNotIn("thêm một mục ngắn **Lưu ý**", prompt)
         self.assertNotIn("KHÔNG THỂ GHI ĐÈ", prompt)
         self.assertNotIn(ACCESSIBLE_QUESTION_RULE, prompt)
+
+    def test_concise_solution_rule_cannot_be_removed_by_admin_prompt(self):
+        prompt = build_system_prompt(
+            TRIANGLE, SOLUTION, 1,
+            prompts={TUTOR_SOLUTION: "Prompt quản trị tùy chỉnh."},
+        )
+        self.assertIn("Prompt quản trị tùy chỉnh.", prompt)
+        self.assertIn(CONCISE_SOLUTION_RULE, prompt)
+
+    def test_numbered_independent_problems_are_kept_separate(self):
+        problems = """Bài 1. Giải phương trình x + 2 = 5.
+Bài 2: Cho tam giác ABC vuông tại A. Tính BC.
+Bài 3 - Tính xác suất lấy được bi đỏ."""
+        self.assertEqual(multiple_problem_count(problems), 3)
+
+        hint = build_system_prompt(problems, HINT, 1)
+        self.assertIn("NHIỀU BÀI TOÁN ĐỘC LẬP (3 bài)", hint)
+        self.assertIn("Không trộn giả thiết, biến, ký hiệu, hình vẽ", hint)
+        self.assertIn("mỗi lượt chỉ dẫn dắt MỘT bài", hint)
+        self.assertIn("tất cả các bài", hint)
+
+        solution = build_system_prompt(problems, SOLUTION, 1)
+        self.assertIn("mỗi bài có tiêu đề riêng", solution)
+        self.assertIn("**Kết luận:** riêng", solution)
+
+    def test_subparts_are_not_mistaken_for_separate_problems(self):
+        problem = "Cho tam giác ABC.\na) Chứng minh AB = AC.\nb) Tính góc B."
+        self.assertEqual(multiple_problem_count(problem), 0)
+        self.assertNotIn("NHIỀU BÀI TOÁN ĐỘC LẬP", build_system_prompt(problem))
 
 
 class StreamChatTests(unittest.TestCase):
@@ -139,6 +181,15 @@ class TutorTurnTests(unittest.TestCase):
         self.assertNotIn("KHÔNG THỂ GHI ĐÈ", prompt[0]["content"])
         self.assertEqual(len(self.store.messages(self.conversation.id, CHAT)), 6)
 
+    def test_detailed_solution_has_a_bounded_output_budget(self):
+        self.turn(text=TRIANGLE)
+        with patch("geo_draw.tutor.stream_chat", return_value=iter(["**Kết luận:** $BC=5$. "])) as stream, \
+                patch("geo_draw.tutor._request_chat", side_effect=ValueError("offline")):
+            run_tutor_turn(
+                self.store, "alice", self.conversation.id, action=SHOW_SOLUTION, ai=AI,
+            )
+        self.assertEqual(stream.call_args.kwargs["max_tokens"], SOLUTION_MAX_TOKENS)
+
     def test_the_tutor_moves_the_level_as_the_student_progresses(self):
         self.turn(text=TRIANGLE, replies=("Đúng rồi. Em nhớ định lý nào?\n", "[[ba", "c:2]]"))
         reply = self.store.messages(self.conversation.id, CHAT)[-1]
@@ -155,6 +206,22 @@ class TutorTurnTests(unittest.TestCase):
         self.assertTrue(conversation.solved)
         self.assertEqual(self.store.messages(self.conversation.id, CHAT)[-1].text,
                          "Chính xác! Em đã giải xong.")
+
+    def test_long_conversations_keep_thirty_two_recent_messages_with_bounded_turns(self):
+        self.turn(text=TRIANGLE)
+        for index in range(36):
+            role = USER if index % 2 == 0 else ASSISTANT
+            text = f"Lập luận cũ {index}"
+            if index == 35:
+                text = "Mở đầu " + "x" * 4000 + " kết luận quan trọng"
+            self.store.add_message(self.conversation.id, role, text, channel=CHAT)
+
+        _, prompt = self.turn(text="Em nên làm tiếp thế nào?")
+        contents = [message["content"] for message in prompt[1:-1]]
+        self.assertNotIn("Lập luận cũ 3", contents)
+        self.assertIn("Lập luận cũ 4", contents)
+        self.assertIn("[… phần giữa của tin nhắn dài đã lược bớt …]", contents[-1])
+        self.assertTrue(contents[-1].endswith("kết luận quan trọng"))
 
     def test_progress_tags_are_ignored_in_solution_mode(self):
         self.turn(text=TRIANGLE)
@@ -195,11 +262,28 @@ class TutorTurnTests(unittest.TestCase):
         self.assertEqual(self.store.get("alice", self.conversation.id).hint_level, 1)
 
     def test_a_photo_is_read_into_the_problem(self):
-        with patch("geo_draw.tutor.extract_problem_from_image", return_value=TRIANGLE):
+        with patch("geo_draw.tutor.extract_problem_from_images", return_value=TRIANGLE):
             (question, _), _ = self.turn(text="", image=b"png", image_type="image/png")
         self.assertEqual(question.text, TRIANGLE)
         self.assertTrue(question.image_path.is_file())
         self.assertEqual(self.store.get("alice", self.conversation.id).problem, TRIANGLE)
+
+    def test_ocr_result_over_the_message_limit_is_rejected_cleanly(self):
+        with patch("geo_draw.tutor.extract_problem_from_images", return_value="x" * 20_001):
+            (question, reply), _ = self.turn(text="", image=b"png", image_type="image/png")
+        self.assertEqual(question.text, "")
+        self.assertIn("20.000 ký tự", reply.text)
+        self.assertTrue(reply.meta["error"])
+
+    def test_multiple_problem_images_are_saved_and_read_together(self):
+        with patch("geo_draw.tutor.extract_problem_from_images", return_value=TRIANGLE) as ocr:
+            (question, _), _ = self.turn(
+                text="", image=b"page-one", image_type="image/png",
+                additional_images=[(b"page-two", "image/jpeg")],
+            )
+        self.assertEqual(len(ocr.call_args.args[0]), 2)
+        self.assertTrue(question.image_path.is_file())
+        self.assertTrue((question.image_path.parent / "problem-2.jpg").is_file())
 
     def test_old_drawing_only_conversations_keep_their_problem(self):
         self.store.add_message(self.conversation.id, USER, TRIANGLE)  # legacy figure request
@@ -207,6 +291,28 @@ class TutorTurnTests(unittest.TestCase):
         self.assertEqual(self.store.get("alice", self.conversation.id).problem, TRIANGLE)
         self.assertEqual(question.text, "Em không biết tính BC")
         self.assertIn(TRIANGLE, prompt[0]["content"])
+
+    def test_original_problem_remains_editable_and_resets_later_chat_and_figures(self):
+        self.turn(text=TRIANGLE)
+        self.turn(text="Em thử tính BC = 4")
+        chat = self.store.messages(self.conversation.id, CHAT)
+        first_user = chat[0]
+        last_user = chat[-2]
+        self.assertEqual(editable_message_ids(self.store, self.conversation.id),
+                         {first_user.id, last_user.id})
+        self.store.add_message(self.conversation.id, ASSISTANT, "Hình cũ", channel=FIGURE)
+
+        replacement = "Giải phương trình 2x = 6."
+        with patch("geo_draw.tutor.stream_chat", return_value=iter(["Em chia hai vế cho 2 nhé."])), \
+                patch("geo_draw.tutor._request_chat", return_value="Phương trình 2x = 6"):
+            rerun_tutor_turn(self.store, "alice", self.conversation.id, first_user.id,
+                             replacement, ai=AI)
+
+        updated = self.store.get("alice", self.conversation.id)
+        self.assertEqual(updated.problem, replacement)
+        self.assertEqual([m.text for m in self.store.messages(self.conversation.id, CHAT)],
+                         [replacement, "Em chia hai vế cho 2 nhé."])
+        self.assertEqual(self.store.messages(self.conversation.id, FIGURE), [])
 
 
 class FigureTurnTests(unittest.TestCase):
@@ -291,6 +397,11 @@ class GeometryDetectionTests(unittest.TestCase):
                      "Kể tên các số nguyên tố nhỏ hơn 20"):
             self.assertFalse(is_geometry_problem(text), text)
 
+    def test_solid_problems_are_detected_separately_and_auto_drawn(self):
+        solid = "Cho hình chóp S.ABCD có đáy là hình vuông"
+        self.assertTrue(is_solid_problem(solid))
+        self.assertTrue(should_auto_draw_geometry(solid, first_turn=True, has_image=False))
+
     def test_followup_image_can_start_a_geometry_drawing(self):
         self.assertTrue(should_auto_draw_geometry(TRIANGLE, first_turn=True, has_image=False))
         self.assertTrue(should_auto_draw_geometry(TRIANGLE, first_turn=False, has_image=True))
@@ -298,6 +409,13 @@ class GeometryDetectionTests(unittest.TestCase):
         self.assertFalse(should_auto_draw_geometry(
             "Giải phương trình x + 1 = 0", first_turn=False, has_image=True,
         ))
+
+    def test_multiple_independent_problems_are_not_merged_into_one_drawing(self):
+        problems = (
+            "Câu 1. Cho tam giác ABC vuông tại A, tính BC.\n"
+            "Câu 2. Cho hình chóp S.ABCD có đáy là hình vuông."
+        )
+        self.assertFalse(should_auto_draw_geometry(problems, first_turn=True, has_image=False))
 
 
 if __name__ == "__main__":

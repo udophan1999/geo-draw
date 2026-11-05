@@ -54,13 +54,18 @@ class PipelineTests(unittest.TestCase):
     def test_parser_rejects_unsupported_figures_instead_of_drawing_a_triangle(self):
         for problem in (
             "Cho ngũ giác ABCDE.",
-            "Cho hình chóp S.ABCD.",
         ):
             with self.subTest(problem=problem):
                 outcome = draw(problem, self.folder, ai=None)
                 self.assertFalse(outcome.ok)
                 self.assertIn("Parser nhanh chưa hỗ trợ", outcome.message)
                 self.assertIsNone(outcome.image_path)
+
+    def test_solid_geometry_needs_mathmate_ai_instead_of_falling_back_to_triangle(self):
+        outcome = draw("Cho hình chóp S.ABCD.", self.folder, ai=None)
+        self.assertFalse(outcome.ok)
+        self.assertIn("hình không gian cần chế độ MathMate AI", outcome.message)
+        self.assertIsNone(outcome.image_path)
 
     def test_parser_keeps_supported_basic_figures(self):
         for problem in (

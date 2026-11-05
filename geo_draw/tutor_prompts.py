@@ -8,6 +8,8 @@ mode is only used when the student explicitly asks for the worked solution.
 
 from __future__ import annotations
 
+import re
+
 from .conversations import HINT, SOLUTION
 from .math_symbols import THCS_MATH_SYMBOLS_VI
 
@@ -19,6 +21,41 @@ HINT_LEVELS = [
     "Chuẩn hóa trình bày",
 ]
 MAX_HINT_LEVEL = len(HINT_LEVELS)
+
+_NUMBERED_PROBLEM_HEADING = re.compile(
+    r"(?im)^[ \t]*(?:(?:bài|câu)\s*(?:số\s*)?\d+|\d{1,3}[.)])"
+    r"(?:\s*[:.)-]|\s+)"
+)
+
+
+def multiple_problem_count(text: str) -> int:
+    """Return the number of explicit top-level exercises, or zero for one problem.
+
+    Subparts such as ``a)`` and ``b)`` deliberately do not count as separate problems. The
+    distinction matters because their givens belong together, while ``Bài 1`` and ``Bài 2`` must
+    never leak facts or notation into each other.
+    """
+    count = len(_NUMBERED_PROBLEM_HEADING.findall(text or ""))
+    return count if count >= 2 else 0
+
+
+def _multiple_problem_rule(problem: str, mode: str) -> str | None:
+    count = multiple_problem_count(problem)
+    if not count:
+        return None
+    common = f"""=== NHIỀU BÀI TOÁN ĐỘC LẬP ({count} bài) ===
+- Giữ nguyên thứ tự và tiêu đề Bài/Câu của đề. Không trộn giả thiết, biến, ký hiệu, hình vẽ hay
+  kết quả của bài này sang bài khác. Các ý a), b), c) dưới cùng một Bài/Câu vẫn thuộc một bài.
+- Nếu học sinh chỉ rõ bài cần hỏi, ưu tiên đúng bài đó; nếu không, bắt đầu từ bài chưa hoàn thành
+  đầu tiên và nói rõ đang xét Bài/Câu nào."""
+    if mode == SOLUTION:
+        return common + """
+- Giải đủ từng bài theo thứ tự, mỗi bài có tiêu đề riêng và dòng **Kết luận:** riêng. Hoàn tất một
+  bài rồi mới sang bài tiếp theo; không dùng một kết luận chung mơ hồ cho cả danh sách."""
+    return common + """
+- Trong chế độ gợi ý, mỗi lượt chỉ dẫn dắt MỘT bài đang xét và vẫn kết thúc bằng đúng một câu hỏi
+  có ý nghĩa cho bài đó. Chỉ chuyển sang bài kế tiếp sau khi bài hiện tại đã xong.
+- Chỉ phát thẻ [[xong]] khi học sinh đã hoàn thành tất cả các bài, không phải mới xong một bài."""
 
 BASE_TUTOR_PROMPT = """
 Bạn là trợ giảng Toán cho học sinh Việt Nam (THCS và THPT), dạy mọi phân môn: số học,
@@ -111,18 +148,42 @@ lập luận hoàn chỉnh chứng minh O cũng là trung điểm BD, rồi kế
 SOLUTION_PROMPT = """
 Bạn là giáo viên Toán Việt Nam (THCS và THPT). Học sinh đã chủ động yêu cầu xem lời giải
 chi tiết. Hãy trình bày lời giải hoàn chỉnh, chuẩn mực như trong vở:
-- Mở đầu bằng 1–2 câu tóm tắt hướng giải.
-- Chia thành các bước có tiêu đề ngắn (**Bước 1**, **Bước 2**…); mỗi bước giải thích vì sao
-  làm như vậy, không chỉ ghi phép biến đổi.
-- Với bài hình học: nêu rõ giả thiết – kết luận, trích định lý được dùng; mỗi ý a), b), c)
-  giải riêng.
+- Đi thẳng vào lời giải, không chào hỏi, không chép lại đề và không viết đoạn “Hướng giải”.
+- Không chia “Bước 1, Bước 2…”. Với đề nhiều ý, chỉ dùng đúng tiêu đề **a)**, **b)**, **c)**.
+- Ưu tiên công thức, phép biến đổi và ký hiệu toán học. Mỗi dòng thể hiện một suy luận; văn bản chỉ
+  dùng ngắn gọn để nêu điều kiện, định lý hoặc căn cứ cần thiết.
+- Với hình học, dùng trực tiếp giả thiết trong chuỗi suy luận; không có đoạn riêng chép lại giả thiết
+  – kết luận và không chép nguyên văn phát biểu dài của định lý.
 - Kiểm tra điều kiện (mẫu khác 0, căn có nghĩa, nghiệm thỏa điều kiện…) khi cần.
 - Kết thúc bằng dòng **Kết luận:** nêu đáp số hoặc điều cần chứng minh.
 - Viết công thức bằng LaTeX: $...$ trong dòng. Công thức riêng dòng thì đặt $$ trên một
   dòng riêng, công thức ở dòng tiếp theo, rồi $$ trên dòng riêng. Không dùng \\[ \\],
   \\( \\) hay \\tag; muốn đánh số phương trình thì ghi (1), (2) bằng chữ thường sau công thức.
-- Sau lời giải, thêm một mục ngắn **Lưu ý** về lỗi hay gặp với dạng bài này.
 Nếu đề thiếu dữ kiện hoặc mơ hồ, nói rõ điểm chưa rõ và giải theo cách hiểu hợp lý nhất.
+""".strip()
+
+CONCISE_SOLUTION_RULE = r"""
+=== LỜI GIẢI NGẮN GỌN, ƯU TIÊN KÝ HIỆU (BẮT BUỘC) ===
+- Viết đúng như một giáo viên giỏi: lời giải phải chính xác, đủ căn cứ nhưng không có câu thừa.
+- Trước khi trả lời, tự kiểm tra âm thầm từng phép tính và suy luận, đủ mọi ý của đề, không dùng
+  điều cần chứng minh làm giả thiết và không bỏ nghiệm/trường hợp hợp lệ. Chỉ xuất bản lời giải sau
+  khi kết luận khớp toàn bộ giả thiết; không viết phần tự kiểm tra này ra cho học sinh.
+- Không viết các mục “Hướng giải”, “Bước 1”, “Bước 2” hoặc “Lưu ý”. Không mở đầu hay tổng kết bằng
+  văn xuôi. Mỗi ý a), b), c) thường chỉ gồm 2–5 dòng suy luận ngắn rồi đến kết luận của ý đó.
+- Không diễn giải một dữ kiện hai lần. Ví dụ, không viết cả “D là trung điểm BC”, “DB = DC”,
+  “D nằm giữa B, C” thành ba câu; chỉ giữ biểu thức cần trực tiếp cho suy luận đang làm.
+- Đặt biểu thức và chuỗi biến đổi ở trung tâm; dùng đúng các ký hiệu =, ⇒, ⇔, ≤, ≥, ∈, ∉, ⟂, ∥,
+  ∠ khi phù hợp. Chỉ dùng ⇔ cho hai mệnh đề tương đương; không thay một suy luận một chiều bằng ⇔.
+- Sau một phép biến đổi chỉ ghi căn cứ thật sự cần thiết trong cụm ngắn, ví dụ “(Pythagore)”,
+  “(Δ > 0)” hoặc “vì AB ∥ CD”; không diễn giải lại phép tính thành một đoạn văn.
+- Không được rút gọn bằng cách bỏ điều kiện xác định, trường hợp, đơn vị, căn cứ của chứng minh hoặc
+  các ý nhỏ mà đề yêu cầu. Nếu có nhiều cách, chọn cách ngắn nhất mà vẫn chặt chẽ ở trình độ đề bài.
+
+Mẫu hình học đúng độ ngắn (không được viết dài hơn chỉ để diễn giải lại):
+**a)**
+$DB=DC,\ DH=DK,\ D\in BC\cap HK$
+$\Rightarrow$ hai đường chéo $BC,HK$ của $BHCK$ cắt nhau tại trung điểm mỗi đường.
+$\Rightarrow BHCK$ là hình bình hành.
 """.strip()
 
 
@@ -183,14 +244,20 @@ def build_system_prompt(problem: str, mode: str = HINT, level: int = 1,
     prompts = prompts or {}
     problem_block = "=== ĐỀ BÀI ===\n" + (problem.strip() or "(Học sinh chưa đưa đề bài.)")
     figure_block = FIGURE_NOTES.get(figure, FIGURE_NOTES[FIGURE_NONE])
+    multi_problem_block = _multiple_problem_rule(problem, mode)
     if mode == SOLUTION:
-        return "\n\n".join([prompts.get(TUTOR_SOLUTION) or SOLUTION_PROMPT, problem_block,
-                            figure_block, THCS_MATH_SYMBOLS_VI])
+        blocks = [prompts.get(TUTOR_SOLUTION) or SOLUTION_PROMPT, problem_block]
+        if multi_problem_block:
+            blocks.append(multi_problem_block)
+        return "\n\n".join([*blocks, figure_block, THCS_MATH_SYMBOLS_VI,
+                            CONCISE_SOLUTION_RULE])
     level = clamp_level(level)
     level_block = (
         f"=== BẬC GỢI Ý HIỆN TẠI: {level}/{MAX_HINT_LEVEL} ({HINT_LEVELS[level - 1]}) ===\n"
         f"Đưa gợi ý ở bậc {level}. Không gộp nhiều bậc trong một lượt."
     )
-    return "\n\n".join([prompts.get(TUTOR_HINT) or BASE_TUTOR_PROMPT, problem_block, figure_block,
-                         level_block, THCS_MATH_SYMBOLS_VI, ACCESSIBLE_QUESTION_RULE, GUARDRAIL,
-                         PROGRESS_RULE])
+    blocks = [prompts.get(TUTOR_HINT) or BASE_TUTOR_PROMPT, problem_block]
+    if multi_problem_block:
+        blocks.append(multi_problem_block)
+    return "\n\n".join([*blocks, figure_block, level_block, THCS_MATH_SYMBOLS_VI,
+                         ACCESSIBLE_QUESTION_RULE, GUARDRAIL, PROGRESS_RULE])

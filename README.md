@@ -144,10 +144,10 @@ Hai lựa chọn model (chọn trong **Cài đặt**):
 - **Tài khoản**: đăng ký hoặc đăng nhập bằng tên và mật khẩu; hoặc bấm **Dùng thử không cần tài khoản**. Lịch sử của người dùng thử chỉ lưu trên trình duyệt đó.
 - **Giải toán**: tin nhắn đầu tiên là đề bài (mọi dạng: phương trình, hàm số, bất đẳng thức, hình học…). Trợ giảng gợi ý theo 5 bậc: *Hiểu đề → Nhớ kiến thức → Chiến lược → Bước đầu tiên → Sâu hơn nữa*. Mỗi lượt kết thúc bằng một câu hỏi dẫn dắt. Học sinh trả lời trong khung chat. Bấm **Gợi ý sâu hơn** khi bí.
   - Ở chế độ **Gợi ý**, trợ giảng không bao giờ đưa lời giải hay đáp số, kể cả khi bị yêu cầu.
-  - Chuyển sang **Lời giải chi tiết** (có hỏi xác nhận) để xem lời giải đầy đủ từng bước. Bấm **Gợi ý** để quay lại.
+  - Chuyển sang **Lời giải chi tiết** (có hỏi xác nhận) để xem lời giải ngắn gọn nhưng đủ ý, ưu tiên công thức và ký hiệu toán học. Bấm **Gợi ý** để quay lại.
   - Công thức toán hiển thị bằng KaTeX.
-- **Vẽ hình**: bài hình học phẳng (có điểm được đặt tên như ABC, tâm O) được **tự vẽ** ở khung bên phải. Bài khác thì bấm **Vẽ hình** nếu cần. Muốn chỉnh hình, nhập vào ô **Yêu cầu chỉnh hình** trong khung hình, ví dụ *"vẽ thêm đường cao AH"*; ứng dụng vẽ lại và giữ bố cục của hình trước.
-- **Ảnh đề bài**: dán ảnh bằng **Ctrl+V**, kéo thả vào khung chat, hoặc bấm nút đính kèm. DeepSeek đọc đề trong ảnh; đề đọc được hiện trong khung chat để bạn kiểm tra.
+- **Vẽ hình**: bài hình học phẳng (có điểm được đặt tên như ABC, tâm O) và hình không gian được **tự vẽ** ở khung bên phải; hình không gian dùng phép chiếu kiểu sách giáo khoa với cạnh khuất nét đứt. MathMate AI còn vẽ đồ thị hàm số, miền tích phân, ellipse/hyperbol, đường cong tham số hoặc cực, miền nghiệm bất phương trình hai ẩn và tập nghiệm trên trục số; biểu đồ cột, tròn, đường, hộp và phân tán; cây xác suất và sơ đồ Venn. Bài khác thì bấm **Vẽ hình** nếu cần. Muốn chỉnh hình, nhập vào ô **Yêu cầu chỉnh hình** trong khung hình, ví dụ *"vẽ thêm đường cao AH"*; ứng dụng vẽ lại và giữ bố cục của hình trước.
+- **Ảnh đề bài**: dán ảnh bằng **Ctrl+V**, kéo thả vào khung chat, hoặc bấm nút đính kèm. Hỗ trợ PNG, JPG, WEBP, GIF, HEIC/HEIF và PDF; có thể gửi tối đa 4 ảnh hoặc trang theo thứ tự cho một đề nhiều trang hay một ảnh đề kèm hình minh họa. DeepSeek đọc và ghép nội dung; đề đọc được hiện trong khung chat để bạn kiểm tra.
 - **Khung hình**: zoom và kéo ảnh, chọn lại các phiên bản trước, xem mã Manim và log.
 - **Chỉnh hình thủ công**: dịch hoặc ẩn tên điểm, ẩn chấm điểm, thêm, ẩn hoặc làm đậm đoạn thẳng. Tab **Dựng hình** hạ đường vuông góc, dựng tia phân giác, đường trung trực hoặc trung tuyến. Mọi thao tác chỉ render lại trên máy chủ, không gọi DeepSeek. Chỉ áp dụng cho hình do DeepSeek tạo.
 

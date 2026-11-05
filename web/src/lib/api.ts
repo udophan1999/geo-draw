@@ -180,11 +180,11 @@ export const api = {
     request<void>(`/conversations/${id}`, { method: 'DELETE' }),
 
   /** A message to the tutor; ``action`` is "deeper", "solution" or "hint" for the buttons. */
-  sendMessage: (input: { text: string; conversationId?: string; image?: File | null; action?: TutorAction }) => {
+  sendMessage: (input: { text: string; conversationId?: string; images?: File[]; action?: TutorAction }) => {
     const form = new FormData()
     form.set('text', input.text)
     if (input.conversationId) form.set('conversation_id', input.conversationId)
-    if (input.image) form.set('image', input.image)
+    input.images?.forEach((image) => form.append('images', image))
     if (input.action) form.set('action', input.action)
     return request<{ conversation: Conversation; job_id: string }>('/messages', {
       method: 'POST',

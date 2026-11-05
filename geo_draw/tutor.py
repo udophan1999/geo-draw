@@ -13,18 +13,22 @@ import unicodedata
 from collections.abc import Callable
 from typing import Literal
 
-from .ai_codegen import AiSettings, _request_chat, extract_problem_from_image, stream_chat
+from .ai_codegen import AiSettings, _request_chat, extract_problem_from_images, stream_chat
 from .conversations import (
-    ASSISTANT, CHAT, HINT, SOLUTION, USER, ConversationStore, Message,
+    ASSISTANT, CHAT, FIGURE, HINT, SOLUTION, USER, ConversationStore, Message,
 )
-from .tutor_prompts import FIGURE_NONE, build_system_prompt, clamp_level
+from .tutor_prompts import FIGURE_NONE, build_system_prompt, clamp_level, multiple_problem_count
 
 ASK = "ask"          # a normal message (the problem, or an answer to the tutor)
 DEEPER = "deeper"    # "Gợi ý sâu hơn": one hint level up
 SHOW_SOLUTION = "solution"  # switch to the worked solution
 BACK_TO_HINTS = "hint"      # switch back to hints
 ACTIONS = (ASK, DEEPER, SHOW_SOLUTION, BACK_TO_HINTS)
-HISTORY_LIMIT = 16  # recent chat messages sent to the model, as in MathLovers
+HISTORY_LIMIT = 32
+HISTORY_MESSAGE_CHARS = 3000
+MAX_USER_MESSAGE_CHARS = 20_000
+SOLUTION_MAX_TOKENS = 3000
+MESSAGE_TOO_LONG = "Tin nhắn dài hơn 20.000 ký tự; hãy chia đề hoặc câu hỏi thành các phần ngắn hơn."
 
 DEFAULT_TEXT = {
     DEEPER: "Em vẫn chưa nghĩ ra, mình gợi ý sâu hơn một chút được không?",
@@ -37,8 +41,18 @@ DEFAULT_TEXT = {
 EventCallback = Callable[[str, object], None]
 
 
+def _history_text(text: str) -> str:
+    """Bound one unusually long turn while retaining both its setup and conclusion."""
+    if len(text) <= HISTORY_MESSAGE_CHARS:
+        return text
+    head = HISTORY_MESSAGE_CHARS * 2 // 3
+    tail = HISTORY_MESSAGE_CHARS - head
+    return text[:head] + "\n[… phần giữa của tin nhắn dài đã lược bớt …]\n" + text[-tail:]
+
+
 def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *,
                    text: str = "", image: bytes | None = None, image_type: str | None = None,
+                   additional_images: list[tuple[bytes, str]] | None = None,
                    action: str = ASK, ai: AiSettings,
                    figure: Callable[[], str] = lambda: FIGURE_NONE,
                    prompts: dict[str, str] | None = None,
@@ -70,17 +84,24 @@ def run_tutor_turn(store: ConversationStore, owner: str, conversation_id: str, *
     user_message_id, user_dir = store.new_message_dir(owner, conversation_id)
     image_path = None
     request = text
-    if image:
-        suffix = mimetypes.guess_extension(image_type or "") or ".png"
-        image_path = user_dir / f"problem{suffix}"
-        image_path.write_bytes(image)
+    image_items = ([(image, image_type or "")] if image else []) + (additional_images or [])
+    if image_items:
+        for index, (image_bytes, mime_type) in enumerate(image_items):
+            suffix = mimetypes.guess_extension(mime_type or "") or ".png"
+            path = user_dir / (f"problem{suffix}" if index == 0 else f"problem-{index + 1}{suffix}")
+            path.write_bytes(image_bytes)
+            if index == 0:
+                image_path = path
         emit("progress", {"stage": "ocr", "label": "Đang đọc đề bài trong ảnh..."})
         try:
-            recognized = extract_problem_from_image(image, image_type or "", ai)
+            recognized = extract_problem_from_images(image_items, ai)
         except ValueError as exc:
             return _save_pair(store, conversation_id, emit, text, image_path, user_message_id,
                               str(exc), mode, level)
         request = recognized + (f"\n\n{text}" if text else "")
+        if len(request) > MAX_USER_MESSAGE_CHARS:
+            return _save_pair(store, conversation_id, emit, text, image_path, user_message_id,
+                              MESSAGE_TOO_LONG, mode, level)
 
     first_turn = not problem
     if first_turn:
@@ -108,9 +129,15 @@ class EditNotAllowed(ValueError):
 
 
 def editable_message(store: ConversationStore, conversation_id: str) -> Message | None:
-    """The student's last chat message: the only one that can be edited."""
+    """Return the student's last chat message (legacy single-message helper)."""
     sent = [m for m in store.messages(conversation_id, CHAT) if m.role == USER]
     return sent[-1] if sent else None
+
+
+def editable_message_ids(store: ConversationStore, conversation_id: str) -> set[str]:
+    """The original problem and the latest student reply may be edited."""
+    sent = [m for m in store.messages(conversation_id, CHAT) if m.role == USER]
+    return {message.id for message in (sent[:1] + sent[-1:])}
 
 
 def rerun_tutor_turn(store: ConversationStore, owner: str, conversation_id: str,
@@ -131,10 +158,9 @@ def rerun_tutor_turn(store: ConversationStore, owner: str, conversation_id: str,
     if not text:
         raise EditNotAllowed("Tin nhắn không được để trống.")
     chat = store.messages(conversation_id, CHAT)
-    last = editable_message(store, conversation_id)
     index = next((i for i, m in enumerate(chat) if m.id == message_id), None)
-    if index is None or last is None or last.id != message_id:
-        raise EditNotAllowed("Chỉ sửa được tin nhắn gần nhất của bạn.")
+    if index is None or message_id not in editable_message_ids(store, conversation_id):
+        raise EditNotAllowed("Chỉ sửa được đề bài ban đầu hoặc tin nhắn gần nhất của bạn.")
     edited, history = chat[index], chat[:index]
     store.delete_messages([m.id for m in chat[index + 1:]])
 
@@ -149,6 +175,9 @@ def rerun_tutor_turn(store: ConversationStore, owner: str, conversation_id: str,
     first_turn = index == 0
     problem = store.problem_of(conversation)
     if first_turn:
+        # Every old drawing belongs to the old problem and must not remain visible if the
+        # replacement is algebraic or while a replacement geometry drawing is rendering.
+        store.delete_messages([m.id for m in store.messages(conversation_id, FIGURE)])
         problem = text
         store.update(owner, conversation_id, problem=problem)
         store.rename(owner, conversation_id, problem)
@@ -174,7 +203,7 @@ def _answer(store: ConversationStore, owner: str, conversation_id: str, *,
                                                       prompts)}]
     for message in history[-HISTORY_LIMIT:]:
         if message.text:
-            model_messages.append({"role": message.role, "content": message.text})
+            model_messages.append({"role": message.role, "content": _history_text(message.text)})
     model_messages.append({"role": "user", "content": _framed(request, problem, history, mode)})
 
     emit("progress", {"stage": "thinking",
@@ -182,7 +211,8 @@ def _answer(store: ConversationStore, owner: str, conversation_id: str, *,
     reply_text, reply_meta = "", dict(meta)
     hidden = _ProgressTagFilter()
     try:
-        for piece in stream_chat(ai, model_messages, max_tokens=6000 if mode == SOLUTION else 1500):
+        for piece in stream_chat(
+                ai, model_messages, max_tokens=SOLUTION_MAX_TOKENS if mode == SOLUTION else 1500):
             reply_text += piece
             shown = hidden.feed(piece)
             if shown:
@@ -377,9 +407,16 @@ def is_geometry_problem(text: str) -> bool:
     return _mentions(plain, _RELATIONS) and not _mentions(plain, _ALGEBRA)
 
 
+def is_solid_problem(text: str) -> bool:
+    """Whether the problem names a school solid that benefits from a projection."""
+    return _mentions(_plain(text), _SOLIDS)
+
+
 def should_auto_draw_geometry(text: str, *, first_turn: bool, has_image: bool) -> bool:
-    """Draw recognized geometry on the first turn or when a later photo introduces it."""
-    return is_geometry_problem(text) and (first_turn or has_image)
+    """Draw one recognized geometry problem, never merge independent exercises into one scene."""
+    return (not multiple_problem_count(text)
+            and (is_geometry_problem(text) or is_solid_problem(text))
+            and (first_turn or has_image))
 
 
 # Drawing requests typed in the chat ------------------------------------------------------

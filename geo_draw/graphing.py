@@ -1,4 +1,4 @@
-"""Function graphs (hàm số, đồ thị, tích phân) drawn by DeepSeek with Manim ``Axes``.
+"""Graphs, statistical charts, and school-math diagrams drawn by DeepSeek with Manim.
 
 The geometry pipeline (``ai_codegen``) only knows plane figures; asked to "draw" an integral it
 invented a triangle. Problems are therefore routed by ``drawing_kind``: plane geometry goes to
@@ -17,21 +17,32 @@ from .ai_codegen import (
     _request_chat, extract_python,
 )
 from .branding import APP_NAME
-from .tutor import _FIGURES, _RELATIONS, _SOLIDS, _mentions, _plain, is_geometry_problem
+from .tutor import (
+    _FIGURES, _RELATIONS, _SOLIDS, _mentions, _plain, is_geometry_problem, is_solid_problem,
+)
 
 GEOMETRY = "geometry"
 GRAPH = "graph"
+SOLID = "solid"
 
 NOT_DRAWABLE = ("Bài này không có hình hay đồ thị để vẽ. Khung hình dùng cho bài hình học và "
                 "bài hàm số, đồ thị, tích phân.")
 GRAPH_NEEDS_AI = f"Vẽ đồ thị cần chế độ {APP_NAME} AI (Cài đặt → Cách vẽ hình)."
+SOLID_NEEDS_AI = f"Vẽ hình không gian cần chế độ {APP_NAME} AI (Cài đặt → Cách vẽ hình)."
 GRAPH_INCOMPLETE = (f"{APP_NAME} chưa vẽ được đồ thị cho đề này. Hãy thử ghi rõ hàm số "
                     "và đoạn cần vẽ.")
 
 _GRAPH_WORDS = [
     "ham so", "do thi", "tich phan", "nguyen ham", "parabol", "dao ham", "cuc tri", "tiem can",
     "dien tich hinh phang", "khao sat", "dong bien", "nghich bien", "gia tri lon nhat",
-    "gia tri nho nhat", "logarit", "ham mu", "luong giac",
+    "gia tri nho nhat", "logarit", "ham mu", "luong giac", "bieu do cot", "bieu do tron",
+    "bieu do duong", "bieu do doan thang", "bieu do tan so", "bieu do tan suat",
+    "histogram", "bieu do thong ke", "elip", "ellipse", "hypebol", "hyperbol",
+    "duong cong tham so", "phuong trinh tham so", "toa do cuc", "duong cong cuc",
+    "mien nghiem", "he bat phuong trinh hai an", "bat phuong trinh hai an",
+    "bieu do hop", "box plot", "bieu do phan tan", "scatter plot",
+    "cay xac suat", "so do cay", "bieu do venn", "so do venn",
+    "truc so", "bieu dien tap nghiem tren truc", "bieu dien khoang",
 ]
 _SHAPE_WORDS = ["goc", "canh", "diem", "hinh", "duong thang", "tia", "cung"]
 _GRAPH_SYMBOLS = re.compile(r"∫|\\int(?![A-Za-z])|\by\s*=|\bf\s*\(\s*x\s*\)")
@@ -44,6 +55,8 @@ def is_graph_problem(text: str) -> bool:
 
 def drawing_kind(text: str) -> str | None:
     """``"geometry"``, ``"graph"`` or ``None`` (nothing to draw: do not invent a figure)."""
+    if is_solid_problem(text):
+        return SOLID
     if is_geometry_problem(text):
         return GEOMETRY
     if is_graph_problem(text):
@@ -85,6 +98,36 @@ Rules:
 - Black and gray only; do not set other colors.
 - Draw only what the problem states or clearly implies. Never add triangles, polygons, or points
   that the problem does not mention.
+- Statistical charts are not function plots. When the request says biểu đồ cột, tròn, đường,
+  tần số, tần suất, or histogram, preserve every category and value from the table/text and draw
+  the requested chart type. For bars use Rectangles with a labeled baseline and value Text; for a
+  line chart use labeled axes, Dots, and connecting Lines; for a pie chart use proportional sectors
+  totaling 360° with category and percentage Text. Never invent a missing observation or silently
+  replace one chart type with another.
+- For a box-and-whisker plot, preserve the exact five-number summary (minimum, Q1, median, Q3,
+  maximum); place them in increasing order on one scaled number line. Never estimate quartiles from
+  appearance. For a scatter plot, plot every stated ordered pair once and label axes/units; draw a
+  trend or regression line only when explicitly requested.
+- For a probability tree, use a clean left-to-right tree with event names and probability labels on
+  branches. Probabilities leaving one node must sum to 1; preserve conditional probabilities and do
+  not replace them with unconditional ones. Show path products or final probabilities only when the
+  problem asks for them.
+- For a Venn diagram, use one closed region per named set, preserve subset/disjoint/overlap relations,
+  place each given element in exactly its stated region, and shade exactly the requested union,
+  intersection, difference, or complement. Never infer that two sets are disjoint from layout alone.
+- For an ellipse, hyperbola, or other implicit conic, derive a correct parametric representation
+  and use axes.plot_parametric_curve; show its center, vertices, foci or asymptotes only when stated
+  or directly required. For a parametric curve x=x(t), y=y(t), preserve the stated t interval.
+- For a polar curve r=f(θ), convert exactly to x=r cos θ and y=r sin θ and plot over the stated θ
+  interval. Do not reinterpret r as y or silently replace the polar curve with a Cartesian graph.
+- For a two-variable inequality or system, draw every boundary with the correct solid/dashed style,
+  test a point to choose the correct half-plane, shade only the common solution region, and label
+  boundary equations. Never shade a plane region for a one-variable inequality.
+- When the request explicitly asks for a number line, interval, or one-variable solution set, draw a
+  horizontal number line rather than Cartesian Axes. Use a filled endpoint for ≤/≥ or an included
+  interval end, an open endpoint for </> or an excluded end, and extend rays/unbounded intervals in
+  the correct direction with an arrow. Preserve unions, intersections, excluded points, and ±∞
+  exactly; infinity is never a filled endpoint.
 """
 
 _NO_LATEX_NAMES = {"MathTex", "Tex", "Title", "DecimalNumber", "Integer", "Variable", "Matrix",

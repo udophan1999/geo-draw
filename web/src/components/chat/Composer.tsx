@@ -1,6 +1,7 @@
 import { EditorContent } from '@tiptap/react'
 import { ArrowUp, ImagePlus, Loader2, Omega, Sigma, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import { SymbolBar } from '@/components/chat/MathInput'
 import { useMathEditor } from '@/components/chat/useMathEditor'
@@ -10,9 +11,9 @@ import { IMAGE_TYPES, acceptImage } from '@/lib/images'
 import { toMessageText } from '@/lib/messageText'
 
 type Props = {
-  image: File | null
-  onImage: (file: File | null) => void
-  onSend: (text: string, image: File | null) => Promise<boolean>
+  images: File[]
+  onImages: (files: File[]) => void
+  onSend: (text: string, images: File[]) => Promise<boolean>
   busy: boolean
   placeholder: string
   /** Shown as a strip on top of the box (the tutor controls). */
@@ -21,7 +22,7 @@ type Props = {
   actions?: React.ReactNode
 }
 
-export function Composer({ image, onImage, onSend, busy, placeholder, header, actions }: Props) {
+export function Composer({ images, onImages, onSend, busy, placeholder, header, actions }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const [showSymbols, setShowSymbols] = useState(false)
@@ -30,25 +31,38 @@ export function Composer({ image, onImage, onSend, busy, placeholder, header, ac
     placeholder,
     className: 'block max-h-[200px] min-h-[2.25rem] w-full overflow-y-auto px-4 pt-3 pb-1 text-sm outline-none',
     onSubmit: () => void submit(),
-    onImage,
+    onImage: (file) => {
+      if (!file) return
+      if (images.length >= 4) return toast.error('Mỗi lượt nhận tối đa 4 ảnh.')
+      onImages([...images, file])
+    },
   })
 
-  const preview = useMemo(() => (image ? URL.createObjectURL(image) : null), [image])
+  const previews = useMemo(() => images.map((image) => ({
+    url: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(image.type)
+      ? URL.createObjectURL(image) : null,
+    name: image.name,
+  })), [images])
   useEffect(() => () => {
-    if (preview) URL.revokeObjectURL(preview)
-  }, [preview])
+    previews.forEach((preview) => { if (preview.url) URL.revokeObjectURL(preview.url) })
+  }, [previews])
 
   const disabled = busy || submitting
-  const canSend = !disabled && (!empty || image !== null)
+  const canSend = !disabled && (!empty || images.length > 0)
 
   const submit = async () => {
     if (!canSend || !editor) return
+    const text = toMessageText(editor.state.doc).trim()
+    if (text.length > 20_000) {
+      toast.error('Tin nhắn dài hơn 20.000 ký tự; hãy chia thành các phần ngắn hơn.')
+      return
+    }
     setSubmitting(true)
-    const ok = await onSend(toMessageText(editor.state.doc).trim(), image)
+    const ok = await onSend(text, images)
     setSubmitting(false)
     if (ok) {
       editor.commands.clearContent(true)
-      onImage(null)
+      onImages([])
     }
     editor.commands.focus()
   }
@@ -57,19 +71,21 @@ export function Composer({ image, onImage, onSend, busy, placeholder, header, ac
     <div className="mx-auto w-full max-w-3xl px-4 pb-3">
       <div className="overflow-hidden rounded-2xl border bg-background shadow-sm transition focus-within:border-primary/50 focus-within:ring-3 focus-within:ring-primary/10">
         {header}
-        {preview && (
-          <div className="px-3 pt-3">
-            <div className="relative inline-block">
-              <img src={preview} alt="Ảnh đính kèm" className="h-20 rounded-lg border bg-white object-contain" />
+        {previews.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-3 pt-3">
+            {previews.map((preview, index) => <div key={`${preview.name}-${index}`} className="relative inline-block">
+              {preview.url
+                ? <img src={preview.url} alt={`Ảnh đính kèm ${index + 1}`} className="h-20 rounded-lg border bg-white object-contain" />
+                : <div className="flex h-20 max-w-40 items-center rounded-lg border bg-muted px-3 text-xs font-medium">{preview.name}</div>}
               <button
                 type="button"
-                aria-label="Bỏ ảnh"
-                onClick={() => onImage(null)}
+                aria-label={`Bỏ ảnh ${index + 1}`}
+                onClick={() => onImages(images.filter((_, itemIndex) => itemIndex !== index))}
                 className="absolute -top-2 -right-2 flex size-5 items-center justify-center rounded-full bg-foreground text-background"
               >
                 <X className="size-3" />
               </button>
-            </div>
+            </div>)}
           </div>
         )}
         {showSymbols && <SymbolBar onInsert={insertText} />}
@@ -108,9 +124,13 @@ export function Composer({ image, onImage, onSend, busy, placeholder, header, ac
             accept={IMAGE_TYPES.join(',')}
             className="hidden"
             onChange={(event) => {
-              onImage(acceptImage(event.target.files?.[0]))
+              const accepted = Array.from(event.target.files ?? [])
+                .map(acceptImage).filter((file): file is File => file !== null)
+              if (images.length + accepted.length > 4) toast.error('Mỗi lượt nhận tối đa 4 ảnh.')
+              onImages([...images, ...accepted].slice(0, 4))
               event.target.value = ''
             }}
+            multiple
           />
           <div className="flex items-center gap-1.5">
             {actions}

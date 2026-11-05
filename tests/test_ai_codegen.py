@@ -7,13 +7,16 @@ from geo_draw.ai_codegen import (
     AiSettings,
     SYSTEM_PROMPT,
     _drawing_facts_text,
+    _basic_nonparallel_transversal_scene,
     _explicit_congruent_triangles,
     _explicit_segment_equality_pairs,
     _ensure_light_theme,
     _normalize_geometry_notation,
     _ordinary_polygons,
+    _primed_parallel_transversal_facts,
+    _primed_parallel_transversal_scene,
     _transversal_numbered_angles_scene,
-    extract_problem_from_image,
+    extract_problem_from_image, extract_problem_from_images,
     extract_python,
     generate_manim_code,
     missing_reference_figure_points,
@@ -85,6 +88,39 @@ class GeoScene(Scene):
                 for number in "1234":
                     self.assertEqual(code.count(f'Text("{number}"'), 2)
 
+    def test_basic_nonparallel_transversal_uses_clean_separated_layout(self):
+        variants = (
+            "Vẽ đường thẳng c cắt đường thẳng a tại A và cắt đường thẳng b tại B. "
+            "Lưu ý không vẽ a và b song song.",
+            "c giao a tại A; c giao b tại B; a không song song với b.",
+        )
+        for problem in variants:
+            with self.subTest(problem=problem):
+                code = _basic_nonparallel_transversal_scene(problem, animate=False)
+                self.assertIsNotNone(code)
+                validate_code(code, problem=problem)
+                self.assertIn("A = np.array([-1.0, 1.35, 0.0])", code)
+                self.assertIn("B = np.array([1.0, -1.35, 0.0])", code)
+                self.assertIn("a_direction = np.array([1.0, 0.13, 0.0])", code)
+                self.assertIn("b_direction = np.array([1.0, -0.09, 0.0])", code)
+                self.assertIn('Text("c", font_size=25).next_to(line_c.get_start(), LEFT', code)
+                self.assertIn('safe_point_label(\n                A, "A"', code)
+                self.assertNotIn("labels_at_A", code)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_basic_nonparallel_transversal_is_drawn_without_ai(self, request_chat):
+        problem = (
+            "Vẽ đường thẳng c cắt đường thẳng a tại A và cắt đường thẳng b tại B. "
+            "Lưu ý không vẽ a và b song song."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertIn("line_a = infinite_line", result.code)
+        self.assertIn("line_b = infinite_line", result.code)
+        self.assertIn("line_c = infinite_line", result.code)
+        self.assertNotIn("parallel_segment_marks", result.code)
+
     @patch("geo_draw.ai_codegen._request_chat")
     def test_transversal_numbered_angles_are_drawn_without_ai(self, request_chat):
         problem = (
@@ -144,9 +180,14 @@ class GeoScene(Scene):
         self.assertIn("permanent regression contract", DRAWING_ERROR_MEMORY)
         self.assertIn("sửa lỗi mới bằng cách làm tái xuất hiện một lỗi cũ", GEOMETRY_HELP_VI)
         self.assertIn("balanced textbook composition", SYSTEM_PROMPT)
+        self.assertIn("outside the visible construction", SYSTEM_PROMPT)
+        self.assertIn("never bunch all three carriers into one central knot", DRAWING_ERROR_MEMORY)
         self.assertIn("a principal symmetry axis must be", DRAWING_ERROR_MEMORY)
         self.assertIn("align a principal symmetry axis exactly", MIDDLE_SCHOOL_GEOMETRY_RULES)
         self.assertIn("phải đặt một trục đối xứng chính xác", GEOMETRY_HELP_VI)
+        self.assertIn("textual and symbolic forms as equivalent", SYSTEM_PROMPT)
+        self.assertIn("aa'/bb'/cc' are complete", DRAWING_ERROR_MEMORY)
+        self.assertIn("Nhận diện dữ kiện tương đương", GEOMETRY_HELP_VI)
 
     def test_congruent_triangle_correspondence_uses_written_vertex_order(self):
         self.assertEqual(
@@ -159,6 +200,73 @@ class GeoScene(Scene):
             ),
             [],
         )
+
+    def test_congruent_triangles_accept_words_and_equivalent_symbols_with_shared_side(self):
+        variants = (
+            "Vẽ hai tam giác ABC và DBC bằng nhau.",
+            "Vẽ tam giác ABC bằng tam giác DBC, lưu ý: BC là cạnh chung của hai tam giác.",
+            "Tam giác ABC bằng với tam giác DBC.",
+            "△ABC ≅ △DBC",
+            "ΔABC = ΔDBC",
+            r"\triangle ABC \cong \triangle DBC",
+        )
+        for problem in variants:
+            with self.subTest(problem=problem):
+                self.assertEqual(_explicit_congruent_triangles(problem), [("ABC", "DBC")])
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_shared_side_congruent_triangles_are_drawn_without_ai(self, request_chat):
+        for problem in (
+            "Vẽ hai tam giác ABC và DBC bằng nhau",
+            "Vẽ tam giác ABC bằng tam giác DBC, lưu ý: BC là cạnh chung của hai tam giác",
+            "△ABC ≅ △DBC",
+        ):
+            with self.subTest(problem=problem):
+                result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+                self.assertTrue(result.ok, result.detail or result.error)
+                self.assertIn("A = np.array([0.0, 2.1, 0.0])", result.code)
+                self.assertIn("D = np.array([0.0, -2.1, 0.0])", result.code)
+                self.assertIn("equal_segment_marks((A, B), (D, B), count=1)", result.code)
+                self.assertIn("equal_segment_marks((C, A), (C, D), count=2)", result.code)
+                self.assertNotIn("equal_segment_marks((B, C), (B, C)", result.code)
+                self.assertEqual(result.code.count("Line(B, C)"), 1)
+        request_chat.assert_not_called()
+
+    def test_primed_parallel_transversal_accepts_words_and_symbols(self):
+        variants = (
+            "Cho đường thẳng aa' song song với đường thẳng bb', đường thẳng cc' cắt hai "
+            "đường thẳng aa' và bb' lần lượt tại A và B, góc cAa' bằng 50°.",
+            "aa′ ∥ bb′; A ∈ aa′ ∩ cc′; B ∈ bb′ ∩ cc′; ∠cAa′ = 50°.",
+            "aa' // bb'; cc' ∩ aa' = {A}; cc' ∩ bb' = {B}; ∠cAa'=50°.",
+            "Cho aa' song song voi bb', cc' cat aa' va bb' lan luot tai A va B, "
+            "goc cAa' bang 50 do.",
+        )
+        for problem in variants:
+            with self.subTest(problem=problem):
+                self.assertEqual(
+                    _primed_parallel_transversal_facts(problem),
+                    ("a", "b", "c", 50.0),
+                )
+                code = _primed_parallel_transversal_scene(problem, animate=False)
+                self.assertIsNotNone(code)
+                validate_code(code, problem=problem)
+                self.assertIn("line_c = infinite_line", code)
+                self.assertIn("parallel_segment_marks", code)
+                self.assertIn('Text("50°"', code)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_primed_parallel_transversal_is_drawn_without_ai(self, request_chat):
+        problem = (
+            "Cho aa' ∥ bb', cc' cắt aa' và bb' lần lượt tại A và B, "
+            "thỏa mãn ∠cAa'=50°."
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertIn("line_a = infinite_line", result.code)
+        self.assertIn("line_b = infinite_line", result.code)
+        self.assertIn("line_c = infinite_line", result.code)
+        self.assertIn('Text("c\'"', result.code)
 
     @patch("geo_draw.ai_codegen._request_chat")
     def test_congruent_triangles_show_all_corresponding_side_and_angle_marks(self, request_chat):
@@ -649,11 +757,30 @@ class GeoScene(Scene):
             "deepseek-v4-flash-vision-exp",
         )
 
+    @patch("geo_draw.ai_codegen._request_chat", return_value="Đề ghép từ hai trang")
+    def test_extract_problem_from_multiple_images_preserves_order(self, request_chat):
+        result = extract_problem_from_images(
+            [(b"page-one", "image/png"), (b"page-two", "image/jpeg")],
+            AiSettings(api_key="test-key"),
+        )
+        self.assertEqual(result, "Đề ghép từ hai trang")
+        content = request_chat.call_args.args[1][0]["content"]
+        self.assertEqual([part["type"] for part in content],
+                         ["text", "image_url", "image_url"])
+        self.assertIn("theo đúng thứ tự đã gửi", content[0]["text"])
+        self.assertTrue(content[1]["image_url"]["url"].startswith("data:image/png;base64,"))
+        self.assertTrue(content[2]["image_url"]["url"].startswith("data:image/jpeg;base64,"))
+
     def test_extract_problem_from_image_rejects_unsupported_files(self):
         with self.assertRaisesRegex(ValueError, "định dạng"):
             extract_problem_from_image(
                 b"not-an-image",
                 "application/pdf",
+                AiSettings(api_key="test-key"),
+            )
+        with self.assertRaisesRegex(ValueError, "tối đa 4 ảnh"):
+            extract_problem_from_images(
+                [(b"x", "image/png")] * 5,
                 AiSettings(api_key="test-key"),
             )
 

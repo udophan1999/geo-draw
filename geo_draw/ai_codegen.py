@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import base64
 import json
+import math
 import os
 import re
 import unicodedata
@@ -194,6 +195,8 @@ Exact construction requirements:
   For `triangle ABC congruent to triangle DEF`, preserve the stated order A-D, B-E, C-F; draw
   matching tick counts on AB-DE, BC-EF, CA-FD and matching arc counts on angles A-D, B-E, C-F.
   Use a different count for each independent corresponding pair so students can read the mapping.
+  Congruent triangles may share a corresponding side, for example ABC and DBC share BC; do not
+  require six distinct vertices and do not draw a duplicate equality mark on the shared side.
   Do not add these congruence marks when congruence is only a conclusion to be proved.
 - For a basic drawing request with unspecified or "arbitrary" lengths/angles, choose a valid,
   readable ordinary configuration automatically and finish the drawing. Do not ask the student
@@ -209,11 +212,20 @@ Exact construction requirements:
   visibly nonparallel, ordinary triangles scalene and non-right, and independent lengths/angles
   visually distinct. Ask for clarification only when two interpretations change a named incidence
   or order relation and neither wording nor a standard convention resolves it.
+- When a transversal c meets nonparallel lines a and b at named points A and B, use a clean textbook
+  composition: keep a and b as two separated near-horizontal carriers with visibly different slopes,
+  and let c cross them diagonally. Unless the intersection of a and b is named or requested, place it
+  outside the visible construction; never create an unnecessary crowded three-line knot near A/B.
 - Lowercase letters a, b, c may name lines while uppercase A, B, C name points. Read relations from
   grammar and context, not letter identity. For a numbered-angle request where transversal c meets
-  a at A and b at B, distribute labels in written order: 1,2 around A and 3,4 around B. If the
-  exact sectors are not specified, choose a consistent readable convention and draw instead of
-  asking the student to choose positions.
+  a at A and b at B, repeat the full set 1,2,3,4 around both A and B. If the exact sectors are not
+  specified, choose a consistent readable convention and draw instead of asking the student to
+  choose positions.
+- Treat textual and symbolic forms as equivalent geometry facts: "bằng nhau" and `≅`, "song song"
+  and `∥`/`//`, "vuông góc" and `⊥`, "thuộc" and `∈`, and "góc ABC" and `∠ABC` must produce the
+  same construction. A carrier written `aa'` is the whole line through the two direction labels
+  a and a', not two unrelated points. If `cc'` cuts `aa'` and `bb'` at A and B, draw one continuous
+  full line cc' through both A and B; never replace it with a short floating stroke.
 - A compact vertex run immediately following a named polygon is a point list even when the student
   typed it in lowercase: "tam giác abc" means points A, B, C and "ngũ giác abcde" means
   A, B, C, D, E. Normalize those display labels to uppercase. Do not uppercase isolated lowercase
@@ -306,6 +318,7 @@ class AiResult:
 def _normalize_geometry_notation(text: str) -> str:
     """Flatten textbook/MathJax geometry notation for deterministic parsing."""
     normalized = unicodedata.normalize("NFC", text or "")
+    normalized = normalized.replace("′", "'").replace("’", "'")
     normalized = normalized.replace("\\(", " ").replace("\\)", " ")
     normalized = normalized.replace("\\[", " ").replace("\\]", " ").replace("$", " ")
     normalized = re.sub(
@@ -325,6 +338,8 @@ def _normalize_geometry_notation(text: str) -> str:
     normalized = re.sub(r"\\(?:degree|circ)\b", "°", normalized, flags=re.I)
     normalized = re.sub(r"\\parallel\b", "∥", normalized, flags=re.I)
     normalized = re.sub(r"\\perp\b", "⊥", normalized, flags=re.I)
+    normalized = re.sub(r"\\(?:cong|equiv)\b", "≅", normalized, flags=re.I)
+    normalized = re.sub(r"\\(?:triangle|Delta)\b", "△", normalized, flags=re.I)
     normalized = re.sub(r"\\(?:quad|qquad)\b|\\[,;!]", " ", normalized)
     normalized = normalized.replace("{", "").replace("}", "")
     return normalized
@@ -372,10 +387,7 @@ def _has_positive_parallel_relation(text: str) -> bool:
     folded = _fold_geometry_notation(text)
     for match in re.finditer(r"//|∥|SONG SONG|PARALLEL", folded):
         prefix = folded[max(0, match.start() - 40):match.start()]
-        if re.search(
-            r"(?:KHONG|KO|NOT)(?:\s+(?:DUOC|PHAI|VE|THE|CAN|LA)){0,5}\s*$",
-            prefix,
-        ):
+        if re.search(r"(?:KHONG|KO|NOT)(?:\s+[A-Z]+){0,8}\s*$", prefix):
             continue
         return True
     return False
@@ -401,17 +413,145 @@ def _explicit_segment_equality_pairs(text: str) -> list[tuple[str, str]]:
 def _explicit_congruent_triangles(text: str) -> list[tuple[str, str]]:
     """Return ordered triangle-name pairs explicitly stated or requested as congruent."""
     folded = _fold_geometry_notation(_drawing_facts_text(text))
+    triangle = r"(?:TAM\s+GIAC\s+|[△Δ]\s*)"
     patterns = (
-        r"(?:VE\s+)?(?:HAI\s+)?TAM\s+GIAC\s+([A-Z]{3})\s+VA\s+([A-Z]{3})\s+BANG\s+NHAU",
-        r"TAM\s+GIAC\s+([A-Z]{3})\s*(?:=|≅)\s*TAM\s+GIAC\s+([A-Z]{3})",
+        rf"(?:VE\s+)?(?:HAI\s+)?{triangle}([A-Z]{{3}})\s+VA\s+"
+        rf"(?:{triangle})?([A-Z]{{3}})\s+BANG\s+NHAU",
+        rf"(?:VE\s+)?{triangle}([A-Z]{{3}})\s+BANG(?:\s+VOI)?\s+"
+        rf"{triangle}([A-Z]{{3}})",
+        rf"{triangle}([A-Z]{{3}})\s*(?:=|≅)\s*(?:{triangle})?([A-Z]{{3}})",
     )
     pairs: list[tuple[str, str]] = []
     for pattern in patterns:
         for match in re.finditer(pattern, folded):
             first, second = match.groups()
-            if len(set(first + second)) == 6:
+            if (first != second and len(set(first)) == 3 and len(set(second)) == 3
+                    and len(set(first + second)) >= 4):
                 pairs.append((first, second))
     return list(dict.fromkeys(pairs))
+
+
+def _primed_parallel_transversal_facts(
+    text: str,
+) -> tuple[str, str, str, float | None] | None:
+    """Recognize aa'/bb'/cc' carriers from either prose or textbook symbols."""
+    folded = _fold_geometry_notation(_drawing_facts_text(text))
+    folded = re.sub(r"\s+", " ", folded).strip()
+    parallel = re.search(
+        r"([A-Z])\1'\s*(?:∥|//|SONG SONG(?: VOI)?)\s*"
+        r"(?:DUONG THANG )?([A-Z])\2'",
+        folded,
+    )
+    if not parallel:
+        return None
+    first, second = parallel.group(1), parallel.group(2)
+    if first == second:
+        return None
+
+    carriers = re.findall(r"\b([A-Z])\1'", folded)
+    transversal = next((name for name in carriers if name not in {first, second}), None)
+    if transversal is None:
+        return None
+    first_name, second_name, cross_name = (
+        first.lower(), second.lower(), transversal.lower(),
+    )
+
+    prose_intersections = bool(re.search(
+        rf"{transversal}{transversal}'\s+CAT(?: HAI DUONG THANG)?\s+"
+        rf"{first}{first}'\s+VA\s+{second}{second}'\s+LAN LUOT TAI A VA B",
+        folded,
+    )) or (
+        bool(re.search(
+            rf"{transversal}{transversal}'\s+CAT(?: DUONG THANG)?\s+"
+            rf"{first}{first}'\s+TAI A",
+            folded,
+        ))
+        and bool(re.search(
+            rf"(?:{transversal}{transversal}'\s+)?CAT(?: DUONG THANG)?\s+"
+            rf"{second}{second}'\s+TAI B",
+            folded,
+        ))
+    )
+    def symbolic_intersection(point: str, left: str, right: str) -> bool:
+        orders = ((left, right), (right, left))
+        return any(
+            re.search(rf"{point}\s*∈\s*{one}{one}'\s*∩\s*{two}{two}'", folded)
+            or re.search(
+                rf"{one}{one}'\s*∩\s*{two}{two}'\s*=\s*\{{?\s*{point}\s*\}}?",
+                folded,
+            )
+            for one, two in orders
+        )
+
+    symbolic_intersections = (
+        symbolic_intersection("A", first, transversal)
+        and symbolic_intersection("B", second, transversal)
+    )
+    if not (prose_intersections or symbolic_intersections):
+        return None
+
+    angle_match = re.search(
+        rf"{transversal}A{first}'\s*(?:=|BANG)\s*(\d+(?:[.,]\d+)?)\s*°?",
+        folded,
+    )
+    angle = float(angle_match.group(1).replace(",", ".")) if angle_match else None
+    if angle is not None and not 15.0 <= angle <= 165.0:
+        return None
+    return first_name, second_name, cross_name, angle
+
+
+def _primed_parallel_transversal_scene(problem: str, animate: bool) -> str | None:
+    """Draw two primed-name parallel carriers and one full transversal through A and B."""
+    facts = _primed_parallel_transversal_facts(problem)
+    if facts is None:
+        return None
+    first, second, transversal, angle = facts
+    theta = angle if angle is not None else 55.0
+    radians = math.radians(theta)
+    vertical_gap = 3.0
+    horizontal_delta = vertical_gap / math.tan(radians)
+    a_x = -horizontal_delta / 2
+    b_x = horizontal_delta / 2
+    angle_objects = ""
+    if angle is not None:
+        angle_text = f"{angle:g}°"
+        angle_objects = f'''\n            Angle(Line(A, angle_c_ray), Line(A, angle_a_ray), radius=0.48, other_angle=False),\n            Text("{angle_text}", font_size=24).move_to(\n                A + 0.82 * np.array([np.cos(-theta / 2), np.sin(-theta / 2), 0.0])\n            ),'''
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, infinite_line, parallel_segment_marks, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        theta = np.deg2rad({theta:.8f})
+        A = np.array([{a_x:.8f}, 1.5, 0.0])
+        B = np.array([{b_x:.8f}, -1.5, 0.0])
+        horizontal = np.array([1.0, 0.0, 0.0])
+        cross_direction = np.array([np.cos(theta), -np.sin(theta), 0.0])
+        a_left, a_right = A - horizontal, A + horizontal
+        b_left, b_right = B - horizontal, B + horizontal
+        c_upper, c_lower = A - cross_direction, A + cross_direction
+        angle_c_ray, angle_a_ray = A + cross_direction, A + horizontal
+        line_a = infinite_line(a_left, a_right, half_length=4.3)
+        line_b = infinite_line(b_left, b_right, half_length=4.3)
+        line_c = infinite_line(c_upper, c_lower, half_length=5.0)
+        self.add(
+            line_a, line_b, line_c,
+            parallel_segment_marks((a_left, a_right), (b_left, b_right), count=1),
+            Text("{first}", font_size=25).next_to(line_a.get_start(), UP, buff=0.10),
+            Text("{first}'", font_size=25).next_to(line_a.get_end(), UP, buff=0.10),
+            Text("{second}", font_size=25).next_to(line_b.get_start(), DOWN, buff=0.10),
+            Text("{second}'", font_size=25).next_to(line_b.get_end(), DOWN, buff=0.10),
+            Text("{transversal}'", font_size=25).next_to(line_c.get_start(), LEFT, buff=0.10),
+            Text("{transversal}", font_size=25).next_to(line_c.get_end(), RIGHT, buff=0.10),{angle_objects}
+            Dot(A), Dot(B),
+            safe_point_label(A, "A", a_left, a_right, c_upper, c_lower, distance=0.60),
+            safe_point_label(B, "B", b_left, b_right, c_upper, c_lower, distance=0.60),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
 
 
 def _transversal_numbered_angles_scene(problem: str, animate: bool) -> str | None:
@@ -432,7 +572,9 @@ def _transversal_numbered_angles_scene(problem: str, animate: bool) -> str | Non
 
     combined_meets = bool(re.search(
         r"(?:DUONG THANG )?C CAT (?:DUONG THANG )?A VA (?:DUONG THANG )?B "
-        r"LAN LUOT TAI A VA B",
+        r"LAN LUOT TAI A VA B"
+        r"|(?:DUONG THANG )?C CAT (?:DUONG THANG )?A TAI A VA "
+        r"(?:(?:DUONG THANG )?C )?CAT (?:DUONG THANG )?B TAI B",
         normalized,
     ))
     c_meets_a = line_meets("C", "A", "A") or combined_meets
@@ -572,6 +714,78 @@ class GeoScene(Scene):
             Dot(A), Dot(B),
             Text("A", font_size=24).move_to(A + np.array([0.0, -1.0, 0.0])),
             Text("B", font_size=24).move_to(B + np.array([0.0, -1.0, 0.0])),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
+def _basic_nonparallel_transversal_scene(problem: str, animate: bool) -> str | None:
+    """Build a clean textbook layout for c meeting nonparallel a and b at A and B."""
+    folded = _fold_geometry_notation(problem)
+    normalized = re.sub(r"[,:;.]", " ", folded)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    def line_meets(first: str, second: str, point: str) -> bool:
+        patterns = (
+            rf"(?:DUONG THANG )?{first} CAT (?:DUONG THANG )?{second} TAI {point}",
+            rf"(?:DUONG THANG )?{second} BI (?:DUONG THANG )?{first} CAT TAI {point}",
+            rf"{first} GIAO {second} TAI {point}",
+        )
+        return any(re.search(pattern, normalized) for pattern in patterns)
+
+    combined_meets = bool(re.search(
+        r"(?:DUONG THANG )?C CAT (?:DUONG THANG )?A VA (?:DUONG THANG )?B "
+        r"LAN LUOT TAI A VA B"
+        r"|(?:DUONG THANG )?C CAT (?:DUONG THANG )?A TAI A VA "
+        r"(?:(?:DUONG THANG )?C )?CAT (?:DUONG THANG )?B TAI B",
+        normalized,
+    ))
+    c_meets_a = line_meets("C", "A", "A") or combined_meets
+    c_meets_b = line_meets("C", "B", "B") or combined_meets
+    nonparallel = bool(re.search(
+        r"(?:A VA B|A B|HAI DUONG(?: THANG)? A VA B).{0,24}"
+        r"KHONG(?: DUOC VE)? SONG SONG"
+        r"|A KHONG SONG SONG(?: VOI)? B"
+        r"|KHONG(?: DUOC)? VE (?:DUONG THANG )?A VA (?:DUONG THANG )?B SONG SONG",
+        normalized,
+    ))
+    if not (c_meets_a and c_meets_b and nonparallel) or "GOC" in normalized:
+        return None
+
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, infinite_line, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([-1.0, 1.35, 0.0])
+        B = np.array([1.0, -1.35, 0.0])
+        a_direction = np.array([1.0, 0.13, 0.0])
+        b_direction = np.array([1.0, -0.09, 0.0])
+        c_direction = B - A
+        a_positive, a_negative = A + a_direction, A - a_direction
+        b_positive, b_negative = B + b_direction, B - b_direction
+        c_positive, c_negative = A + c_direction, A - c_direction
+        line_a = infinite_line(a_negative, a_positive, half_length=4.4)
+        line_b = infinite_line(b_negative, b_positive, half_length=4.4)
+        line_c = infinite_line(c_negative, c_positive, half_length=3.5)
+        self.add(
+            line_a, line_b, line_c,
+            Text("a", font_size=25).next_to(line_a.get_end(), UP, buff=0.10),
+            Text("b", font_size=25).next_to(line_b.get_end(), DOWN, buff=0.10),
+            Text("c", font_size=25).next_to(line_c.get_start(), LEFT, buff=0.10),
+            Dot(A), Dot(B),
+            safe_point_label(
+                A, "A", a_negative, a_positive, c_negative, c_positive,
+                avoid_points=(B,), distance=0.56,
+            ),
+            safe_point_label(
+                B, "B", b_negative, b_positive, c_negative, c_positive,
+                avoid_points=(A,), distance=0.56,
+            ),
         )
         fit_scene_to_frame(self)
         {wait}
@@ -885,12 +1099,102 @@ class GeoScene(Scene):
 '''
 
 
+def _shared_side_congruent_triangles_scene(
+    first: str, second: str, animate: bool,
+) -> str | None:
+    """Draw congruent triangles whose corresponding side is the same physical side."""
+    shared_positions = [index for index in range(3) if first[index] == second[index]]
+    if len(shared_positions) != 2 or len(set(first + second)) != 4:
+        return None
+    distinct_index = next(index for index in range(3) if index not in shared_positions)
+    coordinates: list[str | None] = [None, None, None]
+    coordinates[shared_positions[0]] = "np.array([-2.6, 0.0, 0.0])"
+    coordinates[shared_positions[1]] = "np.array([2.6, 0.0, 0.0])"
+    coordinates[distinct_index] = "np.array([0.0, 2.1, 0.0])"
+    mirrored = "np.array([0.0, -2.1, 0.0])"
+    assignments = [
+        f"        {name} = {coordinates[index]}"
+        for index, name in enumerate(first)
+    ]
+    assignments.append(f"        {second[distinct_index]} = {mirrored}")
+
+    first_sides = ((0, 1), (1, 2), (2, 0))
+    line_calls = []
+    drawn_sides: set[frozenset[str]] = set()
+    for triangle in (first, second):
+        for left, right in first_sides:
+            side = frozenset((triangle[left], triangle[right]))
+            if side in drawn_sides:
+                continue
+            drawn_sides.add(side)
+            line_calls.append(f"            Line({triangle[left]}, {triangle[right]}),")
+    equality_calls = []
+    count = 1
+    for left, right in first_sides:
+        first_side = (first[left], first[right])
+        second_side = (second[left], second[right])
+        if set(first_side) == set(second_side):
+            continue  # the common side is visibly identical to itself; do not double-mark it
+        equality_calls.append(
+            f"            equal_segment_marks(({first_side[0]}, {first_side[1]}), "
+            f"({second_side[0]}, {second_side[1]}), count={count}),"
+        )
+        count += 1
+
+    unique_names = list(dict.fromkeys(first + second))
+    neighbours = {name: set() for name in unique_names}
+    for triangle in (first, second):
+        for left, right in first_sides:
+            neighbours[triangle[left]].add(triangle[right])
+            neighbours[triangle[right]].add(triangle[left])
+    label_calls = [
+        f'            safe_point_label({name}, "{name}", '
+        + ", ".join(sorted(neighbours[name])) + "),"
+        for name in unique_names
+    ]
+    angle_calls = []
+    for index in range(3):
+        angle_calls.extend((
+            f"            interior_angle_marker([{', '.join(first)}], {index}, "
+            f"mark_count={index + 1}),",
+            f"            interior_angle_marker([{', '.join(second)}], {index}, "
+            f"mark_count={index + 1}),",
+        ))
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, interior_angle_marker, safe_point_label, upright_polygon_check
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+{chr(10).join(assignments)}
+        upright_polygon_check([{', '.join(first)}], names="{first}")
+        upright_polygon_check([{', '.join(second)}], names="{second}")
+        self.add(
+{chr(10).join(line_calls)}
+{chr(10).join(equality_calls)}
+{chr(10).join(angle_calls)}
+            *[Dot(point) for point in ({', '.join(unique_names)})],
+{chr(10).join(label_calls)}
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
 def _congruent_triangles_scene(problem: str, animate: bool) -> str | None:
     """Draw two explicitly requested congruent triangles with full correspondence marks."""
     congruent_pairs = _explicit_congruent_triangles(problem)
     if not congruent_pairs:
         return None
     first, second = congruent_pairs[0]
+
+    shared_scene = _shared_side_congruent_triangles_scene(first, second, animate)
+    if shared_scene is not None:
+        return shared_scene
+    if len(set(first + second)) != 6:
+        return None
 
     A, B, C = first
     D, E, F = second
@@ -1794,7 +2098,10 @@ def validate_code(code: str, problem: str | None = None) -> None:
                     "Tia phân giác dùng hai cung bằng nhau từ angle_bisector_segment; "
                     "không ký hiệu thêm toàn bộ góc khi đề không cho số đo."
                 )
-        elif "góc" not in request and "angle" not in request:
+        elif ("GOC" not in _fold_geometry_notation(drawing_request)
+              and "ANGLE" not in _fold_geometry_notation(drawing_request)
+              and "∠" not in drawing_request and "∡" not in drawing_request
+              and not _explicit_congruent_triangles(drawing_facts)):
             if direct_angle_calls or direct_arc_calls or "interior_angle_marker" in called_names:
                 raise ValueError("Đề không yêu cầu góc nên không được tự thêm ký hiệu góc.")
         required_helpers = (
@@ -2971,49 +3278,54 @@ def stream_chat(
         raise ValueError("Mất kết nối với máy chủ AI khi đang trả lời. Hãy thử lại.") from exc
 
 
-def extract_problem_from_image(
-    image_bytes: bytes,
-    mime_type: str,
+def extract_problem_from_images(
+    images: list[tuple[bytes, str]],
     settings: AiSettings,
 ) -> str:
-    """Read one Vietnamese school-math exercise image with DeepSeek Vision."""
+    """Read up to four ordered images belonging to one Vietnamese math exercise."""
     supported = {"image/png", "image/jpeg", "image/webp", "image/gif"}
-    mime_type = (mime_type or "").casefold()
-    if mime_type not in supported:
-        raise ValueError("Ảnh phải có định dạng PNG, JPG, JPEG, WEBP hoặc GIF.")
-    if not image_bytes:
+    if not images:
         raise ValueError("Tệp ảnh đang trống.")
-    if len(image_bytes) > 20 * 1024 * 1024:
-        raise ValueError("Ảnh lớn hơn 20 MB; hãy cắt gọn vùng chứa đề bài rồi thử lại.")
+    if len(images) > 4:
+        raise ValueError("Mỗi lượt nhận tối đa 4 ảnh; hãy chia đề thành nhiều lượt nếu cần.")
+    if sum(len(image_bytes) for image_bytes, _mime_type in images) > 40 * 1024 * 1024:
+        raise ValueError("Tổng dung lượng ảnh lớn hơn 40 MB; hãy cắt gọn rồi thử lại.")
+    normalized = []
+    for image_bytes, mime_type in images:
+        mime_type = (mime_type or "").casefold()
+        if mime_type not in supported:
+            raise ValueError("Ảnh phải có định dạng PNG, JPG, JPEG, WEBP hoặc GIF.")
+        if not image_bytes:
+            raise ValueError("Tệp ảnh đang trống.")
+        if len(image_bytes) > 20 * 1024 * 1024:
+            raise ValueError("Ảnh lớn hơn 20 MB; hãy cắt gọn vùng chứa đề bài rồi thử lại.")
+        normalized.append((image_bytes, mime_type))
 
-    encoded = base64.b64encode(image_bytes).decode("ascii")
+    content = [{
+        "type": "text",
+        "text": (
+            "Đọc chính xác một đề bài Toán từ các ảnh theo đúng thứ tự đã gửi; các ảnh có thể là "
+            "nhiều trang của cùng một đề hoặc một ảnh đề kèm một ảnh hình minh họa. Ghép nội dung "
+            "liên tục nhưng không lặp lại phần giao nhau giữa hai ảnh. Đề thuộc bất kỳ phân môn "
+            "THCS–THPT nào như số học, đại số, hình học, hàm số, giải tích, xác suất hoặc thống kê. "
+            "Chỉ trả về nguyên văn đề bài, không giải, không nhận xét, không thêm Markdown. Giữ "
+            "nguyên tên điểm, số đo, đơn vị, biểu thức, phân số, căn, số mũ, chỉ số, dấu tích phân, "
+            "ma trận, bảng số liệu, ký hiệu bằng nhau, song song, vuông góc và thứ tự các ý a), b), "
+            "c). Chuẩn hóa lỗi xuống dòng nhưng không tự bổ sung dữ kiện không nhìn thấy. Nếu đề "
+            "nhắc đến một Hình đánh số và hình đó cũng hiện rõ trong một ảnh, sau nguyên văn đề bài "
+            "thêm một dòng bắt đầu bằng 'Theo hình vẽ:' mô tả vị trí các điểm, đoạn và quan hệ nhìn "
+            "thấy được. Không suy đoán quan hệ bị khuất hoặc hình không có trong ảnh."
+        ),
+    }]
+    for image_bytes, mime_type in normalized:
+        encoded = base64.b64encode(image_bytes).decode("ascii")
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime_type};base64,{encoded}", "detail": "original"},
+        })
     messages = [{
         "role": "user",
-        "content": [
-            {
-                "type": "text",
-                "text": (
-                    "Đọc chính xác đề bài Toán trong ảnh, thuộc bất kỳ phân môn THCS–THPT nào "
-                    "như số học, đại số, hình học, hàm số, giải tích, xác suất hoặc thống kê. "
-                    "Chỉ trả về nguyên văn đề bài, "
-                    "không giải, không nhận xét, không thêm Markdown. Giữ nguyên tên điểm, số đo, "
-                    "đơn vị, biểu thức, phân số, căn, số mũ, chỉ số, dấu tích phân, ma trận, bảng "
-                    "số liệu, ký hiệu bằng nhau, song song, vuông góc và thứ tự các ý a), b), c). "
-                    "Chuẩn hóa lỗi xuống dòng nhưng không tự bổ sung dữ kiện không nhìn thấy. "
-                    "Nếu đề nhắc đến một Hình đánh số và hình đó cũng hiện rõ trong ảnh, "
-                    "sau nguyên văn đề bài thêm một dòng bắt đầu bằng 'Theo hình vẽ:' "
-                    "mô tả vị trí các điểm, đoạn và quan hệ nhìn thấy được. "
-                    "Không suy đoán quan hệ bị khuất hoặc hình không có trong ảnh."
-                ),
-            },
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{mime_type};base64,{encoded}",
-                    "detail": "original",
-                },
-            },
-        ],
+        "content": content,
     }]
     text = _request_chat(
         settings,
@@ -3027,6 +3339,15 @@ def extract_problem_from_image(
     return text
 
 
+def extract_problem_from_image(
+    image_bytes: bytes,
+    mime_type: str,
+    settings: AiSettings,
+) -> str:
+    """Backward-compatible single-image wrapper."""
+    return extract_problem_from_images([(image_bytes, mime_type)], settings)
+
+
 DRAWING_INCOMPLETE = (f"{APP_NAME} chưa dựng được hình khớp với mọi dữ kiện của đề. Hãy thử yêu cầu "
                       "vẽ lại, hoặc ghi rõ hơn vị trí các điểm.")
 
@@ -3036,6 +3357,8 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
         _transversal_numbered_angles_scene(problem, animate)
+        or _primed_parallel_transversal_scene(problem, animate)
+        or _basic_nonparallel_transversal_scene(problem, animate)
         or _congruent_triangles_scene(problem, animate)
         or _right_isosceles_altitude_midpoints_scene(problem, animate)
         or _triangle_point_with_two_parallels_scene(problem, animate)

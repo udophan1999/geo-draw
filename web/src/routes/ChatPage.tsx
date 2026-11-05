@@ -28,7 +28,7 @@ export function ChatPage() {
   const drawings = figureMessages.filter((m) => m.has_drawing && m.image_url)
 
   const [pick, setPick] = useState<{ key: string; id: string } | null>(null)
-  const [image, setImage] = useState<File | null>(null)
+  const [images, setImages] = useState<File[]>([])
   const [dragging, setDragging] = useState(false)
   const [mobileView, setMobileView] = useState<'chat' | 'drawing'>('chat')
 
@@ -51,7 +51,7 @@ export function ChatPage() {
   const legacyProblem = chatMessages.length === 0 && figureMessages.length > 0 ? info?.problem : undefined
   const busy = Boolean(turn)
 
-  const sendMessage = (text: string, file: File | null) => send({ text, image: file, conversationId })
+  const sendMessage = (text: string, files: File[]) => send({ text, images: files, conversationId })
   const act = (action: TutorAction) => void send({ text: '', conversationId, action })
   const refine = async (text: string) => {
     if (!conversationId) return false
@@ -94,8 +94,9 @@ export function ChatPage() {
           onDrop={(event) => {
             event.preventDefault()
             setDragging(false)
-            const file = acceptImage(event.dataTransfer.files[0])
-            if (file) setImage(file)
+            const accepted = Array.from(event.dataTransfer.files)
+              .map(acceptImage).filter((file): file is File => file !== null)
+            setImages((current) => [...current, ...accepted].slice(0, 4))
           }}
         >
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -104,15 +105,15 @@ export function ChatPage() {
               pending={turn}
               legacyProblem={legacyProblem}
               loading={Boolean(conversationId) && conversation.isPending}
-              onExample={(example) => void sendMessage(example.problem, null)}
+              onExample={(example) => void sendMessage(example.problem, [])}
               onEdit={conversationId && !busy
                 ? (messageId, text) => edit(conversationId, messageId, text)
                 : undefined}
             />
           </div>
           <Composer
-            image={image}
-            onImage={setImage}
+            images={images}
+            onImages={setImages}
             onSend={sendMessage}
             busy={busy}
             header={info && (chatMessages.length > 0 || legacyProblem)

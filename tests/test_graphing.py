@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from geo_draw.ai_codegen import AiResult, AiSettings
 from geo_draw.graphing import (
-    GEOMETRY, GRAPH, drawing_kind, generate_graph_code, validate_graph_code,
+    GEOMETRY, GRAPH, SOLID, drawing_kind, generate_graph_code, validate_graph_code,
 )
 from geo_draw.pipeline import draw
 
@@ -39,12 +39,56 @@ class DrawingKindTests(unittest.TestCase):
                      "Tính diện tích hình phẳng giới hạn bởi y = x² và y = x."]:
             self.assertEqual(drawing_kind(text), GRAPH, text)
 
+    def test_statistical_charts_are_drawable_graphs(self):
+        for text in (
+            "Vẽ biểu đồ cột số học sinh của bốn lớp: 35, 40, 38, 42.",
+            "Lập biểu đồ tròn thể hiện tần suất 20%, 30%, 50%.",
+            "Vẽ biểu đồ đường thống kê nhiệt độ trong 7 ngày.",
+            "Dựng histogram cho bảng tần số ghép nhóm.",
+        ):
+            self.assertEqual(drawing_kind(text), GRAPH, text)
+
+    def test_advanced_coordinate_curves_and_regions_are_graphs(self):
+        for text in (
+            "Vẽ elip (E): x²/9 + y²/4 = 1.",
+            "Khảo sát hypebol x²/4 - y²/9 = 1.",
+            "Vẽ đường cong tham số x = 2cos(t), y = sin(t), 0 ≤ t ≤ 2π.",
+            "Trong tọa độ cực, vẽ đường cong r = 2cos(3θ).",
+            "Biểu diễn miền nghiệm hệ bất phương trình hai ẩn x + y ≤ 3, x ≥ 0, y ≥ 0.",
+        ):
+            self.assertEqual(drawing_kind(text), GRAPH, text)
+
+    def test_common_statistical_and_probability_diagrams_are_drawable(self):
+        for text in (
+            "Vẽ biểu đồ hộp cho mẫu có min = 1, Q1 = 3, trung vị = 5, Q3 = 8, max = 10.",
+            "Lập scatter plot từ các cặp số liệu (1; 2), (2; 5), (3; 7).",
+            "Dùng cây xác suất biểu diễn hai lần tung đồng xu.",
+            "Vẽ sơ đồ Venn biểu diễn A giao B và phần bù của A.",
+        ):
+            self.assertEqual(drawing_kind(text), GRAPH, text)
+
+    def test_number_line_requests_are_drawable(self):
+        for text in (
+            "Biểu diễn tập nghiệm x < -1 hoặc x ≥ 3 trên trục số.",
+            "Vẽ trên trục số khoảng (-2; 5] và nửa khoảng [7; +∞).",
+            "Biểu diễn khoảng nghiệm của bất phương trình 2x + 1 ≤ 5.",
+        ):
+            self.assertEqual(drawing_kind(text), GRAPH, text)
+
     def test_geometry_stays_geometry(self):
         for text in ["Cho tam giác ABC vuông tại A, đường cao AH.",
                      "Cho góc xOy, vẽ tia phân giác Oz.",
                      "Một mảnh vườn hình chữ nhật có chu vi 40 m.",
                      "Cho đường tròn (O) và điểm M nằm ngoài đường tròn, kẻ tiếp tuyến MA."]:
             self.assertEqual(drawing_kind(text), GEOMETRY, text)
+
+    def test_solid_geometry_uses_its_own_drawing_kind(self):
+        for text in (
+            "Cho hình chóp S.ABCD có đáy là hình vuông.",
+            "Cho lăng trụ tam giác ABC.A'B'C'.",
+            "Một hình trụ có tâm hai đáy O và O'.",
+        ):
+            self.assertEqual(drawing_kind(text), SOLID, text)
 
     def test_problems_without_a_figure_are_not_drawn(self):
         for text in ["Giải phương trình x² - 5x + 6 = 0", "Tính 15% của 200",
@@ -87,6 +131,20 @@ class GenerateGraphCodeTests(unittest.TestCase):
         self.assertIn("Axes", first_messages[0]["content"])
         self.assertNotIn("safe_point_label", first_messages[0]["content"])
         self.assertIn("MathTex", chat.call_args_list[1].args[1][-1]["content"])
+
+    def test_graph_prompt_distinguishes_statistical_charts_from_functions(self):
+        from geo_draw.graphing import GRAPH_PROMPT
+
+        self.assertIn("Statistical charts are not function plots", GRAPH_PROMPT)
+        self.assertIn("proportional sectors", GRAPH_PROMPT)
+        self.assertIn("implicit conic", GRAPH_PROMPT)
+        self.assertIn("polar curve", GRAPH_PROMPT)
+        self.assertIn("common solution region", GRAPH_PROMPT)
+        self.assertIn("five-number summary", GRAPH_PROMPT)
+        self.assertIn("probability tree", GRAPH_PROMPT)
+        self.assertIn("Venn diagram", GRAPH_PROMPT)
+        self.assertIn("filled endpoint", GRAPH_PROMPT)
+        self.assertIn("infinity is never a filled endpoint", GRAPH_PROMPT)
 
 
 class GraphPipelineTests(unittest.TestCase):
