@@ -15,6 +15,11 @@ GEOMETRY_HELP_VI = """
 - Khi đề cho phép chọn hướng, phải đặt một trục đối xứng chính xác theo phương dọc hoặc ngang, không
   để trục chính bị chéo hay hơi nghiêng. Với hình thoi không phải hình vuông, mặc định đặt cả hai
   đường chéo là hai trục dọc-ngang; các trục khác vẫn giữ đúng quan hệ hình học bắt buộc.
+- Nhận diện dữ kiện tương đương dù viết bằng chữ hay ký hiệu: “bằng nhau”/≅, “song song”/∥//,
+  “vuông góc”/⊥, “thuộc”/∈ và “góc ABC”/∠ABC phải cho cùng một cấu trúc hình học.
+- Tên đường kiểu aa', bb', cc' chỉ toàn bộ đường thẳng qua hai nhãn đầu mút/hướng tương ứng. Nếu
+  cc' cắt aa' và bb' tại A, B thì cc' phải là một nét liền đầy đủ đi qua cả A lẫn B, không được
+  biến thành đoạn ngắn rời hoặc hai điểm c, c'.
 - Tam giác vuông lớp 9: dùng định lý Pythagore, các hệ thức cạnh–đường cao–hình chiếu
   và các tỉ số lượng giác sin, cos, tan để giải tọa độ trước khi vẽ.
 - Nếu đường cao từ đỉnh góc vuông xuống cạnh huyền chia cạnh huyền thành hai hình chiếu,
@@ -77,6 +82,11 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
   Mark AB-DE, BC-EF, CA-FD with matching tick styles and mark angles A-D, B-E, C-F with matching
   arc styles; use distinct styles for the three independent pairs. Omit all such marks when the
   congruence itself is only a conclusion that students still have to prove.
+- Congruent triangles do not need six distinct vertices. For ABC congruent to DBC, preserve the
+  written correspondence A-D, B-B, C-C, draw the common side BC once, and never double-mark it.
+- Accept prose and textbook symbols as the same facts. In particular, aa'/bb'/cc' are complete
+  lowercase-named carrier lines. If cc' intersects aa' and bb' at A and B, its visible stroke must
+  pass continuously through both intersections and extend clearly beyond them.
 - For a basic request with unspecified or "arbitrary" measurements, choose a conventional,
   readable valid figure automatically and complete every object named in the request. Never stop
   to ask the student to invent side lengths or angles. Unless a special type is stated, choose an

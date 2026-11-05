@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import base64
 import json
+import math
 import os
 import re
 import unicodedata
@@ -194,6 +195,8 @@ Exact construction requirements:
   For `triangle ABC congruent to triangle DEF`, preserve the stated order A-D, B-E, C-F; draw
   matching tick counts on AB-DE, BC-EF, CA-FD and matching arc counts on angles A-D, B-E, C-F.
   Use a different count for each independent corresponding pair so students can read the mapping.
+  Congruent triangles may share a corresponding side, for example ABC and DBC share BC; do not
+  require six distinct vertices and do not draw a duplicate equality mark on the shared side.
   Do not add these congruence marks when congruence is only a conclusion to be proved.
 - For a basic drawing request with unspecified or "arbitrary" lengths/angles, choose a valid,
   readable ordinary configuration automatically and finish the drawing. Do not ask the student
@@ -215,9 +218,14 @@ Exact construction requirements:
   outside the visible construction; never create an unnecessary crowded three-line knot near A/B.
 - Lowercase letters a, b, c may name lines while uppercase A, B, C name points. Read relations from
   grammar and context, not letter identity. For a numbered-angle request where transversal c meets
-  a at A and b at B, distribute labels in written order: 1,2 around A and 3,4 around B. If the
-  exact sectors are not specified, choose a consistent readable convention and draw instead of
-  asking the student to choose positions.
+  a at A and b at B, repeat the full set 1,2,3,4 around both A and B. If the exact sectors are not
+  specified, choose a consistent readable convention and draw instead of asking the student to
+  choose positions.
+- Treat textual and symbolic forms as equivalent geometry facts: "bằng nhau" and `≅`, "song song"
+  and `∥`/`//`, "vuông góc" and `⊥`, "thuộc" and `∈`, and "góc ABC" and `∠ABC` must produce the
+  same construction. A carrier written `aa'` is the whole line through the two direction labels
+  a and a', not two unrelated points. If `cc'` cuts `aa'` and `bb'` at A and B, draw one continuous
+  full line cc' through both A and B; never replace it with a short floating stroke.
 - A compact vertex run immediately following a named polygon is a point list even when the student
   typed it in lowercase: "tam giác abc" means points A, B, C and "ngũ giác abcde" means
   A, B, C, D, E. Normalize those display labels to uppercase. Do not uppercase isolated lowercase
@@ -310,6 +318,7 @@ class AiResult:
 def _normalize_geometry_notation(text: str) -> str:
     """Flatten textbook/MathJax geometry notation for deterministic parsing."""
     normalized = unicodedata.normalize("NFC", text or "")
+    normalized = normalized.replace("′", "'").replace("’", "'")
     normalized = normalized.replace("\\(", " ").replace("\\)", " ")
     normalized = normalized.replace("\\[", " ").replace("\\]", " ").replace("$", " ")
     normalized = re.sub(
@@ -329,6 +338,8 @@ def _normalize_geometry_notation(text: str) -> str:
     normalized = re.sub(r"\\(?:degree|circ)\b", "°", normalized, flags=re.I)
     normalized = re.sub(r"\\parallel\b", "∥", normalized, flags=re.I)
     normalized = re.sub(r"\\perp\b", "⊥", normalized, flags=re.I)
+    normalized = re.sub(r"\\(?:cong|equiv)\b", "≅", normalized, flags=re.I)
+    normalized = re.sub(r"\\(?:triangle|Delta)\b", "△", normalized, flags=re.I)
     normalized = re.sub(r"\\(?:quad|qquad)\b|\\[,;!]", " ", normalized)
     normalized = normalized.replace("{", "").replace("}", "")
     return normalized
@@ -402,17 +413,143 @@ def _explicit_segment_equality_pairs(text: str) -> list[tuple[str, str]]:
 def _explicit_congruent_triangles(text: str) -> list[tuple[str, str]]:
     """Return ordered triangle-name pairs explicitly stated or requested as congruent."""
     folded = _fold_geometry_notation(_drawing_facts_text(text))
+    triangle = r"(?:TAM\s+GIAC\s+|[△Δ]\s*)"
     patterns = (
-        r"(?:VE\s+)?(?:HAI\s+)?TAM\s+GIAC\s+([A-Z]{3})\s+VA\s+([A-Z]{3})\s+BANG\s+NHAU",
-        r"TAM\s+GIAC\s+([A-Z]{3})\s*(?:=|≅)\s*TAM\s+GIAC\s+([A-Z]{3})",
+        rf"(?:VE\s+)?(?:HAI\s+)?{triangle}([A-Z]{{3}})\s+VA\s+"
+        rf"(?:{triangle})?([A-Z]{{3}})\s+BANG\s+NHAU",
+        rf"{triangle}([A-Z]{{3}})\s*(?:=|≅)\s*(?:{triangle})?([A-Z]{{3}})",
     )
     pairs: list[tuple[str, str]] = []
     for pattern in patterns:
         for match in re.finditer(pattern, folded):
             first, second = match.groups()
-            if len(set(first + second)) == 6:
+            if (first != second and len(set(first)) == 3 and len(set(second)) == 3
+                    and len(set(first + second)) >= 4):
                 pairs.append((first, second))
     return list(dict.fromkeys(pairs))
+
+
+def _primed_parallel_transversal_facts(
+    text: str,
+) -> tuple[str, str, str, float | None] | None:
+    """Recognize aa'/bb'/cc' carriers from either prose or textbook symbols."""
+    folded = _fold_geometry_notation(_drawing_facts_text(text))
+    folded = re.sub(r"\s+", " ", folded).strip()
+    parallel = re.search(
+        r"([A-Z])\1'\s*(?:∥|//|SONG SONG(?: VOI)?)\s*"
+        r"(?:DUONG THANG )?([A-Z])\2'",
+        folded,
+    )
+    if not parallel:
+        return None
+    first, second = parallel.group(1), parallel.group(2)
+    if first == second:
+        return None
+
+    carriers = re.findall(r"\b([A-Z])\1'", folded)
+    transversal = next((name for name in carriers if name not in {first, second}), None)
+    if transversal is None:
+        return None
+    first_name, second_name, cross_name = (
+        first.lower(), second.lower(), transversal.lower(),
+    )
+
+    prose_intersections = bool(re.search(
+        rf"{transversal}{transversal}'\s+CAT(?: HAI DUONG THANG)?\s+"
+        rf"{first}{first}'\s+VA\s+{second}{second}'\s+LAN LUOT TAI A VA B",
+        folded,
+    )) or (
+        bool(re.search(
+            rf"{transversal}{transversal}'\s+CAT(?: DUONG THANG)?\s+"
+            rf"{first}{first}'\s+TAI A",
+            folded,
+        ))
+        and bool(re.search(
+            rf"(?:{transversal}{transversal}'\s+)?CAT(?: DUONG THANG)?\s+"
+            rf"{second}{second}'\s+TAI B",
+            folded,
+        ))
+    )
+    def symbolic_intersection(point: str, left: str, right: str) -> bool:
+        orders = ((left, right), (right, left))
+        return any(
+            re.search(rf"{point}\s*∈\s*{one}{one}'\s*∩\s*{two}{two}'", folded)
+            or re.search(
+                rf"{one}{one}'\s*∩\s*{two}{two}'\s*=\s*\{{?\s*{point}\s*\}}?",
+                folded,
+            )
+            for one, two in orders
+        )
+
+    symbolic_intersections = (
+        symbolic_intersection("A", first, transversal)
+        and symbolic_intersection("B", second, transversal)
+    )
+    if not (prose_intersections or symbolic_intersections):
+        return None
+
+    angle_match = re.search(
+        rf"{transversal}A{first}'\s*(?:=|BANG)\s*(\d+(?:[.,]\d+)?)\s*°?",
+        folded,
+    )
+    angle = float(angle_match.group(1).replace(",", ".")) if angle_match else None
+    if angle is not None and not 15.0 <= angle <= 165.0:
+        return None
+    return first_name, second_name, cross_name, angle
+
+
+def _primed_parallel_transversal_scene(problem: str, animate: bool) -> str | None:
+    """Draw two primed-name parallel carriers and one full transversal through A and B."""
+    facts = _primed_parallel_transversal_facts(problem)
+    if facts is None:
+        return None
+    first, second, transversal, angle = facts
+    theta = angle if angle is not None else 55.0
+    radians = math.radians(theta)
+    vertical_gap = 3.0
+    horizontal_delta = vertical_gap / math.tan(radians)
+    a_x = -horizontal_delta / 2
+    b_x = horizontal_delta / 2
+    angle_objects = ""
+    if angle is not None:
+        angle_text = f"{angle:g}°"
+        angle_objects = f'''\n            Angle(Line(A, angle_c_ray), Line(A, angle_a_ray), radius=0.48, other_angle=False),\n            Text("{angle_text}", font_size=24).move_to(\n                A + 0.82 * np.array([np.cos(-theta / 2), np.sin(-theta / 2), 0.0])\n            ),'''
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, infinite_line, parallel_segment_marks, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        theta = np.deg2rad({theta:.8f})
+        A = np.array([{a_x:.8f}, 1.5, 0.0])
+        B = np.array([{b_x:.8f}, -1.5, 0.0])
+        horizontal = np.array([1.0, 0.0, 0.0])
+        cross_direction = np.array([np.cos(theta), -np.sin(theta), 0.0])
+        a_left, a_right = A - horizontal, A + horizontal
+        b_left, b_right = B - horizontal, B + horizontal
+        c_upper, c_lower = A - cross_direction, A + cross_direction
+        angle_c_ray, angle_a_ray = A + cross_direction, A + horizontal
+        line_a = infinite_line(a_left, a_right, half_length=4.3)
+        line_b = infinite_line(b_left, b_right, half_length=4.3)
+        line_c = infinite_line(c_upper, c_lower, half_length=5.0)
+        self.add(
+            line_a, line_b, line_c,
+            parallel_segment_marks((a_left, a_right), (b_left, b_right), count=1),
+            Text("{first}", font_size=25).next_to(line_a.get_start(), UP, buff=0.10),
+            Text("{first}'", font_size=25).next_to(line_a.get_end(), UP, buff=0.10),
+            Text("{second}", font_size=25).next_to(line_b.get_start(), DOWN, buff=0.10),
+            Text("{second}'", font_size=25).next_to(line_b.get_end(), DOWN, buff=0.10),
+            Text("{transversal}'", font_size=25).next_to(line_c.get_start(), LEFT, buff=0.10),
+            Text("{transversal}", font_size=25).next_to(line_c.get_end(), RIGHT, buff=0.10),{angle_objects}
+            Dot(A), Dot(B),
+            safe_point_label(A, "A", a_left, a_right, c_upper, c_lower, distance=0.60),
+            safe_point_label(B, "B", b_left, b_right, c_upper, c_lower, distance=0.60),
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
 
 
 def _transversal_numbered_angles_scene(problem: str, animate: bool) -> str | None:
@@ -960,12 +1097,102 @@ class GeoScene(Scene):
 '''
 
 
+def _shared_side_congruent_triangles_scene(
+    first: str, second: str, animate: bool,
+) -> str | None:
+    """Draw congruent triangles whose corresponding side is the same physical side."""
+    shared_positions = [index for index in range(3) if first[index] == second[index]]
+    if len(shared_positions) != 2 or len(set(first + second)) != 4:
+        return None
+    distinct_index = next(index for index in range(3) if index not in shared_positions)
+    coordinates: list[str | None] = [None, None, None]
+    coordinates[shared_positions[0]] = "np.array([-2.6, 0.0, 0.0])"
+    coordinates[shared_positions[1]] = "np.array([2.6, 0.0, 0.0])"
+    coordinates[distinct_index] = "np.array([0.0, 2.1, 0.0])"
+    mirrored = "np.array([0.0, -2.1, 0.0])"
+    assignments = [
+        f"        {name} = {coordinates[index]}"
+        for index, name in enumerate(first)
+    ]
+    assignments.append(f"        {second[distinct_index]} = {mirrored}")
+
+    first_sides = ((0, 1), (1, 2), (2, 0))
+    line_calls = []
+    drawn_sides: set[frozenset[str]] = set()
+    for triangle in (first, second):
+        for left, right in first_sides:
+            side = frozenset((triangle[left], triangle[right]))
+            if side in drawn_sides:
+                continue
+            drawn_sides.add(side)
+            line_calls.append(f"            Line({triangle[left]}, {triangle[right]}),")
+    equality_calls = []
+    count = 1
+    for left, right in first_sides:
+        first_side = (first[left], first[right])
+        second_side = (second[left], second[right])
+        if set(first_side) == set(second_side):
+            continue  # the common side is visibly identical to itself; do not double-mark it
+        equality_calls.append(
+            f"            equal_segment_marks(({first_side[0]}, {first_side[1]}), "
+            f"({second_side[0]}, {second_side[1]}), count={count}),"
+        )
+        count += 1
+
+    unique_names = list(dict.fromkeys(first + second))
+    neighbours = {name: set() for name in unique_names}
+    for triangle in (first, second):
+        for left, right in first_sides:
+            neighbours[triangle[left]].add(triangle[right])
+            neighbours[triangle[right]].add(triangle[left])
+    label_calls = [
+        f'            safe_point_label({name}, "{name}", '
+        + ", ".join(sorted(neighbours[name])) + "),"
+        for name in unique_names
+    ]
+    angle_calls = []
+    for index in range(3):
+        angle_calls.extend((
+            f"            interior_angle_marker([{', '.join(first)}], {index}, "
+            f"mark_count={index + 1}),",
+            f"            interior_angle_marker([{', '.join(second)}], {index}, "
+            f"mark_count={index + 1}),",
+        ))
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, interior_angle_marker, safe_point_label, upright_polygon_check
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+{chr(10).join(assignments)}
+        upright_polygon_check([{', '.join(first)}], names="{first}")
+        upright_polygon_check([{', '.join(second)}], names="{second}")
+        self.add(
+{chr(10).join(line_calls)}
+{chr(10).join(equality_calls)}
+{chr(10).join(angle_calls)}
+            *[Dot(point) for point in ({', '.join(unique_names)})],
+{chr(10).join(label_calls)}
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
 def _congruent_triangles_scene(problem: str, animate: bool) -> str | None:
     """Draw two explicitly requested congruent triangles with full correspondence marks."""
     congruent_pairs = _explicit_congruent_triangles(problem)
     if not congruent_pairs:
         return None
     first, second = congruent_pairs[0]
+
+    shared_scene = _shared_side_congruent_triangles_scene(first, second, animate)
+    if shared_scene is not None:
+        return shared_scene
+    if len(set(first + second)) != 6:
+        return None
 
     A, B, C = first
     D, E, F = second
@@ -1869,7 +2096,10 @@ def validate_code(code: str, problem: str | None = None) -> None:
                     "Tia phân giác dùng hai cung bằng nhau từ angle_bisector_segment; "
                     "không ký hiệu thêm toàn bộ góc khi đề không cho số đo."
                 )
-        elif "góc" not in request and "angle" not in request:
+        elif ("GOC" not in _fold_geometry_notation(drawing_request)
+              and "ANGLE" not in _fold_geometry_notation(drawing_request)
+              and "∠" not in drawing_request and "∡" not in drawing_request
+              and not _explicit_congruent_triangles(drawing_facts)):
             if direct_angle_calls or direct_arc_calls or "interior_angle_marker" in called_names:
                 raise ValueError("Đề không yêu cầu góc nên không được tự thêm ký hiệu góc.")
         required_helpers = (
@@ -3125,6 +3355,7 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
         _transversal_numbered_angles_scene(problem, animate)
+        or _primed_parallel_transversal_scene(problem, animate)
         or _basic_nonparallel_transversal_scene(problem, animate)
         or _congruent_triangles_scene(problem, animate)
         or _right_isosceles_altitude_midpoints_scene(problem, animate)

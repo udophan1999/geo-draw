@@ -52,6 +52,14 @@ alwaysApply: true
   A, c cắt b tại B” đã đủ để dựng. Nếu đề yêu cầu đánh số các góc tại A và B là 1,2,3,4 thì mỗi
   đỉnh phải có đủ bốn góc: A1,A2,A3,A4 và B1,B2,B3,B4; không chia một bộ số cho hai đỉnh. Trên
   hình chỉ ghi các số 1,2,3,4 trong từng miền góc, không thêm tiền tố A/B và không vẽ cung góc.
+- Cùng một dữ kiện viết bằng chữ hoặc ký hiệu phải được nhận diện như nhau: bằng nhau/≅, song
+  song/∥//, vuông góc/⊥, thuộc/∈, góc ABC/∠ABC. Không được chỉ hỗ trợ một cách viết.
+- `aa'`, `bb'`, `cc'` là tên các đường thẳng đầy đủ, không phải các điểm rời. Nếu `cc'` cắt `aa'`
+  và `bb'` tại A, B thì phải vẽ một nét `cc'` liên tục đi qua cả A và B và kéo rõ ra hai phía;
+  cấm đoạn ngắn lơ lửng, cụt trước giao điểm hoặc chỉ nối một trong hai giao điểm.
+- Hai tam giác bằng nhau có thể chung đỉnh hoặc chung cạnh. `△ABC ≅ △DBC` có thứ tự tương ứng
+  A-D, B-B, C-C và chung cạnh BC; không được đòi đủ sáu đỉnh phân biệt hoặc vẽ BC hai lần/chồng
+  hai bộ vạch lên cạnh chung.
 - Mặc định tự chọn mọi tham số trình bày chưa nêu: hướng hình, tỉ lệ, độ dài/góc minh họa, phía đặt
   điểm tự do, vị trí giao điểm không tên và miền đặt nhãn. Không được dùng các lựa chọn này để tự
   thêm quan hệ thuộc, thứ tự, bằng nhau, song song, vuông góc hoặc dạng hình đặc biệt.
