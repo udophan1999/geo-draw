@@ -13,7 +13,9 @@ alwaysApply: true
 - Nền bản vẽ màu trắng; nét, điểm, nhãn và ký hiệu màu đen.
 - Mọi đường hình học dùng nét liền; đoạn thẳng không có mũi tên.
 - Ký hiệu góc đa giác phải nằm trong hình và chỉ xuất hiện một lần cho mỗi góc.
-- Hai góc khác số đo dùng số cung khác nhau; hai góc bằng nhau dùng cùng kiểu cung.
+- Góc đã ghi số đo được phân biệt bằng chính nhãn độ nên có thể cùng dùng một cung gọn; không ép bốn
+  góc khác nhau phải dùng bốn kiểu cung khi helper chỉ hỗ trợ tối đa ba. Các góc bằng nhau không ghi
+  số đo dùng cùng kiểu cung; các nhóm bằng nhau độc lập không ghi số đo dùng kiểu khác nhau.
 - Khi một đỉnh có nhiều góc con, tự ghi số 1, 2 sát các cung để phân biệt.
 - Tia phân giác phải là một nét liền từ đỉnh qua các giao điểm đến cạnh biên đầu tiên của hình.
 - Chỉ vẽ ô vuông cho quan hệ vuông góc thuộc dữ kiện; kết luận cần chứng minh không được tự gắn ký hiệu.
@@ -130,3 +132,9 @@ alwaysApply: true
   mũ và giữ dạng `\\widehat{A}`/`\\widehat{ABC}` khi chèn; không để ô vuông dưới mũ rồi đẩy chữ ra
   ngoài. Chỉ mẫu “Góc (ký hiệu)” mới đổi thành `∠A`/`∠ABC`. Mọi sửa lỗi IME phải kiểm tra cả phân
   số và các mẫu accent, không được sửa loại này nhưng làm hỏng loại kia.
+- Tứ giác được cho đủ bốn góc phải nhận diện tương đương các dạng Â, `\widehat{A}`, `∠A`, `m∠A`
+  và “góc A”. Nếu mỗi góc nằm trong (0°,180°) và tổng bằng 360°, phải tự tính một tứ giác lồi cân
+  đối có đúng các góc rồi vẽ, không đẩy sang AI thử-sai hoặc hỏi học sinh xác nhận lại phép cộng.
+- Quan hệ đặc biệt bị các số đo đã cho bắt buộc không phải là lỗi “tự ý vẽ hình đặc biệt”. Ví dụ
+  trong tứ giác, A+B=180° bắt buộc AD∥BC; bộ kiểm tra hình thường phải cho phép quan hệ suy ra này
+  nhưng không được tự vẽ dấu song song nếu đề chỉ cho số đo góc.

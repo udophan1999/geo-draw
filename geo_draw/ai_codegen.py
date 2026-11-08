@@ -333,7 +333,7 @@ def _normalize_geometry_notation(text: str) -> str:
         normalized,
         flags=re.I,
     )
-    normalized = re.sub(r"(?<![A-Za-z])(?:∠|∡)\s*([A-Za-z]{1,3})", r"\1", normalized)
+    normalized = re.sub(r"(?:∠|∡)\s*([A-Za-z]{1,3})", r"\1", normalized)
     normalized = re.sub(r"\^\s*\{?\s*\\circ\s*\}?", "°", normalized, flags=re.I)
     normalized = re.sub(r"\\(?:degree|circ)\b", "°", normalized, flags=re.I)
     normalized = re.sub(r"\\parallel\b", "∥", normalized, flags=re.I)
@@ -498,6 +498,116 @@ def _primed_parallel_transversal_facts(
     if angle is not None and not 15.0 <= angle <= 165.0:
         return None
     return first_name, second_name, cross_name, angle
+
+
+def _quadrilateral_angle_facts(text: str) -> tuple[str, tuple[float, ...]] | None:
+    """Recognize four stated interior angles written with words, hats, or angle symbols."""
+    folded = _fold_geometry_notation(_drawing_facts_text(text))
+    folded = re.sub(r"\s+", " ", folded).strip()
+    polygon = re.search(r"(?:\bTU GIAC|□)\s+([A-Z]{4})(?![A-Z])", folded)
+    if not polygon or len(set(polygon.group(1))) != 4:
+        return None
+    names = polygon.group(1)
+    measures: dict[str, float] = {}
+    for match in re.finditer(
+        rf"(?:(?:GOC|M)\s*)?([{re.escape(names)}])\s*(?:=|BANG)\s*"
+        r"(\d+(?:[.,]\d+)?)\s*(?:°|DO)",
+        folded,
+    ):
+        measures[match.group(1)] = float(match.group(2).replace(",", "."))
+    if set(measures) != set(names):
+        return None
+    ordered = tuple(measures[name] for name in names)
+    if any(not 5.0 <= value <= 175.0 for value in ordered):
+        return None
+    if abs(sum(ordered) - 360.0) > 0.05:
+        return None
+    return names, ordered
+
+
+def _quadrilateral_with_angles_scene(problem: str, animate: bool) -> str | None:
+    """Build a balanced convex quadrilateral from all four stated interior angles."""
+    facts = _quadrilateral_angle_facts(problem)
+    if facts is None:
+        return None
+    names, angles = facts
+    _, angle_b, angle_c, _ = angles
+    directions = (
+        0.0,
+        math.pi - math.radians(angle_b),
+        2.0 * math.pi - math.radians(angle_b + angle_c),
+        math.pi + math.radians(angles[0]),
+    )
+    unit = tuple((math.cos(value), math.sin(value)) for value in directions)
+    determinant = unit[2][0] * unit[3][1] - unit[3][0] * unit[2][1]
+    if abs(determinant) < 1e-8:
+        return None
+
+    candidates: list[tuple[float, float, float, float]] = []
+    for step in range(20, 501):
+        side_b = step / 100.0
+        rhs_x = -(unit[0][0] + side_b * unit[1][0])
+        rhs_y = -(unit[0][1] + side_b * unit[1][1])
+        side_c = (rhs_x * unit[3][1] - unit[3][0] * rhs_y) / determinant
+        side_d = (unit[2][0] * rhs_y - rhs_x * unit[2][1]) / determinant
+        if side_c <= 0.12 or side_d <= 0.12:
+            continue
+        sides = (1.0, side_b, side_c, side_d)
+        ratio = max(sides) / min(sides)
+        candidates.append((ratio, side_b, side_c, side_d))
+    if not candidates:
+        return None
+    _, side_b, side_c, _ = min(candidates)
+    raw = [
+        (0.0, 0.0),
+        (1.0, 0.0),
+        (1.0 + side_b * unit[1][0], side_b * unit[1][1]),
+        (
+            1.0 + side_b * unit[1][0] + side_c * unit[2][0],
+            side_b * unit[1][1] + side_c * unit[2][1],
+        ),
+    ]
+    min_x, max_x = min(x for x, _ in raw), max(x for x, _ in raw)
+    min_y, max_y = min(y for _, y in raw), max(y for _, y in raw)
+    scale = min(5.8 / max(max_x - min_x, 0.1), 3.8 / max(max_y - min_y, 0.1))
+    center_x, center_y = (min_x + max_x) / 2.0, (min_y + max_y) / 2.0
+    points = tuple(((x - center_x) * scale, (y - center_y) * scale) for x, y in raw)
+    point_lines = "\n".join(
+        f"        {name} = np.array([{x:.8f}, {y:.8f}, 0.0])"
+        for name, (x, y) in zip(names, points)
+    )
+    marker_lines = "\n".join(
+        f"            interior_angle_marker([{', '.join(names)}], {index}, "
+        f"degrees={measure:g}, mark_count=1),"
+        for index, measure in enumerate(angles)
+    )
+    label_lines = "\n".join(
+        f'            safe_point_label({name}, "{name}", '
+        f'{names[(index - 1) % 4]}, {names[(index + 1) % 4]}, '
+        f"avoid_points=({', '.join(other for other in names if other != name)},), "
+        f"avoid_segments=(({names[0]}, {names[1]}), ({names[1]}, {names[2]}), "
+        f"({names[2]}, {names[3]}), ({names[3]}, {names[0]}))),"
+        for index, name in enumerate(names)
+    )
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, interior_angle_marker, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+{point_lines}
+        self.add(
+            Line({names[0]}, {names[1]}), Line({names[1]}, {names[2]}),
+            Line({names[2]}, {names[3]}), Line({names[3]}, {names[0]}),
+            Dot({names[0]}), Dot({names[1]}), Dot({names[2]}), Dot({names[3]}),
+{marker_lines}
+{label_lines}
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
 
 
 def _primed_parallel_transversal_scene(problem: str, animate: bool) -> str | None:
@@ -2090,8 +2200,9 @@ def validate_code(code: str, problem: str | None = None) -> None:
                     previous_count = styles_by_degrees.setdefault(degree_value, count_value)
                     if previous_count != count_value:
                         raise ValueError("Các góc bằng nhau phải dùng cùng số cung ký hiệu.")
-                if len(set(styles_by_degrees.values())) != len(styles_by_degrees):
-                    raise ValueError("Hai góc khác nhau phải dùng số cung ký hiệu khác nhau.")
+                # A degree label already distinguishes unequal measured angles. Reusing one clean
+                # arc is necessary when four or more different values are stated, because the
+                # verified helper intentionally supports at most three stacked arcs.
         elif ("phân giác" in request or "bisector" in request) and not explicit_angles:
             if direct_angle_calls or direct_arc_calls or "interior_angle_marker" in called_names:
                 raise ValueError(
@@ -3095,6 +3206,14 @@ def _ensure_ordinary_polygon_checks(code: str, problem: str | None) -> str:
             r"\bgóc\s+([A-Z])\s*(?:=|bằng)\s*90\s*(?:°|độ)?", facts, re.I,
         )
     )
+    folded_facts = _fold_geometry_notation(facts)
+    right_vertices.update(
+        match.group(1)
+        for match in re.finditer(
+            r"(?:(?:GOC|M)\s*)?([A-Z])\s*(?:=|BANG)\s*90\s*(?:°|DO)",
+            folded_facts,
+        )
+    )
     for match in re.finditer(
         r"\b([A-Z]{2})\s*(?:vuông\s+góc\s+với|⊥|\\perp)\s*([A-Z]{2})\b",
         facts, re.I,
@@ -3103,6 +3222,19 @@ def _ensure_ordinary_polygon_checks(code: str, problem: str | None) -> str:
         if len(shared) == 1:
             right_vertices.update(shared)
     parallel_pairs = _explicit_parallel_relations(problem)
+    angle_facts = _quadrilateral_angle_facts(facts)
+    if angle_facts is not None:
+        angle_names, angle_values = angle_facts
+        for index in range(4):
+            if abs(angle_values[index] + angle_values[(index + 1) % 4] - 180.0) > 0.05:
+                continue
+            # Two consecutive supplementary interior angles force the two outer sides
+            # to be parallel (for A+B=180°, DA ∥ BC). This is not an accidental special case.
+            first = angle_names[(index - 1) % 4] + angle_names[index]
+            second = angle_names[(index + 1) % 4] + angle_names[(index + 2) % 4]
+            relation = (first, second)
+            if relation not in parallel_pairs and relation[::-1] not in parallel_pairs:
+                parallel_pairs.append(relation)
     already_checked = {
         keyword.value.value
         for node in ast.walk(construct)
@@ -3356,7 +3488,8 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
-        _transversal_numbered_angles_scene(problem, animate)
+        _quadrilateral_with_angles_scene(problem, animate)
+        or _transversal_numbered_angles_scene(problem, animate)
         or _primed_parallel_transversal_scene(problem, animate)
         or _basic_nonparallel_transversal_scene(problem, animate)
         or _congruent_triangles_scene(problem, animate)

@@ -63,8 +63,9 @@ NON-REGRESSION MEMORY -- previously corrected drawing failures:
 - Display each explicitly given numerical segment length once, close to but not touching its
   segment; never omit its unit or invent measurements that the problem does not state.
 - Use only solid strokes. A finite segment has no arrowhead, including parallel segments.
-- Put a polygon angle marker inside the polygon and draw it exactly once. Unequal angle measures
-  use different arc counts; equal angles use the same arc style.
+- Put a polygon angle marker inside the polygon and draw it exactly once. Numerical degree labels
+  already distinguish unequal measured angles, so they may reuse one clean arc. Equal unlabeled
+  angles use the same style; unrelated unlabeled equality groups use different styles.
 - For a triangle determined by two angles, intersect the two inward rays with the verified
   ray_intersection helper. Never accept a point behind either ray: that turns an angle into its
   supplementary angle (for example 30 degrees into 150 degrees).
@@ -280,8 +281,8 @@ INTERIOR-ANGLE MARKERS -- mandatory for every polygon angle:
 - Draw exactly one marker for each explicitly requested angle. The verified
   `interior_angle_marker(..., degrees=...)` already returns both the arc and its degree label;
   never add another Arc, Angle, or Text degree label for that same angle.
-- Distinguish unequal stated angles by their arc count: use `mark_count=1`, `mark_count=2`, then
-  `mark_count=3` for different angle measures. Equal angles must use the same mark_count.
+- For stated numerical angle measures, prefer `mark_count=1`; the degree labels distinguish them.
+  Equal unlabeled angles must use the same mark_count, while unrelated unlabeled groups differ.
 - Put the degree Text label beside the MIDPOINT OF THE SELECTED INTERIOR ARC, toward the
   polygon interior. The arc and label must not cross outside the polygon.
 - Before returning code, numerically verify every stated angle from dot/cross products of
@@ -312,6 +313,9 @@ HỆ THỐNG KIẾN THỨC VÀ KÝ HIỆU HÌNH HỌC THCS (LỚP 6–9)
   không ghi thêm "90°". Góc <90° nhọn; giữa 90° và 180° tù; =180° bẹt; >180° và <360° phản.
 - ΔABC: tam giác ABC; ΔABC ≅ ΔDEF: hai tam giác bằng nhau theo đúng thứ tự đỉnh tương ứng;
   ΔABC ∼ ΔDEF: hai tam giác đồng dạng; □ABCD có thể chỉ tứ giác ABCD.
+- Khi tứ giác cho đủ bốn góc, phải nhận cùng một dữ kiện dù viết bằng Â, `\widehat{A}`, `∠A`,
+  `m∠A` hay “góc A”. Kiểm tra tổng bằng 360° rồi dựng tứ giác lồi có đúng bốn góc; không chuyển
+  việc chọn tham số trình bày cho học sinh và không từ chối chỉ vì bốn số đo khác nhau.
 - (O;R): đường tròn tâm O bán kính R; R là bán kính, d=2R là đường kính; cung AB viết ⌢AB;
   dây AB, tiếp tuyến d tại A, cát tuyến d cắt đường tròn tại hai điểm.
 - C, S lần lượt là chu vi và diện tích; V là thể tích; Sxq, Stp là diện tích xung quanh và toàn phần.
