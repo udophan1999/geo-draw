@@ -219,7 +219,10 @@ GENERAL POLYGONS
 
 TRIANGLES
 - A triangle has three non-collinear vertices. Its interior angles sum to 180 degrees.
-- Isosceles: two equal sides; the two base angles are equal. Equilateral: three equal sides
+- Isosceles: two equal sides; the two base angles are equal. Whenever an isosceles triangle is
+  stated as a given drawing, show matching ticks on its equal legs and matching arcs on both base
+  angles. If only one base-angle measure is stated, put the number on that angle and keep the same
+  unnumbered arc style on the other base angle. Equilateral: three equal sides
   and three 60-degree angles. Every stated equilateral triangle must be checked numerically with
   equilateral_triangle_check before rendering; the check does not add visible side ticks.
   Right: one 90-degree angle. Acute: all angles <90 degrees.

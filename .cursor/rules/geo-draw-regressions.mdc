@@ -138,3 +138,7 @@ alwaysApply: true
 - Quan hệ đặc biệt bị các số đo đã cho bắt buộc không phải là lỗi “tự ý vẽ hình đặc biệt”. Ví dụ
   trong tứ giác, A+B=180° bắt buộc AD∥BC; bộ kiểm tra hình thường phải cho phép quan hệ suy ra này
   nhưng không được tự vẽ dấu song song nếu đề chỉ cho số đo góc.
+- Cả “tam giác cân ABC tại A” và “tam giác ABC cân tại A” đều phải kích hoạt cùng tính chất hình:
+  đánh dấu AB=AC bằng cùng kiểu vạch và đánh dấu ∠B=∠C bằng cùng kiểu cung. Nếu đề chỉ ghi một góc
+  kề đáy, ví dụ ∠B=30°, cung tại B mang số 30° còn C có cung cùng kiểu nhưng không tự lặp số đo;
+  không được chỉ vẽ đúng tọa độ rồi bỏ các ký hiệu tính chất.
