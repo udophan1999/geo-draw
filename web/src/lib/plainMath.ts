@@ -13,7 +13,7 @@ const SUBSCRIPT: Record<string, string> = {
 }
 const COMMANDS: Record<string, string> = {
   cdot: '·', times: '×', div: '÷', le: '≤', leq: '≤', ge: '≥', geq: '≥', ne: '≠', neq: '≠',
-  pm: '±', approx: '≈', pi: 'π', angle: '∠', widehat: '∠', triangle: '△', perp: '⊥', parallel: '∥',
+  pm: '±', approx: '≈', pi: 'π', angle: '∠', triangle: '△', perp: '⊥', parallel: '∥',
   alpha: 'α', beta: 'β', gamma: 'γ', Delta: 'Δ', delta: 'δ', infty: '∞', Rightarrow: '⇒',
   Leftrightarrow: '⇔', in: '∈', notin: '∉', subset: '⊂', cup: '∪', cap: '∩', emptyset: '∅',
   varnothing: '∅', sim: '∽', circ: '°', degree: '°', left: '', right: '',
@@ -31,7 +31,8 @@ export function latexToPlain(latex: string): string | null {
     .replace(/\\(?:text|mathrm)\{([^{}]*)\}/g, '$1')
   // \sqrt{x} with a short plain body: √x (√(…) for longer ones would read ambiguously).
   text = text.replace(/\\sqrt\{([A-Za-z0-9]{1,3})\}/g, '√$1')
-  text = text.replace(/\\widehat\{([A-Za-z]{1,3})\}/g, '∠$1') // "góc A"
+  // Keep \widehat{ABC} rendered as a formula chip: unlike \angle ABC, Unicode has no
+  // equivalent that preserves the textbook hat over the vertex/name.
   // A space after a command only ends its name in LaTeX ("\perp BC"): drop it.
   text = text.replace(/\\([A-Za-z]+) ?/g, (whole, name: string) =>
     name in COMMANDS ? COMMANDS[name] : whole)

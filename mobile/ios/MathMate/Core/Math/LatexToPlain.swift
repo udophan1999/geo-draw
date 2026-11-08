@@ -15,7 +15,7 @@ enum LatexToPlain {
     ]
     private static let commands: [String: String] = [
         "cdot": "·", "times": "×", "div": "÷", "le": "≤", "leq": "≤", "ge": "≥", "geq": "≥", "ne": "≠", "neq": "≠",
-        "pm": "±", "approx": "≈", "pi": "π", "angle": "∠", "widehat": "∠", "triangle": "△", "perp": "⊥",
+        "pm": "±", "approx": "≈", "pi": "π", "angle": "∠", "triangle": "△", "perp": "⊥",
         "parallel": "∥", "alpha": "α", "beta": "β", "gamma": "γ", "Delta": "Δ", "delta": "δ", "infty": "∞",
         "Rightarrow": "⇒", "Leftrightarrow": "⇔", "in": "∈", "notin": "∉", "subset": "⊂", "cup": "∪", "cap": "∩",
         "emptyset": "∅", "varnothing": "∅", "sim": "∽", "circ": "°", "degree": "°", "left": "", "right": "",
@@ -25,7 +25,6 @@ enum LatexToPlain {
     private static let degree = regex(#"\^\{?\\circ\}?"#)
     private static let textCommand = regex(#"\\(?:text|mathrm)\{([^{}]*)\}"#)
     private static let shortRoot = regex(#"\\sqrt\{([A-Za-z0-9]{1,3})\}"#)
-    private static let angle = regex(#"\\widehat\{([A-Za-z]{1,3})\}"#)
     private static let command = regex(#"\\([A-Za-z]+) ?"#)
     private static let script = regex(#"([\^_])(?:\{([^{}]*)\}|(.))"#)
     private static let leftover = regex(#"[\\{}^_]"#)
@@ -36,7 +35,7 @@ enum LatexToPlain {
         text = replace(textCommand, in: text) { $0[1] ?? "" }
         // \sqrt{x} with a short plain body: √x (√(…) for longer ones would read ambiguously).
         text = replace(shortRoot, in: text) { "√" + ($0[1] ?? "") }
-        text = replace(angle, in: text) { "∠" + ($0[1] ?? "") }  // "góc A"
+        // Keep \widehat{ABC} as a rendered formula chip. Only \angle ABC becomes plain ∠ABC.
         // A space after a command only ends its name in LaTeX ("\perp BC"): drop it.
         text = replace(command, in: text) { groups in commands[groups[1] ?? ""] ?? groups[0]! }
         var failed = false

@@ -126,3 +126,7 @@ alwaysApply: true
 - Với c cắt hai đường thẳng không song song a, b lần lượt tại A, B: mặc định đặt a và b gần ngang,
   tách thoáng và có độ dốc khác nhau rõ ràng; c là đường cắt chéo. Nếu giao điểm a∩b không được gọi
   tên hay yêu cầu, phải đặt nó ngoài vùng hình chính, không dồn ba đường thành một nút giữa A và B.
+- Trong công cụ công thức, mẫu “Góc” phải cho phép bộ gõ tiếng Việt điền trực tiếp vào ô dưới dấu
+  mũ và giữ dạng `\\widehat{A}`/`\\widehat{ABC}` khi chèn; không để ô vuông dưới mũ rồi đẩy chữ ra
+  ngoài. Chỉ mẫu “Góc (ký hiệu)” mới đổi thành `∠A`/`∠ABC`. Mọi sửa lỗi IME phải kiểm tra cả phân
+  số và các mẫu accent, không được sửa loại này nhưng làm hỏng loại kia.
