@@ -96,6 +96,15 @@ export function FormulaDialog({ open, onOpenChange, onInsert, initialLatex = '',
     if (!open) return
     let cancelled = false
     let keyboard: VirtualKeyboard | undefined
+    let mathField: MathField | undefined
+    // MathLive 0.110-0.111 deletes a selected placeholder when an IME composition starts.
+    // Intercept only composition events retargeted from our field before they reach MathLive's
+    // shadow-root handler. The browser still commits the composed character into the selection.
+    // See https://github.com/arnog/mathlive/issues/3058.
+    const preserveSelectedPlaceholder = (event: Event) => {
+      if (event.target === mathField) event.stopImmediatePropagation()
+    }
+    const compositionEvents = ['compositionstart', 'compositionupdate', 'compositionend'] as const
     const onGeometry = () => setKeyboardHeight(keyboard?.visible ? keyboard.boundingRect.height : 0)
     void (async () => {
       // Loaded on demand: MathLive is large and most messages need no formula editor.
@@ -107,6 +116,7 @@ export function FormulaDialog({ open, onOpenChange, onInsert, initialLatex = '',
       MathfieldElement.strings = { vi: MATHLIVE_VI } // menu, tooltips, keyboard tabs
       MathfieldElement.locale = 'vi'
       const element = new MathfieldElement() as unknown as MathField
+      mathField = element
       element.setAttribute('aria-label', 'Công thức')
       // The math keyboard stays open until its button closes it. "auto" hid it whenever the
       // field lost focus (a click on a gallery tab), and on touch screens brought it back right
@@ -115,14 +125,9 @@ export function FormulaDialog({ open, onOpenChange, onInsert, initialLatex = '',
       element.mathVirtualKeyboardPolicy = 'manual'
       element.style.cssText = 'display:block;width:100%;min-height:4.5rem;font-size:1.75rem;' +
         'padding:0.75rem 1rem;border:1px solid var(--border);border-radius:0.75rem;'
-      // MathLive bug (0.110–0.111.1): when an IME starts composing a letter (the Vietnamese
-      // keyboard of Windows), it deletes the selection first, and deleting a template's
-      // selected empty slot removes the whole fraction. Put the caret in the slot instead:
-      // the composed letter then fills it, as a plain keystroke would.
-      element.addEventListener('compositionstart', () => {
-        const [start, end] = element.selection.ranges[0] ?? [0, 0]
-        if (start !== end && element.getValue(start, end) === '\\placeholder{}') element.position = start
-      }, true)
+      for (const type of compositionEvents) {
+        document.addEventListener(type, preserveSelectedPlaceholder, true)
+      }
       host.current.replaceChildren(element)
       field.current = element
       keyboard = virtualKeyboard()
@@ -139,12 +144,16 @@ export function FormulaDialog({ open, onOpenChange, onInsert, initialLatex = '',
     })()
     return () => {
       cancelled = true
+      for (const type of compositionEvents) {
+        document.removeEventListener(type, preserveSelectedPlaceholder, true)
+      }
       keyboard?.removeEventListener('geometrychange', onGeometry)
       keyboard?.removeEventListener('virtual-keyboard-toggle', onGeometry)
       keyboard?.hide()
       setKeyboardHeight(0)
       setReady(false)
       field.current = null
+      mathField = undefined
     }
   }, [open])
 

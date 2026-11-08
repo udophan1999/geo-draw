@@ -76,6 +76,23 @@ test('bộ gõ tiếng Việt (IME) điền vào ô trống của mẫu, không 
   await expect(formulaChips(page).locator('.mfrac')).toHaveCount(1)
 })
 
+test('bộ gõ tiếng Việt điền được đỉnh dưới dấu mũ và giữ đúng ký hiệu góc', async ({ page }) => {
+  desktopOnly()
+  const { dialog, field } = await openFormula(page)
+  await dialog.getByRole('tab', { name: 'Hình học' }).click()
+  await dialog.getByRole('button', { name: 'Góc', exact: true }).click()
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Input.imeSetComposition', { text: 'A', selectionStart: 1, selectionEnd: 1 })
+  await cdp.send('Input.insertText', { text: 'A' })
+  expect(await field.evaluate((el) => (el as unknown as { value: string }).value)).toBe('\\widehat{A}')
+
+  await dialog.getByRole('button', { name: 'Chèn vào tin nhắn' }).click()
+  const chip = formulaChips(page)
+  await expect(chip).toHaveCount(1)
+  await expect(chip).toHaveAttribute('data-latex', '\\widehat{A}')
+  await expect(composer(page)).not.toContainText('∠A')
+})
+
 test('Enter trong ô công thức chèn luôn', async ({ page }) => {
   desktopOnly()
   const { dialog } = await openFormula(page)
