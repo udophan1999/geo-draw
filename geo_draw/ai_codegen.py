@@ -154,8 +154,9 @@ Exact construction requirements:
   AC and BD through I normally.
 - Add conventional geometry marks only for construction data stated in the problem: equal-length
   ticks, equal-angle arcs, and right-angle squares. All main and auxiliary lines remain solid.
-- A shape name constrains coordinates but does not by itself request equality ticks. For a
-  parallelogram, rectangle, square, or rhombus, never mark equal sides unless the problem explicitly
+- A shape name constrains coordinates but does not usually request equality ticks. A stated
+  isosceles triangle is the important teaching exception: always mark its two equal legs and its
+  two equal base angles. For a parallelogram, rectangle, square, or rhombus, never mark equal sides unless the problem explicitly
   states a segment equality or explicitly asks for those marks. In particular, do not infer and
   mark AB=CD or AD=BC merely from the word "parallelogram". Draw auxiliary objects normally and
   add only their explicitly required markers, such as right-angle squares and midpoint ticks.
@@ -249,10 +250,11 @@ Exact construction requirements:
 - A raw `Line` must connect named points directly. Never create oversized carrier lines with
   arithmetic endpoints such as `Line(C - 12*n, C + 12*n)`: they shrink the actual figure and
   create large empty margins. Use `line_through_intersection` for a required extension.
-- Call `interior_angle_marker` exactly once for each angle explicitly stated in the problem.
-  Never add a separate `Text("50°")`, Arc, or Angle for an angle already handled by this helper.
-- Give unequal stated angles different arc counts with `mark_count=1`, `2`, or `3`; give equal
-  angles the same mark_count. For example, 50° may use one arc and 130° two arcs.
+- Call `interior_angle_marker` exactly once for each angle explicitly stated in the problem and for
+  both equal base angles of a stated isosceles triangle. Never add a separate `Text("50°")`, Arc,
+  or Angle for an angle already handled by this helper.
+- A numeric degree label already distinguishes measured angles. Equal derived angles, especially
+  the two base angles of an isosceles triangle, must use the same mark_count.
 - Call helpers with these exact signatures:
   `apply_light_theme(self)` as the first statement in `construct`;
   `parallel_segment_marks((A, B), (C, D), count=1)`;
@@ -333,7 +335,7 @@ def _normalize_geometry_notation(text: str) -> str:
         normalized,
         flags=re.I,
     )
-    normalized = re.sub(r"(?<![A-Za-z])(?:∠|∡)\s*([A-Za-z]{1,3})", r"\1", normalized)
+    normalized = re.sub(r"(?:∠|∡)\s*([A-Za-z]{1,3})", r"\1", normalized)
     normalized = re.sub(r"\^\s*\{?\s*\\circ\s*\}?", "°", normalized, flags=re.I)
     normalized = re.sub(r"\\(?:degree|circ)\b", "°", normalized, flags=re.I)
     normalized = re.sub(r"\\parallel\b", "∥", normalized, flags=re.I)
@@ -498,6 +500,116 @@ def _primed_parallel_transversal_facts(
     if angle is not None and not 15.0 <= angle <= 165.0:
         return None
     return first_name, second_name, cross_name, angle
+
+
+def _quadrilateral_angle_facts(text: str) -> tuple[str, tuple[float, ...]] | None:
+    """Recognize four stated interior angles written with words, hats, or angle symbols."""
+    folded = _fold_geometry_notation(_drawing_facts_text(text))
+    folded = re.sub(r"\s+", " ", folded).strip()
+    polygon = re.search(r"(?:\bTU GIAC|□)\s+([A-Z]{4})(?![A-Z])", folded)
+    if not polygon or len(set(polygon.group(1))) != 4:
+        return None
+    names = polygon.group(1)
+    measures: dict[str, float] = {}
+    for match in re.finditer(
+        rf"(?:(?:GOC|M)\s*)?([{re.escape(names)}])\s*(?:=|BANG)\s*"
+        r"(\d+(?:[.,]\d+)?)\s*(?:°|DO)",
+        folded,
+    ):
+        measures[match.group(1)] = float(match.group(2).replace(",", "."))
+    if set(measures) != set(names):
+        return None
+    ordered = tuple(measures[name] for name in names)
+    if any(not 5.0 <= value <= 175.0 for value in ordered):
+        return None
+    if abs(sum(ordered) - 360.0) > 0.05:
+        return None
+    return names, ordered
+
+
+def _quadrilateral_with_angles_scene(problem: str, animate: bool) -> str | None:
+    """Build a balanced convex quadrilateral from all four stated interior angles."""
+    facts = _quadrilateral_angle_facts(problem)
+    if facts is None:
+        return None
+    names, angles = facts
+    _, angle_b, angle_c, _ = angles
+    directions = (
+        0.0,
+        math.pi - math.radians(angle_b),
+        2.0 * math.pi - math.radians(angle_b + angle_c),
+        math.pi + math.radians(angles[0]),
+    )
+    unit = tuple((math.cos(value), math.sin(value)) for value in directions)
+    determinant = unit[2][0] * unit[3][1] - unit[3][0] * unit[2][1]
+    if abs(determinant) < 1e-8:
+        return None
+
+    candidates: list[tuple[float, float, float, float]] = []
+    for step in range(20, 501):
+        side_b = step / 100.0
+        rhs_x = -(unit[0][0] + side_b * unit[1][0])
+        rhs_y = -(unit[0][1] + side_b * unit[1][1])
+        side_c = (rhs_x * unit[3][1] - unit[3][0] * rhs_y) / determinant
+        side_d = (unit[2][0] * rhs_y - rhs_x * unit[2][1]) / determinant
+        if side_c <= 0.12 or side_d <= 0.12:
+            continue
+        sides = (1.0, side_b, side_c, side_d)
+        ratio = max(sides) / min(sides)
+        candidates.append((ratio, side_b, side_c, side_d))
+    if not candidates:
+        return None
+    _, side_b, side_c, _ = min(candidates)
+    raw = [
+        (0.0, 0.0),
+        (1.0, 0.0),
+        (1.0 + side_b * unit[1][0], side_b * unit[1][1]),
+        (
+            1.0 + side_b * unit[1][0] + side_c * unit[2][0],
+            side_b * unit[1][1] + side_c * unit[2][1],
+        ),
+    ]
+    min_x, max_x = min(x for x, _ in raw), max(x for x, _ in raw)
+    min_y, max_y = min(y for _, y in raw), max(y for _, y in raw)
+    scale = min(5.8 / max(max_x - min_x, 0.1), 3.8 / max(max_y - min_y, 0.1))
+    center_x, center_y = (min_x + max_x) / 2.0, (min_y + max_y) / 2.0
+    points = tuple(((x - center_x) * scale, (y - center_y) * scale) for x, y in raw)
+    point_lines = "\n".join(
+        f"        {name} = np.array([{x:.8f}, {y:.8f}, 0.0])"
+        for name, (x, y) in zip(names, points)
+    )
+    marker_lines = "\n".join(
+        f"            interior_angle_marker([{', '.join(names)}], {index}, "
+        f"degrees={measure:g}, mark_count=1),"
+        for index, measure in enumerate(angles)
+    )
+    label_lines = "\n".join(
+        f'            safe_point_label({name}, "{name}", '
+        f'{names[(index - 1) % 4]}, {names[(index + 1) % 4]}, '
+        f"avoid_points=({', '.join(other for other in names if other != name)},), "
+        f"avoid_segments=(({names[0]}, {names[1]}), ({names[1]}, {names[2]}), "
+        f"({names[2]}, {names[3]}), ({names[3]}, {names[0]}))),"
+        for index, name in enumerate(names)
+    )
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, interior_angle_marker, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+{point_lines}
+        self.add(
+            Line({names[0]}, {names[1]}), Line({names[1]}, {names[2]}),
+            Line({names[2]}, {names[3]}), Line({names[3]}, {names[0]}),
+            Dot({names[0]}), Dot({names[1]}), Dot({names[2]}), Dot({names[3]}),
+{marker_lines}
+{label_lines}
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
 
 
 def _primed_parallel_transversal_scene(problem: str, animate: bool) -> str | None:
@@ -927,6 +1039,112 @@ class GeoScene(Scene):
 '''
 
 
+def _isosceles_triangle_facts(
+    text: str,
+) -> tuple[str, str, dict[str, float], float] | None:
+    """Return names, apex, explicit measures and the derived base angle."""
+    folded = _fold_geometry_notation(_drawing_facts_text(text))
+    folded = re.sub(r"\s+", " ", folded).strip()
+    match = re.search(
+        r"TAM GIAC CAN ([A-Z]{3}) TAI ([A-Z])"
+        r"|TAM GIAC ([A-Z]{3}) (?:LA )?CAN TAI ([A-Z])",
+        folded,
+    )
+    if not match:
+        return None
+    names = match.group(1) or match.group(3)
+    apex = match.group(2) or match.group(4)
+    if len(set(names)) != 3 or apex not in names:
+        return None
+    measures: dict[str, float] = {}
+    for angle in re.finditer(
+        rf"(?:(?:GOC|M)\s*)?([{re.escape(names)}])\s*(?:=|BANG)\s*"
+        r"(\d+(?:[.,]\d+)?)\s*(?:°|DO)",
+        folded,
+    ):
+        measures[angle.group(1)] = float(angle.group(2).replace(",", "."))
+    if any(not 5.0 <= value <= 175.0 for value in measures.values()):
+        return None
+    base_vertices = [name for name in names if name != apex]
+    base_values = [measures[name] for name in base_vertices if name in measures]
+    if base_values and max(base_values) - min(base_values) > 0.05:
+        return None
+    if base_values:
+        base_angle = base_values[0]
+    elif apex in measures:
+        base_angle = (180.0 - measures[apex]) / 2.0
+    else:
+        base_angle = 55.0
+    if not 5.0 <= base_angle <= 87.5:
+        return None
+    if apex in measures and abs(measures[apex] + 2.0 * base_angle - 180.0) > 0.05:
+        return None
+    return names, apex, measures, base_angle
+
+
+def _isosceles_triangle_scene(problem: str, animate: bool) -> str | None:
+    """Draw a stated isosceles triangle with its defining side and base-angle marks."""
+    facts = _isosceles_triangle_facts(problem)
+    if facts is None:
+        return None
+    names, apex, measures, base_angle = facts
+    bases = [name for name in names if name != apex]
+    half_base = 3.0
+    height = half_base * math.tan(math.radians(base_angle))
+    scale = min(1.0, 3.8 / max(height, 0.1))
+    half_base *= scale
+    height *= scale
+    coordinates = {
+        apex: (0.0, height / 2.0),
+        bases[0]: (-half_base, -height / 2.0),
+        bases[1]: (half_base, -height / 2.0),
+    }
+    point_lines = "\n".join(
+        f"        {name} = np.array([{coordinates[name][0]:.8f}, "
+        f"{coordinates[name][1]:.8f}, 0.0])"
+        for name in names
+    )
+    marker_lines = []
+    for base in bases:
+        degrees = f", degrees={measures[base]:g}" if base in measures else ""
+        marker_lines.append(
+            f"            interior_angle_marker([{', '.join(names)}], {names.index(base)}"
+            f"{degrees}, mark_count=1),"
+        )
+    if apex in measures:
+        apex_count = 1 if abs(measures[apex] - base_angle) <= 0.05 else 2
+        marker_lines.append(
+            f"            interior_angle_marker([{', '.join(names)}], {names.index(apex)}, "
+            f"degrees={measures[apex]:g}, mark_count={apex_count}),"
+        )
+    markers = "\n".join(marker_lines)
+    labels = "\n".join(
+        f'            safe_point_label({name}, "{name}", '
+        f"{', '.join(other for other in names if other != name)}, "
+        f"avoid_points=({', '.join(other for other in names if other != name)},)),"
+        for name in names
+    )
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, interior_angle_marker, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+{point_lines}
+        self.add(
+            Line({names[0]}, {names[1]}), Line({names[1]}, {names[2]}), Line({names[2]}, {names[0]}),
+            Dot({names[0]}), Dot({names[1]}), Dot({names[2]}),
+            equal_segment_marks(({apex}, {bases[0]}), ({apex}, {bases[1]}), count=1),
+{markers}
+{labels}
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
 def _right_isosceles_altitude_midpoints_scene(
     problem: str, animate: bool,
 ) -> str | None:
@@ -961,6 +1179,8 @@ class GeoScene(Scene):
             Line(A, C), Line(B, D),
             altitude_segment(A, H, B, C), Line(O, H), Line(H, E),
             interior_angle_marker([A, B, C], 0, degrees=90, mark_count=1),
+            interior_angle_marker([A, B, C], 1, mark_count=2),
+            interior_angle_marker([A, B, C], 2, mark_count=2),
             equal_segment_marks((A, B), (A, C), count=3),
             equal_segment_marks((O, B), (O, D), count=1),
             midpoint_marker(O, A, C, other_points=(B, D, E, H), count=2),
@@ -1846,11 +2066,13 @@ def validate_code(code: str, problem: str | None = None) -> None:
             ))
         parent_equalities = {frozenset((left, right)) for left, right in stated_equalities}
         for match in re.finditer(
-            r"tam\s+giác\s+([A-Z]{3})\s+(?:vuông\s+)?cân\s+tại\s+([A-Z])",
+            r"tam\s+giác\s+(?:(?:vuông\s+)?cân\s+([A-Z]{3})\s+tại\s+([A-Z])"
+            r"|([A-Z]{3})\s+(?:là\s+)?(?:vuông\s+)?cân\s+tại\s+([A-Z]))",
             drawing_facts,
             re.I,
         ):
-            vertices, apex = match.group(1).upper(), match.group(2).upper()
+            vertices = (match.group(1) or match.group(3)).upper()
+            apex = (match.group(2) or match.group(4)).upper()
             others = [vertex for vertex in vertices if vertex != apex]
             if len(others) == 2:
                 isosceles_pair = (
@@ -2039,7 +2261,16 @@ def validate_code(code: str, problem: str | None = None) -> None:
         for _names, _isosceles_apex, right_vertex in _stated_triangle_conditions(problem):
             if right_vertex:
                 explicit_angles.add(right_vertex)
-        if explicit_angles and any(word in request for word in polygon_words):
+        isosceles_base_pairs: list[tuple[str, str]] = []
+        for triangle_names, isosceles_apex, _right_vertex in _stated_triangle_conditions(problem):
+            if isosceles_apex:
+                bases = tuple(name for name in triangle_names if name != isosceles_apex)
+                if len(bases) == 2:
+                    isosceles_base_pairs.append(bases)
+        required_angle_vertices = set(explicit_angles)
+        for bases in isosceles_base_pairs:
+            required_angle_vertices.update(bases)
+        if required_angle_vertices and any(word in request for word in polygon_words):
             if (
                 "tam giác" in request
                 and len(explicit_angles) >= 2
@@ -2063,9 +2294,9 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 raise ValueError(
                     "interior_angle_marker đã có nhãn số đo; không được thêm Text số đo góc lần hai."
                 )
-            if explicit_angles and interior_angle_calls != len(explicit_angles):
+            if interior_angle_calls != len(required_angle_vertices):
                 raise ValueError(
-                    f"Mỗi góc chỉ được ký hiệu một lần: đề có {len(explicit_angles)} góc "
+                    f"Mỗi góc chỉ được ký hiệu một lần: hình cần {len(required_angle_vertices)} góc "
                     f"nhưng mã tạo {interior_angle_calls} ký hiệu."
                 )
             if len(explicit_angles) > 1:
@@ -2078,20 +2309,48 @@ def validate_code(code: str, problem: str | None = None) -> None:
                     count_node = next(
                         (kw.value for kw in call.keywords if kw.arg == "mark_count"), None
                     )
-                    if not (isinstance(degrees_node, ast.Constant)
-                            and isinstance(degrees_node.value, (int, float))
-                            and isinstance(count_node, ast.Constant)
+                    if not (isinstance(count_node, ast.Constant)
                             and isinstance(count_node.value, int)):
                         raise ValueError(
-                            "Khi đề có nhiều góc, mỗi ký hiệu phải ghi rõ degrees và mark_count."
+                            "Khi hình có nhiều góc, mỗi ký hiệu phải ghi rõ mark_count."
                         )
+                    if degrees_node is None:
+                        continue
+                    if not (isinstance(degrees_node, ast.Constant)
+                            and isinstance(degrees_node.value, (int, float))):
+                        raise ValueError("Số đo góc trong degrees phải là một hằng số.")
                     degree_value = float(degrees_node.value)
                     count_value = count_node.value
                     previous_count = styles_by_degrees.setdefault(degree_value, count_value)
                     if previous_count != count_value:
                         raise ValueError("Các góc bằng nhau phải dùng cùng số cung ký hiệu.")
-                if len(set(styles_by_degrees.values())) != len(styles_by_degrees):
-                    raise ValueError("Hai góc khác nhau phải dùng số cung ký hiệu khác nhau.")
+                # A degree label already distinguishes unequal measured angles. Reusing one clean
+                # arc is necessary when four or more different values are stated, because the
+                # verified helper intentionally supports at most three stacked arcs.
+            marker_styles_by_vertex: dict[str, int] = {}
+            for call in interior_angle_nodes:
+                if len(call.args) < 2:
+                    continue
+                vertices_node, index_node = call.args[0], call.args[1]
+                count_node = next(
+                    (kw.value for kw in call.keywords if kw.arg == "mark_count"), None,
+                )
+                if not (isinstance(vertices_node, (ast.List, ast.Tuple))
+                        and isinstance(index_node, ast.Constant)
+                        and isinstance(index_node.value, int)
+                        and isinstance(count_node, ast.Constant)
+                        and isinstance(count_node.value, int)):
+                    continue
+                vertex_names = [
+                    item.id for item in vertices_node.elts if isinstance(item, ast.Name)
+                ]
+                if 0 <= index_node.value < len(vertex_names):
+                    marker_styles_by_vertex[vertex_names[index_node.value]] = count_node.value
+            for first_base, second_base in isosceles_base_pairs:
+                if marker_styles_by_vertex.get(first_base) != marker_styles_by_vertex.get(second_base):
+                    raise ValueError(
+                        "Hai góc kề đáy của tam giác cân phải dùng cùng kiểu cung ký hiệu."
+                    )
         elif ("phân giác" in request or "bisector" in request) and not explicit_angles:
             if direct_angle_calls or direct_arc_calls or "interior_angle_marker" in called_names:
                 raise ValueError(
@@ -2105,6 +2364,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
             if direct_angle_calls or direct_arc_calls or "interior_angle_marker" in called_names:
                 raise ValueError("Đề không yêu cầu góc nên không được tự thêm ký hiệu góc.")
         required_helpers = (
+            (("tam giác cân", "isosceles triangle"),
+             ("equal_segment_marks", "interior_angle_marker")),
             (("hình thang cân", "isosceles trapezoid"),
              ("equal_segment_marks", "parallel_segment_marks")),
             (("trung điểm", "midpoint"), ("midpoint_marker",)),
@@ -2118,6 +2379,18 @@ def validate_code(code: str, problem: str | None = None) -> None:
                 missing = [helper for helper in helpers if helper not in called_names]
                 if missing:
                     raise ValueError("Thiếu phép dựng đã kiểm chứng: " + ", ".join(missing))
+        for triangle_names, isosceles_apex, _right_vertex in _stated_triangle_conditions(problem):
+            if not isosceles_apex:
+                continue
+            bases = [name for name in triangle_names if name != isosceles_apex]
+            required_sides = {
+                tuple(sorted((isosceles_apex, bases[0]))),
+                tuple(sorted((isosceles_apex, bases[1]))),
+            }
+            if not any(required_sides <= segment_keys for segment_keys, _count in equality_groups):
+                raise ValueError(
+                    "Tam giác cân phải đánh dấu hai cạnh bên bằng nhau bằng equal_segment_marks."
+                )
         if len(angle_bisector_calls) > 1:
             for call in angle_bisector_calls:
                 boundary_node = next(
@@ -2706,6 +2979,12 @@ def _stated_triangle_conditions(problem: str | None) -> list[tuple[str, str | No
             item = (match.group(1), match.group(2), match.group(2))
             if item not in conditions:
                 conditions.append(item)
+    for match in re.finditer(
+        r"TAM\s+GIAC\s+CAN\s+([A-Z]{3})\s+TAI\s+([A-Z])", facts,
+    ):
+        item = (match.group(1), match.group(2), None)
+        if item not in conditions:
+            conditions.append(item)
     triangle_names = {
         match.group(1)
         for match in re.finditer(r"TAM\s+GIAC\s+([A-Z]{3})(?![A-Z])", facts)
@@ -2872,6 +3151,135 @@ def _ensure_stated_right_angle_markers(code: str, problem: str | None) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _ensure_isosceles_triangle_property_marks(code: str, problem: str | None) -> str:
+    """Inject the defining equal-leg ticks and equal-base-angle arcs when omitted."""
+    conditions = [
+        (names, apex) for names, apex, _right in _stated_triangle_conditions(problem)
+        if apex
+    ]
+    if not conditions:
+        return code
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    scene_class = next(
+        (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GeoScene"),
+        None,
+    )
+    construct = next(
+        (node for node in (scene_class.body if scene_class else [])
+         if isinstance(node, ast.FunctionDef) and node.name == "construct"),
+        None,
+    )
+    if construct is None:
+        return code
+    fit_call = next(
+        (node for node in ast.walk(construct)
+         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+         and node.func.id == "fit_scene_to_frame"),
+        None,
+    )
+    if fit_call is None:
+        return code
+
+    equality_groups: list[tuple[set[tuple[str, str]], int]] = []
+    used_equality_counts: set[int] = set()
+    angle_styles: dict[str, int] = {}
+    for node in ast.walk(construct):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+            continue
+        count_node = next((kw.value for kw in node.keywords if kw.arg == "count"), None)
+        count = count_node.value if isinstance(count_node, ast.Constant) else 1
+        if node.func.id == "equal_segment_marks":
+            segments = {
+                tuple(sorted(item.id for item in argument.elts))
+                for argument in node.args
+                if (isinstance(argument, (ast.Tuple, ast.List))
+                    and len(argument.elts) == 2
+                    and all(isinstance(item, ast.Name) for item in argument.elts))
+            }
+            equality_groups.append((segments, count))
+            if isinstance(count, int):
+                used_equality_counts.add(count)
+        elif node.func.id == "midpoint_marker" and isinstance(count, int):
+            used_equality_counts.add(count)
+        elif node.func.id == "interior_angle_marker" and len(node.args) >= 2:
+            vertices_node, index_node = node.args[:2]
+            mark_node = next((kw.value for kw in node.keywords if kw.arg == "mark_count"), None)
+            if not (isinstance(vertices_node, (ast.List, ast.Tuple))
+                    and isinstance(index_node, ast.Constant)
+                    and isinstance(index_node.value, int)
+                    and isinstance(mark_node, ast.Constant)
+                    and isinstance(mark_node.value, int)):
+                continue
+            vertices = [item.id for item in vertices_node.elts if isinstance(item, ast.Name)]
+            if 0 <= index_node.value < len(vertices):
+                angle_styles[vertices[index_node.value]] = mark_node.value
+
+    folded = _fold_geometry_notation(_drawing_facts_text(problem or ""))
+    explicit_measures = {
+        match.group(1): float(match.group(2).replace(",", "."))
+        for match in re.finditer(
+            r"(?:(?:GOC|M)\s*)?([A-Z])\s*(?:=|BANG)\s*"
+            r"(\d+(?:[.,]\d+)?)\s*(?:°|DO)",
+            folded,
+        )
+    }
+    additions: list[str] = []
+    for names, apex in conditions:
+        bases = [name for name in names if name != apex]
+        required_sides = {
+            tuple(sorted((apex, bases[0]))),
+            tuple(sorted((apex, bases[1]))),
+        }
+        if not any(required_sides <= segments for segments, _count in equality_groups):
+            count = next((value for value in range(1, 4) if value not in used_equality_counts), 1)
+            additions.append(
+                f"self.add(equal_segment_marks(({apex}, {bases[0]}), "
+                f"({apex}, {bases[1]}), count={count}))"
+            )
+            used_equality_counts.add(count)
+        base_style = angle_styles.get(bases[0]) or angle_styles.get(bases[1]) or 1
+        for base in bases:
+            if base in angle_styles:
+                continue
+            degree = (
+                f", degrees={explicit_measures[base]:g}"
+                if base in explicit_measures else ""
+            )
+            additions.append(
+                f"self.add(interior_angle_marker([{', '.join(names)}], "
+                f"{names.index(base)}{degree}, mark_count={base_style}))"
+            )
+            angle_styles[base] = base_style
+    if not additions:
+        return code
+    lines = code.rstrip().splitlines()
+    insertion_index = fit_call.lineno - 1
+    indent = re.match(r"\s*", lines[insertion_index]).group(0)
+    lines[insertion_index:insertion_index] = [f"{indent}{line}" for line in additions]
+    imported = {
+        alias.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "geo_draw.geometry_primitives"
+        for alias in node.names
+    }
+    missing_imports = [
+        name for name in ("equal_segment_marks", "interior_angle_marker")
+        if name not in imported and "*" not in imported
+    ]
+    if missing_imports:
+        import_nodes = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+        import_index = max(node.end_lineno or node.lineno for node in import_nodes)
+        lines.insert(
+            import_index,
+            "from geo_draw.geometry_primitives import " + ", ".join(missing_imports),
+        )
+    return "\n".join(lines) + "\n"
+
+
 def _classification_shapes(problem: str | None) -> list[str]:
     """Return every explicitly named polygon whose boundary must be visible."""
     if not problem:
@@ -2901,6 +3309,12 @@ def _stated_polygons(problem: str | None) -> list[str]:
             names = match.group(1)
             if len(set(names)) == size and names not in found:
                 found.append(names)
+    for match in re.finditer(
+        r"\bTAM\s+GIAC\s+(?:VUONG\s+)?CAN\s+([A-Z]{3})(?![A-Z])", facts,
+    ):
+        names = match.group(1)
+        if len(set(names)) == 3 and names not in found:
+            found.append(names)
     return found
 
 
@@ -3095,6 +3509,14 @@ def _ensure_ordinary_polygon_checks(code: str, problem: str | None) -> str:
             r"\bgóc\s+([A-Z])\s*(?:=|bằng)\s*90\s*(?:°|độ)?", facts, re.I,
         )
     )
+    folded_facts = _fold_geometry_notation(facts)
+    right_vertices.update(
+        match.group(1)
+        for match in re.finditer(
+            r"(?:(?:GOC|M)\s*)?([A-Z])\s*(?:=|BANG)\s*90\s*(?:°|DO)",
+            folded_facts,
+        )
+    )
     for match in re.finditer(
         r"\b([A-Z]{2})\s*(?:vuông\s+góc\s+với|⊥|\\perp)\s*([A-Z]{2})\b",
         facts, re.I,
@@ -3103,6 +3525,19 @@ def _ensure_ordinary_polygon_checks(code: str, problem: str | None) -> str:
         if len(shared) == 1:
             right_vertices.update(shared)
     parallel_pairs = _explicit_parallel_relations(problem)
+    angle_facts = _quadrilateral_angle_facts(facts)
+    if angle_facts is not None:
+        angle_names, angle_values = angle_facts
+        for index in range(4):
+            if abs(angle_values[index] + angle_values[(index + 1) % 4] - 180.0) > 0.05:
+                continue
+            # Two consecutive supplementary interior angles force the two outer sides
+            # to be parallel (for A+B=180°, DA ∥ BC). This is not an accidental special case.
+            first = angle_names[(index - 1) % 4] + angle_names[index]
+            second = angle_names[(index + 1) % 4] + angle_names[(index + 2) % 4]
+            relation = (first, second)
+            if relation not in parallel_pairs and relation[::-1] not in parallel_pairs:
+                parallel_pairs.append(relation)
     already_checked = {
         keyword.value.value
         for node in ast.walk(construct)
@@ -3168,6 +3603,7 @@ def sanitize_code(code: str, animate: bool, problem: str | None = None) -> str:
     code = _ensure_ordinary_polygon_checks(code, problem)
     code = _ensure_triangle_shape_checks(code, problem)
     code = _ensure_stated_right_angle_markers(code, problem)
+    code = _ensure_isosceles_triangle_property_marks(code, problem)
     code = _ensure_upright_polygon_checks(code, problem)
     validate_code(code, problem=problem)
     return code
@@ -3356,7 +3792,9 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
-        _transversal_numbered_angles_scene(problem, animate)
+        _isosceles_triangle_scene(problem, animate)
+        or _quadrilateral_with_angles_scene(problem, animate)
+        or _transversal_numbered_angles_scene(problem, animate)
         or _primed_parallel_transversal_scene(problem, animate)
         or _basic_nonparallel_transversal_scene(problem, animate)
         or _congruent_triangles_scene(problem, animate)

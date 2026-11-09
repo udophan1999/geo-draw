@@ -10,11 +10,15 @@ from geo_draw.ai_codegen import (
     _basic_nonparallel_transversal_scene,
     _explicit_congruent_triangles,
     _explicit_segment_equality_pairs,
+    _isosceles_triangle_facts,
+    _isosceles_triangle_scene,
     _ensure_light_theme,
     _normalize_geometry_notation,
     _ordinary_polygons,
     _primed_parallel_transversal_facts,
     _primed_parallel_transversal_scene,
+    _quadrilateral_angle_facts,
+    _quadrilateral_with_angles_scene,
     _transversal_numbered_angles_scene,
     extract_problem_from_image, extract_problem_from_images,
     extract_python,
@@ -43,6 +47,103 @@ class GeoScene(Scene):
 
 
 class AiCodegenTests(unittest.TestCase):
+    def test_isosceles_triangle_accepts_both_word_orders_and_marks_properties(self):
+        variants = (
+            "Vẽ tam giác cân ABC tại A có ∠B = 30°",
+            "Vẽ tam giác ABC cân tại A có góc B bằng 30 độ",
+            r"Vẽ tam giác cân ABC tại A có $\widehat{B}=30^\circ$",
+        )
+        for problem in variants:
+            with self.subTest(problem=problem):
+                self.assertEqual(
+                    _isosceles_triangle_facts(problem),
+                    ("ABC", "A", {"B": 30.0}, 30.0),
+                )
+                code = _isosceles_triangle_scene(problem, animate=False)
+                self.assertIsNotNone(code)
+                validate_code(code, problem=problem)
+                self.assertIn("equal_segment_marks((A, B), (A, C), count=1)", code)
+                self.assertIn(
+                    "interior_angle_marker([A, B, C], 1, degrees=30, mark_count=1)",
+                    code,
+                )
+                self.assertIn(
+                    "interior_angle_marker([A, B, C], 2, mark_count=1)",
+                    code,
+                )
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_isosceles_triangle_properties_are_drawn_without_ai(self, request_chat):
+        problem = "Vẽ tam giác cân ABC tại A có ∠B = 30°"
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertEqual(result.code.count("interior_angle_marker("), 2)
+        self.assertEqual(result.code.count("degrees=30"), 1)
+        self.assertIn("equal_segment_marks((A, B), (A, C), count=1)", result.code)
+        self.assertIn("isosceles_apex='A'", result.code)
+
+        with self.assertRaisesRegex(ValueError, "equal_segment_marks"):
+            validate_code(
+                result.code.replace(
+                    "            equal_segment_marks((A, B), (A, C), count=1),\n", "",
+                ),
+                problem=problem,
+            )
+        with self.assertRaisesRegex(ValueError, "hình cần 2 góc"):
+            validate_code(
+                result.code.replace(
+                    "            interior_angle_marker([A, B, C], 2, mark_count=1),\n", "",
+                ),
+                problem=problem,
+            )
+
+    def test_isosceles_triangle_without_measure_still_gets_property_marks(self):
+        problem = "Vẽ tam giác cân MNP tại M"
+        code = _isosceles_triangle_scene(problem, animate=False)
+        self.assertIsNotNone(code)
+        validate_code(code, problem=problem)
+        self.assertIn("equal_segment_marks((M, N), (M, P), count=1)", code)
+        self.assertEqual(code.count("interior_angle_marker("), 2)
+
+    def test_quadrilateral_angles_accept_words_hats_and_angle_symbols(self):
+        variants = (
+            "Vẽ tứ giác ABCD có Â = 108°, ∠B = 72°, góc C bằng 65 độ, ∡D = 115°",
+            r"Vẽ tứ giác ABCD có $\widehat{A}=108^\circ$, "
+            r"$\angle B=72^\circ$, $\widehat{C}=65^\circ$, $\angle D=115^\circ$",
+            "Cho tứ giác ABCD: góc A bằng 108 độ, góc B bằng 72 độ, "
+            "góc C bằng 65 độ, góc D bằng 115 độ.",
+        )
+        for problem in variants:
+            with self.subTest(problem=problem):
+                self.assertEqual(
+                    _quadrilateral_angle_facts(problem),
+                    ("ABCD", (108.0, 72.0, 65.0, 115.0)),
+                )
+                code = _quadrilateral_with_angles_scene(problem, animate=False)
+                self.assertIsNotNone(code)
+                validate_code(code, problem=problem)
+                self.assertEqual(code.count("interior_angle_marker("), 4)
+                self.assertEqual(code.count("mark_count=1"), 4)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_quadrilateral_with_four_angles_is_drawn_without_ai(self, request_chat):
+        problem = "Vẽ tứ giác ABCD có Â=108°, ∠B=72°, ∠C=65°, ∠D=115°"
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertIn("degrees=108", result.code)
+        self.assertIn("degrees=72", result.code)
+        self.assertIn("degrees=65", result.code)
+        self.assertIn("degrees=115", result.code)
+        self.assertIn("allowed_parallel_pairs=(('DA', 'BC'),)", result.code)
+        self.assertNotIn("parallel_segment_marks", result.code)
+
+    def test_quadrilateral_angle_builder_rejects_invalid_total(self):
+        problem = "Vẽ tứ giác ABCD có ∠A=108°, ∠B=72°, ∠C=65°, ∠D=110°"
+        self.assertIsNone(_quadrilateral_angle_facts(problem))
+        self.assertIsNone(_quadrilateral_with_angles_scene(problem, animate=False))
+
     def test_prompt_normalizes_lowercase_polygon_vertices_only(self):
         self.assertIn('"tam giác abc" means points A, B, C', SYSTEM_PROMPT)
         self.assertIn("Do not uppercase isolated lowercase", SYSTEM_PROMPT)
@@ -922,7 +1023,7 @@ class GeoScene(Scene):
         self.assertIn(DRAWING_ERROR_MEMORY, SYSTEM_PROMPT)
         for remembered_rule in (
             "exactly one right-angle square",
-            "Unequal angle measures",
+            "Numerical degree labels",
             "All explicitly equal segments share one tick style",
             "Use only solid strokes",
             "Define, dot, label, and connect every named point",
@@ -1175,27 +1276,6 @@ class GeoScene(Scene):
         with self.assertRaisesRegex(ValueError, "chỉ được ký hiệu một lần"):
             validate_code(duplicated, problem="Vẽ hình bình hành ABCD, góc A bằng 45 độ")
 
-    def test_unequal_angles_require_different_arc_counts(self):
-        same_style = """from manim import *
-import numpy as np
-from geo_draw.geometry_primitives import interior_angle_marker, parallel_segment_marks
-
-class GeoScene(Scene):
-    def construct(self):
-        A = np.array([0, 0, 0])
-        B = np.array([3, 0, 0])
-        C = np.array([4, 2, 0])
-        D = np.array([1, 2, 0])
-        self.add(interior_angle_marker([A, B, C, D], 0, degrees=45, mark_count=1))
-        self.add(interior_angle_marker([A, B, C, D], 1, degrees=135, mark_count=1))
-        self.add(parallel_segment_marks((A, B), (D, C)))
-"""
-        with self.assertRaisesRegex(ValueError, "góc khác nhau"):
-            validate_code(
-                same_style,
-                problem="Vẽ hình bình hành ABCD, góc A bằng 45 độ, góc B bằng 135 độ",
-            )
-
     def test_accepts_complete_scene_with_opposite_ray_and_frame_fit(self):
         complete = """from manim import *
 import numpy as np
@@ -1251,7 +1331,7 @@ class GeoScene(Scene):
     def test_grouped_and_repeated_midpoint_facts_keep_correct_tick_groups(self):
         complete = """from manim import *
 import numpy as np
-from geo_draw.geometry_primitives import midpoint_marker, fit_scene_to_frame
+from geo_draw.geometry_primitives import equal_segment_marks, interior_angle_marker, midpoint_marker, fit_scene_to_frame
 
 class GeoScene(Scene):
     def construct(self):
@@ -1263,6 +1343,9 @@ class GeoScene(Scene):
         M = np.array([0.0, 0.0, 0.0])
         O = 2 * E - M
         self.add(Line(A, B), Line(A, C), Line(O, M))
+        self.add(equal_segment_marks((A, B), (A, C), count=3))
+        self.add(interior_angle_marker([A, B, C], 1, mark_count=1))
+        self.add(interior_angle_marker([A, B, C], 2, mark_count=1))
         self.add(midpoint_marker(E, A, B, other_points=(C, F, M, O), count=1))
         self.add(midpoint_marker(F, A, C, other_points=(B, E, M, O), count=1))
         self.add(midpoint_marker(E, O, M, other_points=(A, B, C, F), count=2))
@@ -1288,7 +1371,7 @@ class GeoScene(Scene):
             "midpoint_marker(F, A, C, other_points=(B, E, M, O), count=1)",
             "midpoint_marker(F, A, C, other_points=(B, E, M, O), count=3)",
         )
-        with self.assertRaisesRegex(ValueError, "hai đoạn bằng nhau"):
+        with self.assertRaisesRegex(ValueError, "Nhóm cạnh bằng nhau|hai đoạn bằng nhau"):
             validate_code(mismatched_equal_parents, problem=problem)
 
         reused_unrelated_style = complete.replace(

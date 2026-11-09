@@ -65,6 +65,10 @@
     },
     {
       "input": "\\widehat{ABC}",
+      "expected": null
+    },
+    {
+      "input": "\\angle ABC",
       "expected": "∠ABC"
     },
     {

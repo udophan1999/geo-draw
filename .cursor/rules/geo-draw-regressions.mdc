@@ -13,7 +13,9 @@ alwaysApply: true
 - Nền bản vẽ màu trắng; nét, điểm, nhãn và ký hiệu màu đen.
 - Mọi đường hình học dùng nét liền; đoạn thẳng không có mũi tên.
 - Ký hiệu góc đa giác phải nằm trong hình và chỉ xuất hiện một lần cho mỗi góc.
-- Hai góc khác số đo dùng số cung khác nhau; hai góc bằng nhau dùng cùng kiểu cung.
+- Góc đã ghi số đo được phân biệt bằng chính nhãn độ nên có thể cùng dùng một cung gọn; không ép bốn
+  góc khác nhau phải dùng bốn kiểu cung khi helper chỉ hỗ trợ tối đa ba. Các góc bằng nhau không ghi
+  số đo dùng cùng kiểu cung; các nhóm bằng nhau độc lập không ghi số đo dùng kiểu khác nhau.
 - Khi một đỉnh có nhiều góc con, tự ghi số 1, 2 sát các cung để phân biệt.
 - Tia phân giác phải là một nét liền từ đỉnh qua các giao điểm đến cạnh biên đầu tiên của hình.
 - Chỉ vẽ ô vuông cho quan hệ vuông góc thuộc dữ kiện; kết luận cần chứng minh không được tự gắn ký hiệu.
@@ -119,10 +121,28 @@ alwaysApply: true
   bằng cách bỏ điều kiện, trường hợp, đơn vị, căn cứ chứng minh hoặc ý nhỏ mà đề yêu cầu. Quy tắc này
   là khối bắt buộc, không bị prompt quản trị tùy chỉnh ghi đè.
 - Không được thêm “Hướng giải”, “Bước 1/2/3” hoặc “Lưu ý” vào lời giải chi tiết. Với đề nhiều ý chỉ
-  dùng tiêu đề a), b), c); mỗi ý thường gồm 2–5 dòng công thức/suy luận. Không viết lại cùng một dữ
+  dùng tiêu đề a), b), c); mỗi ý thường gồm 3–6 dòng công thức/suy luận, một bài chứng minh thông
+  thường không quá 350 từ. Không viết lại cùng một dữ
   kiện dưới dạng định nghĩa, đẳng thức và câu văn riêng; tên định lý/căn cứ chỉ ghi trong cụm ngắn.
   Trước khi xuất, phải tự kiểm tra mọi phép tính, suy luận, trường hợp và ý nhỏ; không dùng kết luận
   làm giả thiết. Khi có nhiều cách, chọn cách ngắn nhất vẫn chặt chẽ như bài giải của giáo viên.
+- Khi tạo lời giải hoàn chỉnh, không đưa các câu trả lời dài trước đó của trợ lý vào ngữ cảnh vì dễ
+  làm mô hình lặp lại phần giảng. Chỉ giữ các làm rõ gần đây của học sinh; không xuất bản nháp, câu tự
+  sửa như “cần xét lại”, “cách gọn hơn”, “để tránh rối”, hoặc nhiều cách giải cho cùng một ý.
 - Với c cắt hai đường thẳng không song song a, b lần lượt tại A, B: mặc định đặt a và b gần ngang,
   tách thoáng và có độ dốc khác nhau rõ ràng; c là đường cắt chéo. Nếu giao điểm a∩b không được gọi
   tên hay yêu cầu, phải đặt nó ngoài vùng hình chính, không dồn ba đường thành một nút giữa A và B.
+- Trong công cụ công thức, mẫu “Góc” phải cho phép bộ gõ tiếng Việt điền trực tiếp vào ô dưới dấu
+  mũ và giữ dạng `\\widehat{A}`/`\\widehat{ABC}` khi chèn; không để ô vuông dưới mũ rồi đẩy chữ ra
+  ngoài. Chỉ mẫu “Góc (ký hiệu)” mới đổi thành `∠A`/`∠ABC`. Mọi sửa lỗi IME phải kiểm tra cả phân
+  số và các mẫu accent, không được sửa loại này nhưng làm hỏng loại kia.
+- Tứ giác được cho đủ bốn góc phải nhận diện tương đương các dạng Â, `\widehat{A}`, `∠A`, `m∠A`
+  và “góc A”. Nếu mỗi góc nằm trong (0°,180°) và tổng bằng 360°, phải tự tính một tứ giác lồi cân
+  đối có đúng các góc rồi vẽ, không đẩy sang AI thử-sai hoặc hỏi học sinh xác nhận lại phép cộng.
+- Quan hệ đặc biệt bị các số đo đã cho bắt buộc không phải là lỗi “tự ý vẽ hình đặc biệt”. Ví dụ
+  trong tứ giác, A+B=180° bắt buộc AD∥BC; bộ kiểm tra hình thường phải cho phép quan hệ suy ra này
+  nhưng không được tự vẽ dấu song song nếu đề chỉ cho số đo góc.
+- Cả “tam giác cân ABC tại A” và “tam giác ABC cân tại A” đều phải kích hoạt cùng tính chất hình:
+  đánh dấu AB=AC bằng cùng kiểu vạch và đánh dấu ∠B=∠C bằng cùng kiểu cung. Nếu đề chỉ ghi một góc
+  kề đáy, ví dụ ∠B=30°, cung tại B mang số 30° còn C có cung cùng kiểu nhưng không tự lặp số đo;
+  không được chỉ vẽ đúng tọa độ rồi bỏ các ký hiệu tính chất.
