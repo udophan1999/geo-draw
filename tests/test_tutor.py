@@ -81,7 +81,10 @@ class PromptTests(unittest.TestCase):
         self.assertIn("không chép lại đề", prompt)
         self.assertIn("Chỉ dùng ⇔", prompt)
         self.assertIn("Không viết các mục “Hướng giải”, “Bước 1”", prompt)
-        self.assertIn("Mỗi ý a), b), c) thường chỉ gồm 2–5 dòng", prompt)
+        self.assertIn("mỗi ý\n  thường gồm 3–6 dòng", prompt)
+        self.assertIn("không quá 350 từ", prompt)
+        self.assertIn("Cấm xuất bản nháp", prompt)
+        self.assertIn("Không giải thích lại bằng văn xuôi", prompt)
         self.assertIn("lời giải phải chính xác, đủ căn cứ", prompt)
         self.assertIn("tự kiểm tra âm thầm từng phép tính và suy luận", prompt)
         self.assertIn("điều cần chứng minh làm giả thiết", prompt)
@@ -170,7 +173,7 @@ class TutorTurnTests(unittest.TestCase):
         self.assertIn("BẬC GỢI Ý HIỆN TẠI: 1/5", prompt[0]["content"])
 
     def test_deeper_and_solution_change_the_state(self):
-        self.turn(text=TRIANGLE)
+        self.turn(text=TRIANGLE, replies=("Gợi ý cũ rất dài và mang tính hội thoại.",))
         _, prompt = self.turn(action=DEEPER)
         self.assertEqual(self.store.get("alice", self.conversation.id).hint_level, 2)
         self.assertIn("gợi ý sâu hơn", prompt[-1]["content"])
@@ -179,6 +182,10 @@ class TutorTurnTests(unittest.TestCase):
         conversation = self.store.get("alice", self.conversation.id)
         self.assertEqual((conversation.mode, conversation.hint_level), (SOLUTION, 2))
         self.assertNotIn("KHÔNG THỂ GHI ĐÈ", prompt[0]["content"])
+        self.assertNotIn("Gợi ý cũ rất dài", "\n".join(message["content"] for message in prompt))
+        self.assertEqual(prompt[0]["role"], "system")
+        self.assertTrue(all(message["role"] == "user" for message in prompt[1:]))
+        self.assertEqual(prompt[-1]["content"], "Cho em xem lời giải ngắn gọn, đầy đủ nhé.")
         self.assertEqual(len(self.store.messages(self.conversation.id, CHAT)), 6)
 
     def test_detailed_solution_has_a_bounded_output_budget(self):
@@ -189,6 +196,7 @@ class TutorTurnTests(unittest.TestCase):
                 self.store, "alice", self.conversation.id, action=SHOW_SOLUTION, ai=AI,
             )
         self.assertEqual(stream.call_args.kwargs["max_tokens"], SOLUTION_MAX_TOKENS)
+        self.assertEqual(SOLUTION_MAX_TOKENS, 1400)
 
     def test_the_tutor_moves_the_level_as_the_student_progresses(self):
         self.turn(text=TRIANGLE, replies=("Đúng rồi. Em nhớ định lý nào?\n", "[[ba", "c:2]]"))

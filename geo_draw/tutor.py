@@ -27,12 +27,12 @@ ACTIONS = (ASK, DEEPER, SHOW_SOLUTION, BACK_TO_HINTS)
 HISTORY_LIMIT = 32
 HISTORY_MESSAGE_CHARS = 3000
 MAX_USER_MESSAGE_CHARS = 20_000
-SOLUTION_MAX_TOKENS = 3000
+SOLUTION_MAX_TOKENS = 1400
 MESSAGE_TOO_LONG = "Tin nhắn dài hơn 20.000 ký tự; hãy chia đề hoặc câu hỏi thành các phần ngắn hơn."
 
 DEFAULT_TEXT = {
     DEEPER: "Em vẫn chưa nghĩ ra, mình gợi ý sâu hơn một chút được không?",
-    SHOW_SOLUTION: "Cho em xem lời giải chi tiết nhé.",
+    SHOW_SOLUTION: "Cho em xem lời giải ngắn gọn, đầy đủ nhé.",
     BACK_TO_HINTS: "Mình quay lại gợi ý từng bước để em tự làm nhé.",
 }
 
@@ -201,7 +201,13 @@ def _answer(store: ConversationStore, owner: str, conversation_id: str, *,
     model_messages = [{"role": "system",
                        "content": build_system_prompt(problem, mode, level, figure(),
                                                       prompts)}]
-    for message in history[-HISTORY_LIMIT:]:
+    context = history[-HISTORY_LIMIT:]
+    if mode == SOLUTION:
+        # Old tutor replies tend to prime the model to repeat the earlier lesson and produce a
+        # long, conversational solution.  The problem is already present in the system prompt;
+        # retain only recent student clarifications when preparing the final worked solution.
+        context = [message for message in context if message.role == USER][-4:]
+    for message in context:
         if message.text:
             model_messages.append({"role": message.role, "content": _history_text(message.text)})
     model_messages.append({"role": "user", "content": _framed(request, problem, history, mode)})
@@ -317,7 +323,7 @@ def _framed(request: str, problem: str, history: list[Message], mode: str) -> st
     """The first message restates the problem the way a student would ask for help."""
     if history or request != problem:
         return request
-    ask = ("Cho em xem lời giải chi tiết nhé." if mode == SOLUTION
+    ask = ("Cho em xem lời giải ngắn gọn, đầy đủ nhé." if mode == SOLUTION
            else "Em chưa biết bắt đầu từ đâu, mình gợi ý giúp em nhé.")
     return f"Đề bài của em:\n{problem}\n\n{ask}"
 
