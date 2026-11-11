@@ -155,7 +155,8 @@ chi tiết. Hãy trình bày lời giải hoàn chỉnh, chuẩn mực như tron
 - Với hình học, dùng trực tiếp giả thiết trong chuỗi suy luận; không có đoạn riêng chép lại giả thiết
   – kết luận và không chép nguyên văn phát biểu dài của định lý.
 - Kiểm tra điều kiện (mẫu khác 0, căn có nghĩa, nghiệm thỏa điều kiện…) khi cần.
-- Kết thúc bằng dòng **Kết luận:** nêu đáp số hoặc điều cần chứng minh.
+- Kết luận trực tiếp ở cuối mỗi ý bằng “Vậy ...” hoặc một chuỗi suy luận; không thêm mục
+  **Kết luận:** lặp lại toàn bộ các kết quả đã nêu.
 - Viết công thức bằng LaTeX: $...$ trong dòng. Công thức riêng dòng thì đặt $$ trên một
   dòng riêng, công thức ở dòng tiếp theo, rồi $$ trên dòng riêng. Không dùng \\[ \\],
   \\( \\) hay \\tag; muốn đánh số phương trình thì ghi (1), (2) bằng chữ thường sau công thức.
@@ -172,7 +173,7 @@ CONCISE_SOLUTION_RULE = r"""
   như “cần xét lại”, “cách gọn hơn”, “để tránh rối”, hoặc trình bày nhiều cách giải cho cùng một ý.
 - Không mở đầu bằng “Dưới đây là lời giải”, không tóm tắt giả thiết – kết luận và không lặp kết luận
   ở cuối nếu từng ý đã kết luận rõ. Với một bài có nhiều ý, chỉ dùng **a)**, **b)**, **c)**; mỗi ý
-  thường gồm 3–5 dòng suy luận ngắn. Toàn bộ một bài chứng minh thông thường không quá 300 từ.
+  thường gồm 2–4 dòng suy luận ngắn. Toàn bộ một bài chứng minh thông thường không quá 240 từ.
 - Không diễn giải một dữ kiện hai lần. Ví dụ, không viết cả “D là trung điểm BC”, “DB = DC”,
   “D nằm giữa B, C” thành ba câu; chỉ giữ biểu thức cần trực tiếp cho suy luận đang làm.
 - Đặt biểu thức và chuỗi biến đổi ở trung tâm; dùng đúng các ký hiệu =, ⇒, ⇔, ≤, ≥, ∈, ∉, ⟂, ∥,
@@ -183,6 +184,9 @@ CONCISE_SOLUTION_RULE = r"""
   các ý nhỏ mà đề yêu cầu. Nếu có nhiều cách, chọn cách ngắn nhất mà vẫn chặt chẽ ở trình độ đề bài.
 - Mỗi ý chỉ giữ một mạch chứng minh hoàn chỉnh: dữ kiện/kết quả trước ⇒ tính chất cần dùng ⇒ kết luận.
   Không giải thích lại bằng văn xuôi điều vừa thể hiện rõ bằng công thức hoặc ký hiệu.
+- Theo văn phong bài làm trong vở: có thể viết “Xét $\triangle ABH$ và $\triangle CBH$: ...
+  $\Rightarrow\triangle ABH=\triangle CBH$ (c.g.c.) $\Rightarrow AH=CB$”; tên trường hợp bằng nhau,
+  định lý hoặc dấu hiệu nhận biết chỉ ghi trong ngoặc/cụm ngắn, không chép nguyên phát biểu.
 
 Mẫu hình học đúng độ ngắn (không được viết dài hơn chỉ để diễn giải lại):
 **a)**

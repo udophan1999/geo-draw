@@ -27,9 +27,9 @@ ACTIONS = (ASK, DEEPER, SHOW_SOLUTION, BACK_TO_HINTS)
 HISTORY_LIMIT = 32
 HISTORY_MESSAGE_CHARS = 3000
 MAX_USER_MESSAGE_CHARS = 20_000
-SOLUTION_MAX_TOKENS = 1400
-SOLUTION_REWRITE_MAX_TOKENS = 1000
-SOLUTION_WORD_LIMIT = 300
+SOLUTION_MAX_TOKENS = 1200
+SOLUTION_REWRITE_MAX_TOKENS = 900
+SOLUTION_WORD_LIMIT = 240
 MESSAGE_TOO_LONG = "Tin nhắn dài hơn 20.000 ký tự; hãy chia đề hoặc câu hỏi thành các phần ngắn hơn."
 
 _VERBOSE_SOLUTION_PATTERNS = (
@@ -44,7 +44,7 @@ _VERBOSE_SOLUTION_PATTERNS = (
     r"\bđể tránh rối",
 )
 
-SOLUTION_REWRITE_PROMPT = """
+SOLUTION_REWRITE_PROMPT = r"""
 Bạn là biên tập viên lời giải Toán cho học sinh Việt Nam. Hãy kiểm tra tính đúng đắn rồi viết lại
 bản nháp thành lời giải cuối cùng ngắn gọn như bài làm trong vở.
 
@@ -52,9 +52,12 @@ Yêu cầu bắt buộc:
 - Chỉ xuất bản lời giải cuối; âm thầm sửa mọi suy luận sai hoặc thiếu căn cứ trong bản nháp.
 - Không chào hỏi, không chép đề, không có “Tóm tắt hướng giải”, “Giả thiết – Kết luận”, “Bước 1/2”,
   “Lưu ý”, lời tự sửa, hoặc nhiều cách giải cho cùng một ý.
-- Với đề nhiều ý chỉ dùng **a)**, **b)**, **c)**. Mỗi ý là một mạch 3–5 dòng:
+- Với đề nhiều ý chỉ dùng **a)**, **b)**, **c)**. Mỗi ý là một mạch 2–4 dòng:
   dữ kiện/kết quả trước ⇒ tính chất cần dùng ⇒ kết luận.
 - Ưu tiên ký hiệu; văn xuôi chỉ nêu căn cứ cần thiết. Không bỏ ý, điều kiện hoặc trường hợp.
+- Viết theo kiểu bài làm trong vở: “Xét $\triangle...$ và $\triangle...$: ... $\Rightarrow$
+  $\triangle...=\triangle...$ (c.g.c.) $\Rightarrow$ ...”; hoặc nối các đẳng thức/góc bằng một
+  chuỗi $\Rightarrow$. Kết luận trực tiếp bằng “Vậy ...”, không thêm khối tổng kết lặp lại.
 - Một bài thông thường không quá {word_limit} từ.
 """.strip()
 

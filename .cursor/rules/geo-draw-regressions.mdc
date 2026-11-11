@@ -121,8 +121,8 @@ alwaysApply: true
   bằng cách bỏ điều kiện, trường hợp, đơn vị, căn cứ chứng minh hoặc ý nhỏ mà đề yêu cầu. Quy tắc này
   là khối bắt buộc, không bị prompt quản trị tùy chỉnh ghi đè.
 - Không được thêm “Hướng giải”, “Bước 1/2/3” hoặc “Lưu ý” vào lời giải chi tiết. Với đề nhiều ý chỉ
-  dùng tiêu đề a), b), c); mỗi ý thường gồm 3–5 dòng công thức/suy luận, một bài chứng minh thông
-  thường không quá 300 từ. Không viết lại cùng một dữ
+  dùng tiêu đề a), b), c); mỗi ý thường gồm 2–4 dòng công thức/suy luận, một bài chứng minh thông
+  thường không quá 240 từ. Không viết lại cùng một dữ
   kiện dưới dạng định nghĩa, đẳng thức và câu văn riêng; tên định lý/căn cứ chỉ ghi trong cụm ngắn.
   Trước khi xuất, phải tự kiểm tra mọi phép tính, suy luận, trường hợp và ý nhỏ; không dùng kết luận
   làm giả thiết. Khi có nhiều cách, chọn cách ngắn nhất vẫn chặt chẽ như bài giải của giáo viên.
@@ -132,6 +132,9 @@ alwaysApply: true
 - Không phát trực tiếp bản nháp lời giải cho học sinh. Trước khi hiển thị, phải kiểm tra độ dài và các
   mẫu dài dòng (“Tóm tắt hướng giải”, “Giả thiết – Kết luận”, “Bước 1/2”, “Lưu ý”, câu tự sửa); nếu
   vi phạm thì chạy một lượt biên tập âm thầm để kiểm chứng, sửa sai và chỉ xuất bản bản rút gọn.
+- Văn phong chuẩn lấy từ bài làm THCS: nối dữ kiện và kết quả bằng `⇒`; khi xét hai tam giác, liệt kê
+  đủ điều kiện rồi ghi trường hợp bằng nhau trong cụm ngắn như `(c.g.c.)`; kết luận trực tiếp bằng
+  “Vậy ...”. Không bắt buộc mục `Kết luận:` và không chép nguyên văn phát biểu dài của định lý.
 - Với c cắt hai đường thẳng không song song a, b lần lượt tại A, B: mặc định đặt a và b gần ngang,
   tách thoáng và có độ dốc khác nhau rõ ràng; c là đường cắt chéo. Nếu giao điểm a∩b không được gọi
   tên hay yêu cầu, phải đặt nó ngoài vùng hình chính, không dồn ba đường thành một nút giữa A và B.
