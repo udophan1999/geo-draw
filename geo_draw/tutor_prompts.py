@@ -172,7 +172,7 @@ CONCISE_SOLUTION_RULE = r"""
   như “cần xét lại”, “cách gọn hơn”, “để tránh rối”, hoặc trình bày nhiều cách giải cho cùng một ý.
 - Không mở đầu bằng “Dưới đây là lời giải”, không tóm tắt giả thiết – kết luận và không lặp kết luận
   ở cuối nếu từng ý đã kết luận rõ. Với một bài có nhiều ý, chỉ dùng **a)**, **b)**, **c)**; mỗi ý
-  thường gồm 3–6 dòng suy luận ngắn. Toàn bộ một bài chứng minh thông thường không quá 350 từ.
+  thường gồm 3–5 dòng suy luận ngắn. Toàn bộ một bài chứng minh thông thường không quá 300 từ.
 - Không diễn giải một dữ kiện hai lần. Ví dụ, không viết cả “D là trung điểm BC”, “DB = DC”,
   “D nằm giữa B, C” thành ba câu; chỉ giữ biểu thức cần trực tiếp cho suy luận đang làm.
 - Đặt biểu thức và chuỗi biến đổi ở trung tâm; dùng đúng các ký hiệu =, ⇒, ⇔, ≤, ≥, ∈, ∉, ⟂, ∥,
