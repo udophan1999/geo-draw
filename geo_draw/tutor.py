@@ -27,8 +27,39 @@ ACTIONS = (ASK, DEEPER, SHOW_SOLUTION, BACK_TO_HINTS)
 HISTORY_LIMIT = 32
 HISTORY_MESSAGE_CHARS = 3000
 MAX_USER_MESSAGE_CHARS = 20_000
-SOLUTION_MAX_TOKENS = 1400
+SOLUTION_MAX_TOKENS = 1200
+SOLUTION_REWRITE_MAX_TOKENS = 900
+SOLUTION_WORD_LIMIT = 240
 MESSAGE_TOO_LONG = "Tin nhắn dài hơn 20.000 ký tự; hãy chia đề hoặc câu hỏi thành các phần ngắn hơn."
+
+_VERBOSE_SOLUTION_PATTERNS = (
+    r"\bchào\s+em\b",
+    r"\bdưới đây là (?:lời giải|bài giải)",
+    r"\btóm tắt (?:hướng giải|đề bài)",
+    r"\bgiả thiết\s*[-–—]\s*kết luận",
+    r"(?:^|\n)\s*(?:\*\*)?bước\s+\d+",
+    r"(?:^|\n)\s*(?:\*\*)?lưu ý",
+    r"\bcần xét (?:lại|cẩn thận hơn)",
+    r"\bcách (?:trình bày )?gọn hơn",
+    r"\bđể tránh rối",
+)
+
+SOLUTION_REWRITE_PROMPT = r"""
+Bạn là biên tập viên lời giải Toán cho học sinh Việt Nam. Hãy kiểm tra tính đúng đắn rồi viết lại
+bản nháp thành lời giải cuối cùng ngắn gọn như bài làm trong vở.
+
+Yêu cầu bắt buộc:
+- Chỉ xuất bản lời giải cuối; âm thầm sửa mọi suy luận sai hoặc thiếu căn cứ trong bản nháp.
+- Không chào hỏi, không chép đề, không có “Tóm tắt hướng giải”, “Giả thiết – Kết luận”, “Bước 1/2”,
+  “Lưu ý”, lời tự sửa, hoặc nhiều cách giải cho cùng một ý.
+- Với đề nhiều ý chỉ dùng **a)**, **b)**, **c)**. Mỗi ý là một mạch 2–4 dòng:
+  dữ kiện/kết quả trước ⇒ tính chất cần dùng ⇒ kết luận.
+- Ưu tiên ký hiệu; văn xuôi chỉ nêu căn cứ cần thiết. Không bỏ ý, điều kiện hoặc trường hợp.
+- Viết theo kiểu bài làm trong vở: “Xét $\triangle...$ và $\triangle...$: ... $\Rightarrow$
+  $\triangle...=\triangle...$ (c.g.c.) $\Rightarrow$ ...”; hoặc nối các đẳng thức/góc bằng một
+  chuỗi $\Rightarrow$. Kết luận trực tiếp bằng “Vậy ...”, không thêm khối tổng kết lặp lại.
+- Một bài thông thường không quá {word_limit} từ.
+""".strip()
 
 DEFAULT_TEXT = {
     DEEPER: "Em vẫn chưa nghĩ ra, mình gợi ý sâu hơn một chút được không?",
@@ -221,11 +252,14 @@ def _answer(store: ConversationStore, owner: str, conversation_id: str, *,
                 ai, model_messages, max_tokens=SOLUTION_MAX_TOKENS if mode == SOLUTION else 1500):
             reply_text += piece
             shown = hidden.feed(piece)
-            if shown:
+            if shown and mode != SOLUTION:
                 emit("delta", {"text": shown})
         reply_text, reported_level, done = read_progress(reply_text)
         if not reply_text.strip():
             raise ValueError("AI không trả về nội dung. Hãy thử lại.")
+        if mode == SOLUTION:
+            reply_text = _revise_solution_if_needed(ai, problem, reply_text, emit)
+            emit("delta", {"text": reply_text})
         if mode == HINT:
             level = max(level, clamp_level(reported_level or level))
             solved = solved or done
@@ -243,6 +277,39 @@ def _answer(store: ConversationStore, owner: str, conversation_id: str, *,
                 store.rename(owner, conversation_id, title)
     emit("conversation", store.get(owner, conversation_id))
     return reply
+
+
+def _solution_word_limit(problem: str) -> int:
+    """Allow the normal cap per independent exercise, not per sub-question a), b), c)."""
+    return SOLUTION_WORD_LIMIT * max(1, multiple_problem_count(problem))
+
+
+def _solution_needs_revision(text: str, problem: str) -> bool:
+    """Detect output that is too long or visibly resembles an internal teaching draft."""
+    plain = re.sub(r"\\[A-Za-z]+", " ", text)
+    words = re.findall(r"\w+", plain, flags=re.UNICODE)
+    if len(words) > _solution_word_limit(problem):
+        return True
+    return any(re.search(pattern, text, flags=re.IGNORECASE | re.MULTILINE)
+               for pattern in _VERBOSE_SOLUTION_PATTERNS)
+
+
+def _revise_solution_if_needed(ai: AiSettings, problem: str, draft: str,
+                               emit: EventCallback) -> str:
+    """Run one silent correctness-and-concision pass before showing a verbose solution."""
+    if not _solution_needs_revision(draft, problem):
+        return draft.strip()
+    emit("progress", {"stage": "thinking", "label": "Đang kiểm tra và rút gọn lời giải..."})
+    word_limit = _solution_word_limit(problem)
+    messages = [
+        {"role": "system", "content": SOLUTION_REWRITE_PROMPT.format(word_limit=word_limit)},
+        {"role": "user", "content": f"ĐỀ BÀI:\n{problem}\n\nBẢN NHÁP:\n{draft}"},
+    ]
+    try:
+        revised = _request_chat(ai, messages, max_tokens=SOLUTION_REWRITE_MAX_TOKENS).strip()
+    except ValueError:
+        return draft.strip()
+    return revised or draft.strip()
 
 
 TITLE_PROMPT = """

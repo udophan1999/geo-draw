@@ -12,9 +12,11 @@ from geo_draw.conversations import (
     ASSISTANT, CHAT, FIGURE, HINT, SOLUTION, USER, ConversationStore,
 )
 from geo_draw.tutor import (
-    DEEPER, GENERIC, SHOW_SOLUTION, SOLUTION_MAX_TOKENS, SPECIFIC, drawing_request,
-    editable_message_ids, is_geometry_problem, is_solid_problem, record_canned_reply,
-    rerun_tutor_turn, run_tutor_turn, should_auto_draw_geometry, suggest_title,
+    DEEPER, GENERIC, SHOW_SOLUTION, SOLUTION_MAX_TOKENS, SOLUTION_REWRITE_MAX_TOKENS,
+    SOLUTION_WORD_LIMIT, SOLUTION_REWRITE_PROMPT, SPECIFIC, _solution_needs_revision,
+    drawing_request, editable_message_ids,
+    is_geometry_problem, is_solid_problem, record_canned_reply, rerun_tutor_turn,
+    run_tutor_turn, should_auto_draw_geometry, suggest_title,
 )
 from geo_draw.tutor_prompts import (
     ACCESSIBLE_QUESTION_RULE, CONCISE_SOLUTION_RULE, FIGURE_DRAWING, FIGURE_NONE,
@@ -75,14 +77,16 @@ class PromptTests(unittest.TestCase):
 
     def test_solution_prompt_has_no_guardrail(self):
         prompt = build_system_prompt(TRIANGLE, SOLUTION, 3)
-        self.assertIn("**Kết luận:**", prompt)
+        self.assertIn("Kết luận trực tiếp ở cuối mỗi ý", prompt)
+        self.assertIn("không thêm mục\n  **Kết luận:** lặp lại", prompt)
         self.assertIn(CONCISE_SOLUTION_RULE, prompt)
         self.assertIn("Ưu tiên công thức, phép biến đổi và ký hiệu toán học", prompt)
         self.assertIn("không chép lại đề", prompt)
         self.assertIn("Chỉ dùng ⇔", prompt)
         self.assertIn("Không viết các mục “Hướng giải”, “Bước 1”", prompt)
-        self.assertIn("mỗi ý\n  thường gồm 3–6 dòng", prompt)
-        self.assertIn("không quá 350 từ", prompt)
+        self.assertIn("mỗi ý\n  thường gồm 2–4 dòng", prompt)
+        self.assertIn("không quá 240 từ", prompt)
+        self.assertIn("$\\Rightarrow\\triangle ABH=\\triangle CBH$ (c.g.c.)", prompt)
         self.assertIn("Cấm xuất bản nháp", prompt)
         self.assertIn("Không giải thích lại bằng văn xuôi", prompt)
         self.assertIn("lời giải phải chính xác, đủ căn cứ", prompt)
@@ -191,12 +195,46 @@ class TutorTurnTests(unittest.TestCase):
     def test_detailed_solution_has_a_bounded_output_budget(self):
         self.turn(text=TRIANGLE)
         with patch("geo_draw.tutor.stream_chat", return_value=iter(["**Kết luận:** $BC=5$. "])) as stream, \
-                patch("geo_draw.tutor._request_chat", side_effect=ValueError("offline")):
+                patch("geo_draw.tutor._request_chat") as request:
             run_tutor_turn(
                 self.store, "alice", self.conversation.id, action=SHOW_SOLUTION, ai=AI,
             )
         self.assertEqual(stream.call_args.kwargs["max_tokens"], SOLUTION_MAX_TOKENS)
-        self.assertEqual(SOLUTION_MAX_TOKENS, 1400)
+        self.assertEqual(SOLUTION_MAX_TOKENS, 1200)
+        self.assertEqual(SOLUTION_WORD_LIMIT, 240)
+        request.assert_not_called()
+
+    def test_verbose_solution_is_rewritten_before_it_is_shown(self):
+        self.turn(text=TRIANGLE)
+        self.events.clear()
+        draft = (
+            "**Tóm tắt hướng giải:** Ta dùng định lý Pythagore.\n"
+            "**Giả thiết – Kết luận:** AB=3, AC=4.\n"
+            "**Bước 1:** Tính cạnh huyền.\n**Bước 2:** Kết luận."
+        )
+        concise = "**Lời giải:** $BC=\\sqrt{AB^2+AC^2}=5$.\n\n**Kết luận:** $BC=5$."
+        with patch("geo_draw.tutor.stream_chat", return_value=iter([draft])), \
+                patch("geo_draw.tutor._request_chat", return_value=concise) as request:
+            _, reply = run_tutor_turn(
+                self.store, "alice", self.conversation.id, action=SHOW_SOLUTION, ai=AI,
+                on_event=lambda kind, data: self.events.append((kind, data)),
+            )
+        self.assertEqual(reply.text, concise)
+        shown = "".join(data["text"] for kind, data in self.events if kind == "delta")
+        self.assertEqual(shown, concise)
+        self.assertNotIn("Bước 1", shown)
+        self.assertEqual(request.call_args.kwargs["max_tokens"], SOLUTION_REWRITE_MAX_TOKENS)
+        self.assertEqual(SOLUTION_REWRITE_MAX_TOKENS, 900)
+        self.assertIn("Mỗi ý là một mạch 2–4 dòng", SOLUTION_REWRITE_PROMPT)
+        self.assertIn("Kết luận trực tiếp bằng “Vậy ...”", SOLUTION_REWRITE_PROMPT)
+        rewrite_messages = request.call_args.args[1]
+        self.assertIn(TRIANGLE, rewrite_messages[-1]["content"])
+        self.assertIn(draft, rewrite_messages[-1]["content"])
+
+    def test_solution_quality_gate_detects_verbose_drafts(self):
+        self.assertTrue(_solution_needs_revision("**Bước 1:** Chứng minh.", TRIANGLE))
+        self.assertTrue(_solution_needs_revision("từ " * 241, TRIANGLE))
+        self.assertFalse(_solution_needs_revision("$BC=\\sqrt{3^2+4^2}=5$.", TRIANGLE))
 
     def test_the_tutor_moves_the_level_as_the_student_progresses(self):
         self.turn(text=TRIANGLE, replies=("Đúng rồi. Em nhớ định lý nào?\n", "[[ba", "c:2]]"))
