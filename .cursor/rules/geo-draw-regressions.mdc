@@ -151,4 +151,9 @@ alwaysApply: true
 - Cả “tam giác cân ABC tại A” và “tam giác ABC cân tại A” đều phải kích hoạt cùng tính chất hình:
   đánh dấu AB=AC bằng cùng kiểu vạch và đánh dấu ∠B=∠C bằng cùng kiểu cung. Nếu đề chỉ ghi một góc
   kề đáy, ví dụ ∠B=30°, cung tại B mang số 30° còn C có cung cùng kiểu nhưng không tự lặp số đo;
-  không được chỉ vẽ đúng tọa độ rồi bỏ các ký hiệu tính chất.
+  không được chỉ vẽ đúng tọa độ rồi bỏ các ký hiệu tính chất. Tính từ loại góc như “nhọn” trong
+  “tam giác nhọn ABC cân tại A” không được làm mất nhận diện tam giác cân.
+- Khi câu chứng minh giới thiệu một đường tròn được xác định duy nhất bằng tâm và đường kính, chẳng
+  hạn “đường tròn tâm O đường kính BC”, phải dựng đường tròn đó như đối tượng tham chiếu của bài và
+  dựng tâm O. Chỉ loại phần kết luận theo sau như “đi qua H, K”, hai cung bằng nhau hay số đo cung;
+  không được vừa cấm đường tròn vì nằm sau từ “chứng minh” vừa bắt buộc điểm O khiến hình luôn lỗi.
