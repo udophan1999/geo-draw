@@ -805,6 +805,28 @@ class GeoScene(Scene):
                 with self.assertRaisesRegex(ValueError, "phần cần chứng minh"):
                     validate_code(code, problem=problem)
 
+    def test_center_diameter_circle_in_proof_goal_is_kept_as_reference_object(self):
+        problem = (
+            "Cho tam giác nhọn ABC cân tại A. Từ B và C kẻ lần lượt hai đường cao "
+            "BH và CK của tam giác ABC. "
+            "a) Chứng minh rằng đường tròn tâm O đường kính BC đi qua K và H. "
+            "b) Chứng minh rằng hai cung nhỏ BH và CK bằng nhau. "
+            "c) Tính số đo của cung nhỏ KH nếu góc BAC = 40°."
+        )
+        facts = _drawing_facts_text(problem)
+        self.assertIn("đường tròn tâm O đường kính BC", facts)
+        self.assertNotIn("đi qua K và H", facts)
+        self.assertNotIn("hai cung nhỏ BH và CK bằng nhau", facts)
+
+        result = generate_manim_code(problem, AiSettings(api_key="test-key"), False)
+
+        self.assertTrue(result.ok, result.error)
+        self.assertIn("Circle(radius=", result.code)
+        self.assertIn("altitude_segment(B, H, A, C)", result.code)
+        self.assertIn("altitude_segment(C, K, A, B)", result.code)
+        self.assertIn("equal_segment_marks((A, B), (A, C), count=1)", result.code)
+        self.assertIn("degrees=40", result.code)
+
     def test_circle_stated_in_givens_is_allowed(self):
         code = """from manim import *
 import numpy as np
