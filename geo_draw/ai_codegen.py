@@ -1046,8 +1046,8 @@ def _isosceles_triangle_facts(
     folded = _fold_geometry_notation(_drawing_facts_text(text))
     folded = re.sub(r"\s+", " ", folded).strip()
     match = re.search(
-        r"TAM GIAC CAN ([A-Z]{3}) TAI ([A-Z])"
-        r"|TAM GIAC ([A-Z]{3}) (?:LA )?CAN TAI ([A-Z])",
+        r"TAM GIAC (?:NHON )?CAN ([A-Z]{3}) TAI ([A-Z])"
+        r"|TAM GIAC (?:NHON )?([A-Z]{3}) (?:LA )?CAN TAI ([A-Z])",
         folded,
     )
     if not match:
@@ -1139,6 +1139,76 @@ class GeoScene(Scene):
             equal_segment_marks(({apex}, {bases[0]}), ({apex}, {bases[1]}), count=1),
 {markers}
 {labels}
+        )
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
+def _isosceles_two_altitudes_diameter_circle_scene(
+    problem: str, animate: bool,
+) -> str | None:
+    """Build the standard ABC isosceles configuration with BH, CK and (O; BC)."""
+    facts = _isosceles_triangle_facts(problem)
+    folded = re.sub(r"\s+", " ", _fold_geometry_notation(problem)).strip()
+    if facts is None:
+        return None
+    names, apex, _measures, _base_angle = facts
+    if names != "ABC" or apex != "A":
+        return None
+    has_two_altitudes = bool(re.search(
+        r"TU B VA C KE LAN LUOT(?: HAI)? DUONG CAO BH VA CK",
+        folded,
+    ))
+    has_diameter_circle = bool(re.search(
+        r"DUONG TRON TAM O DUONG KINH BC",
+        folded,
+    ))
+    if not (has_two_altitudes and has_diameter_circle):
+        return None
+
+    apex_measure = re.search(
+        r"(?:GOC\s*)?BAC\s*(?:=|BANG)\s*(\d+(?:[.,]\d+)?)\s*(?:°|DO)?",
+        folded,
+    )
+    apex_angle = float(apex_measure.group(1).replace(",", ".")) if apex_measure else 50.0
+    if not 10.0 <= apex_angle < 90.0:
+        return None
+    half_base = 2.6
+    height = half_base / math.tan(math.radians(apex_angle / 2.0))
+    base_y = -height / 2.0
+    apex_y = height / 2.0
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, altitude_segment, equal_segment_marks, fit_scene_to_frame, interior_angle_marker, safe_point_label
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        A = np.array([0.0, {apex_y:.8f}, 0.0])
+        B = np.array([-{half_base:.8f}, {base_y:.8f}, 0.0])
+        C = np.array([{half_base:.8f}, {base_y:.8f}, 0.0])
+        O = (B + C) / 2
+        H = A + np.dot(B - A, C - A) / np.dot(C - A, C - A) * (C - A)
+        K = A + np.dot(C - A, B - A) / np.dot(B - A, B - A) * (B - A)
+        circle = Circle(radius=np.linalg.norm(C - B) / 2, color=BLACK).move_to(O)
+        self.add(
+            circle,
+            Line(A, B), Line(B, C), Line(C, A),
+            altitude_segment(B, H, A, C),
+            altitude_segment(C, K, A, B),
+            equal_segment_marks((A, B), (A, C), count=1),
+            interior_angle_marker([A, B, C], 0, degrees={apex_angle:g}, mark_count=2),
+            interior_angle_marker([A, B, C], 1, mark_count=1),
+            interior_angle_marker([A, B, C], 2, mark_count=1),
+            Dot(A), Dot(B), Dot(C), Dot(H), Dot(K), Dot(O),
+            safe_point_label(A, "A", B, C, H, K),
+            safe_point_label(B, "B", A, C, H, O),
+            safe_point_label(C, "C", A, B, K, O),
+            safe_point_label(H, "H", A, B, C, O, distance=0.42),
+            safe_point_label(K, "K", A, B, C, O, distance=0.42),
+            safe_point_label(O, "O", B, C, H, K, distance=0.42),
         )
         fit_scene_to_frame(self)
         {wait}
@@ -1599,6 +1669,21 @@ def _drawing_facts_text(problem: str) -> str:
             given = parts[0].strip()
             if not in_proof and given:
                 facts.append(given)
+            # A proof goal can introduce a fully specified reference object that
+            # the remaining exercise parts need in order to be readable. Keep
+            # only the circle construction itself, never the claimed incidence
+            # that follows it. This is deliberately narrower than accepting a
+            # generic "cùng thuộc một đường tròn" conclusion.
+            reference_circle = re.search(
+                r"đường\s+tròn\s+(?:tâm\s+[A-Z]|\(\s*[A-Z]\s*\))\s*,?\s*"
+                r"(?:có\s+)?đường\s+kính\s+[A-Z]{2}\b",
+                parts[1],
+                flags=re.I,
+            )
+            if reference_circle:
+                construction = re.sub(r"\s+", " ", reference_circle.group(0)).strip()
+                if construction not in facts:
+                    facts.append(construction)
             in_proof = True
         elif not in_proof:
             facts.append(clause)
@@ -2066,8 +2151,8 @@ def validate_code(code: str, problem: str | None = None) -> None:
             ))
         parent_equalities = {frozenset((left, right)) for left, right in stated_equalities}
         for match in re.finditer(
-            r"tam\s+giác\s+(?:(?:vuông\s+)?cân\s+([A-Z]{3})\s+tại\s+([A-Z])"
-            r"|([A-Z]{3})\s+(?:là\s+)?(?:vuông\s+)?cân\s+tại\s+([A-Z]))",
+            r"tam\s+giác\s+(?:(?:nhọn\s+)?(?:vuông\s+)?cân\s+([A-Z]{3})\s+tại\s+([A-Z])"
+            r"|(?:nhọn\s+)?([A-Z]{3})\s+(?:là\s+)?(?:vuông\s+)?cân\s+tại\s+([A-Z]))",
             drawing_facts,
             re.I,
         ):
@@ -2980,21 +3065,25 @@ def _stated_triangle_conditions(problem: str | None) -> list[tuple[str, str | No
             if item not in conditions:
                 conditions.append(item)
     for match in re.finditer(
-        r"TAM\s+GIAC\s+CAN\s+([A-Z]{3})\s+TAI\s+([A-Z])", facts,
+        r"TAM\s+GIAC\s+(?:NHON\s+)?CAN\s+([A-Z]{3})\s+TAI\s+([A-Z])", facts,
     ):
         item = (match.group(1), match.group(2), None)
         if item not in conditions:
             conditions.append(item)
     triangle_names = {
         match.group(1)
-        for match in re.finditer(r"TAM\s+GIAC\s+([A-Z]{3})(?![A-Z])", facts)
+        for match in re.finditer(
+            r"TAM\s+GIAC\s+(?:NHON\s+)?([A-Z]{3})(?![A-Z])", facts,
+        )
     }
     for names in triangle_names:
         isosceles = re.search(
-            rf"TAM\s+GIAC\s+{names}\s+(?:LA\s+)?CAN\s+TAI\s+([A-Z])", facts,
+            rf"TAM\s+GIAC\s+(?:NHON\s+)?{names}\s+(?:LA\s+)?CAN\s+TAI\s+([A-Z])",
+            facts,
         )
         right = re.search(
-            rf"TAM\s+GIAC\s+{names}\s+(?:LA\s+)?VUONG\s+TAI\s+([A-Z])", facts,
+            rf"TAM\s+GIAC\s+(?:NHON\s+)?{names}\s+(?:LA\s+)?VUONG\s+TAI\s+([A-Z])",
+            facts,
         )
         if isosceles or right:
             item = (
@@ -3792,7 +3881,8 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
                         repair_log: str | None = None,
                         previous_code: str | None = None) -> AiResult:
     deterministic = (
-        _isosceles_triangle_scene(problem, animate)
+        _isosceles_two_altitudes_diameter_circle_scene(problem, animate)
+        or _isosceles_triangle_scene(problem, animate)
         or _quadrilateral_with_angles_scene(problem, animate)
         or _transversal_numbered_angles_scene(problem, animate)
         or _primed_parallel_transversal_scene(problem, animate)
