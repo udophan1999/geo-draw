@@ -361,7 +361,13 @@ class ChatTests(ApiTestCase):
     def test_asking_for_a_drawing_in_the_chat_draws_it(self):
         client = self.client()
         self.use_parser(client)
-        started = self.send(client, WORD_PROBLEM).json()
+        # The parser only draws figures with named vertices, and those are drawn on the first
+        # turn by themselves: switch that off so the figure only comes when the student asks.
+        auto_draw = patch("api.routers.messages.should_auto_draw_geometry", return_value=False)
+        auto_draw.start()
+        self.addCleanup(auto_draw.stop)
+        started = self.send(client, "Mảnh vườn hình chữ nhật ABCD có chu vi 34 m. "
+                                    "Tính chiều dài và chiều rộng.").json()
         read_events(client, started["job_id"])
         conversation_id = started["conversation"]["id"]
         system_prompt = self.tutor_stream.call_args.args[1][0]["content"]

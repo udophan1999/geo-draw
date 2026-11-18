@@ -99,7 +99,10 @@ def start_figure_job(state: AppState, owner: Owner, conversation: Conversation,
         raise HTTPException(422, "Chưa có đề bài để vẽ hình.")
     settings = load_settings(owner)
     # Checked before any quota is spent: the AI would otherwise invent a figure.
-    kind = drawing_kind(owner.store.problem_of(conversation) or text)
+    # A later request can bring its own figure (a geometry photo after an equation), so
+    # the request text counts when the conversation's problem has nothing to draw.
+    problem = owner.store.problem_of(conversation)
+    kind = (drawing_kind(problem) if problem else None) or (drawing_kind(text) if text else None)
     if kind is None:
         raise HTTPException(422, NOT_DRAWABLE)
     if kind == GRAPH and settings.mode != "ai":
