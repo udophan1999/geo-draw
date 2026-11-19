@@ -1089,6 +1089,24 @@ def _isosceles_triangle_scene(problem: str, animate: bool) -> str | None:
         return None
     names, apex, measures, base_angle = facts
     bases = [name for name in names if name != apex]
+    folded = re.sub(r"\s+", " ", _fold_geometry_notation(problem)).strip()
+    midpoint_matches = [
+        (match.group(1).upper(), tuple(sorted(match.group(2).upper())))
+        for match in re.finditer(
+            r"\b([A-Z])\s+LA\s+TRUNG\s+DIEM\s+(?:CUA\s+)?([A-Z]{2})\b",
+            folded,
+        )
+    ]
+    base_parent = tuple(sorted(bases))
+    unsupported_midpoints = [
+        relation for relation in midpoint_matches if relation[1] != base_parent
+    ]
+    if unsupported_midpoints:
+        return None
+    base_midpoint = next(
+        (midpoint for midpoint, parent in midpoint_matches if parent == base_parent),
+        None,
+    )
     half_base = 3.0
     height = half_base * math.tan(math.radians(base_angle))
     scale = min(1.0, 3.8 / max(height, 0.1))
@@ -1124,21 +1142,35 @@ def _isosceles_triangle_scene(problem: str, animate: bool) -> str | None:
         f"avoid_points=({', '.join(other for other in names if other != name)},)),"
         for name in names
     )
+    midpoint_definition = ""
+    midpoint_objects = ""
+    midpoint_import = ""
+    if base_midpoint is not None:
+        midpoint_import = ", midpoint_marker"
+        midpoint_definition = (
+            f"\n        {base_midpoint} = ({bases[0]} + {bases[1]}) / 2.0"
+        )
+        midpoint_objects = f'''\n            midpoint_marker({base_midpoint}, {bases[0]}, {bases[1]},
+                            other_points=({apex},), count=2),
+            Dot({base_midpoint}),
+            safe_point_label({base_midpoint}, "{base_midpoint}", {apex}, {bases[0]}, {bases[1]},
+                             avoid_points=({apex}, {bases[0]}, {bases[1]}), distance=0.38),'''
     wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
     return f'''from manim import *
 import numpy as np
-from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, interior_angle_marker, safe_point_label
+from geo_draw.geometry_primitives import apply_light_theme, equal_segment_marks, fit_scene_to_frame, interior_angle_marker, safe_point_label{midpoint_import}
 
 class GeoScene(Scene):
     def construct(self):
         apply_light_theme(self)
-{point_lines}
+{point_lines}{midpoint_definition}
         self.add(
             Line({names[0]}, {names[1]}), Line({names[1]}, {names[2]}), Line({names[2]}, {names[0]}),
             Dot({names[0]}), Dot({names[1]}), Dot({names[2]}),
             equal_segment_marks(({apex}, {bases[0]}), ({apex}, {bases[1]}), count=1),
 {markers}
 {labels}
+{midpoint_objects}
         )
         fit_scene_to_frame(self)
         {wait}
