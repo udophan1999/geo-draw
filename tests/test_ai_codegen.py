@@ -106,6 +106,20 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("equal_segment_marks((M, N), (M, P), count=1)", code)
         self.assertEqual(code.count("interior_angle_marker("), 2)
 
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_isosceles_triangle_with_base_midpoint_is_built_exactly(self, request_chat):
+        problem = "Vẽ tam giác ABC cân tại A, có H là trung điểm BC"
+
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertIn("H = (B + C) / 2.0", result.code)
+        self.assertIn("midpoint_marker(H, B, C", result.code)
+        self.assertIn("other_points=(A,), count=2", result.code)
+        self.assertIn('safe_point_label(H, "H"', result.code)
+        self.assertIn("equal_segment_marks((A, B), (A, C), count=1)", result.code)
+
     def test_quadrilateral_angles_accept_words_hats_and_angle_symbols(self):
         variants = (
             "Vẽ tứ giác ABCD có Â = 108°, ∠B = 72°, góc C bằng 65 độ, ∡D = 115°",
