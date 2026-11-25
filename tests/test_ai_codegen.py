@@ -15,6 +15,8 @@ from geo_draw.ai_codegen import (
     _ensure_light_theme,
     _normalize_geometry_notation,
     _ordinary_polygons,
+    _parallelogram_ray_ratio_facts,
+    _parallelogram_ray_ratio_scene,
     _primed_parallel_transversal_facts,
     _primed_parallel_transversal_scene,
     _quadrilateral_angle_facts,
@@ -47,6 +49,39 @@ class GeoScene(Scene):
 
 
 class AiCodegenTests(unittest.TestCase):
+    def test_parallelogram_ray_ratio_is_parsed_and_built_deterministically(self):
+        problem = (
+            "Cho hình bình hành ABCD. Lấy điểm P trên tia AB sao cho AP = 2AB. "
+            "a) Tứ giác BPCD có phải là hình bình hành không? Tại sao?"
+        )
+        self.assertEqual(
+            _parallelogram_ray_ratio_facts(problem),
+            ("ABCD", "P", "AB", 2.0),
+        )
+        code = _parallelogram_ray_ratio_scene(problem, animate=False)
+        self.assertIsNotNone(code)
+        self.assertIn("P = A + 2.00000000 * (B - A)", code)
+        self.assertIn("carrier_ray = ray(A, B, length=6.80000000)", code)
+        self.assertIn('Text("AP = 2AB"', code)
+        self.assertIn("Line(P, C)", code)
+        self.assertIn("Line(D, B)", code)
+        validate_code(code, problem=problem)
+
+    @patch("geo_draw.ai_codegen._request_chat")
+    def test_parallelogram_ray_ratio_does_not_call_ai(self, request_chat):
+        problem = (
+            "3.43. Cho hình bình hành ABCD. Lấy điểm P trên tia AB sao cho AP = 2AB. "
+            "a) Tứ giác BPCD có phải là hình bình hành không? Tại sao?"
+        )
+        result = generate_manim_code(problem, AiSettings(api_key="unused"), animate=False)
+        self.assertTrue(result.ok, result.detail or result.error)
+        request_chat.assert_not_called()
+        self.assertIn("P = A + 2.00000000 * (B - A)", result.code)
+        self.assertIn("Line(B, P)", result.code)
+        self.assertIn("Line(P, C)", result.code)
+        self.assertIn("Line(C, D)", result.code)
+        self.assertIn("Line(D, B)", result.code)
+
     def test_isosceles_triangle_accepts_both_word_orders_and_marks_properties(self):
         variants = (
             "Vẽ tam giác cân ABC tại A có ∠B = 30°",

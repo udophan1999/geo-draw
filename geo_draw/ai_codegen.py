@@ -612,6 +612,87 @@ class GeoScene(Scene):
 '''
 
 
+def _parallelogram_ray_ratio_facts(
+    text: str,
+) -> tuple[str, str, str, float] | None:
+    """Recognize a point placed beyond a parallelogram side by a stated ray ratio."""
+    facts = _fold_geometry_notation(_drawing_facts_text(text))
+    facts = re.sub(r"\s+", " ", facts).strip()
+    polygon = re.search(r"\bHINH BINH HANH\s+([A-Z]{4})(?![A-Z])", facts)
+    if polygon is None or len(set(polygon.group(1))) != 4:
+        return None
+    relation = re.search(
+        r"(?:LAY|GOI)?\s*(?:DIEM\s+)?([A-Z])\s+TREN\s+TIA\s+([A-Z]{2})\s+"
+        r"SAO CHO\s+([A-Z]{2})\s*=\s*(\d+(?:[.,]\d+)?)\s*([A-Z]{2})",
+        facts,
+    )
+    if relation is None:
+        return None
+    point, carrier, measured, ratio_text, reference = relation.groups()
+    ratio = float(ratio_text.replace(",", "."))
+    if (
+        point in polygon.group(1)
+        or carrier[0] == carrier[1]
+        or carrier[0] + point != measured
+        or reference != carrier
+        or carrier[0] not in polygon.group(1)
+        or carrier[1] not in polygon.group(1)
+        or not 1.05 <= ratio <= 6.0
+    ):
+        return None
+    return polygon.group(1), point, carrier, ratio
+
+
+def _parallelogram_ray_ratio_scene(problem: str, animate: bool) -> str | None:
+    """Draw a parallelogram and a ratio point beyond one of its boundary vertices."""
+    facts = _parallelogram_ray_ratio_facts(problem)
+    if facts is None:
+        return None
+    names, point_name, carrier, ratio = facts
+    if carrier != names[:2]:
+        return None
+    A, B, C, D = names
+    edge_length = min(3.0, 6.0 / ratio)
+    b_x = -3.0 + edge_length
+    c_x = b_x + 1.0
+    ray_length = ratio * edge_length + 0.8
+    wait = "self.wait(0.5)" if animate else "self.wait(0.1)"
+    ratio_label = f"{ratio:g}"
+    return f'''from manim import *
+import numpy as np
+from geo_draw.geometry_primitives import apply_light_theme, fit_scene_to_frame, ray, safe_point_label, upright_polygon_check
+
+class GeoScene(Scene):
+    def construct(self):
+        apply_light_theme(self)
+        {A} = np.array([-3.0, -1.2, 0.0])
+        {B} = np.array([{b_x:.8f}, -1.2, 0.0])
+        {D} = np.array([-2.0, 1.5, 0.0])
+        {C} = np.array([{c_x:.8f}, 1.5, 0.0])
+        {point_name} = {A} + {ratio:.8f} * ({B} - {A})
+        carrier_ray = ray({A}, {B}, length={ray_length:.8f})
+        given_boundary = VGroup(
+            Line({B}, {C}), Line({C}, {D}), Line({D}, {A}),
+        )
+        proof_boundary = VGroup(Line({point_name}, {C}), Line({D}, {B}))
+        ratio_text = Text("{A}{point_name} = {ratio_label}{A}{B}", font_size=24).next_to(
+            Line({A}, {point_name}), DOWN, buff=0.28,
+        )
+        self.add(carrier_ray, given_boundary, proof_boundary, ratio_text)
+        self.add(Dot({A}), Dot({B}), Dot({C}), Dot({D}), Dot({point_name}))
+        self.add(
+            safe_point_label({A}, "{A}", {B}, {D}),
+            safe_point_label({B}, "{B}", {A}, {C}, {point_name}, {D}),
+            safe_point_label({C}, "{C}", {B}, {D}, {point_name}),
+            safe_point_label({D}, "{D}", {A}, {C}, {B}),
+            safe_point_label({point_name}, "{point_name}", {B}, {C}),
+        )
+        upright_polygon_check([{A}, {B}, {C}, {D}], names="{names}")
+        fit_scene_to_frame(self)
+        {wait}
+'''
+
+
 def _primed_parallel_transversal_scene(problem: str, animate: bool) -> str | None:
     """Draw two primed-name parallel carriers and one full transversal through A and B."""
     facts = _primed_parallel_transversal_facts(problem)
@@ -3915,6 +3996,7 @@ def generate_manim_code(problem: str, settings: AiSettings, animate: bool,
     deterministic = (
         _isosceles_two_altitudes_diameter_circle_scene(problem, animate)
         or _isosceles_triangle_scene(problem, animate)
+        or _parallelogram_ray_ratio_scene(problem, animate)
         or _quadrilateral_with_angles_scene(problem, animate)
         or _transversal_numbered_angles_scene(problem, animate)
         or _primed_parallel_transversal_scene(problem, animate)

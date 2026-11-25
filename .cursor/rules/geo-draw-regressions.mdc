@@ -1,6 +1,8 @@
 ---
 description: Quy tắc chống tái phát lỗi dựng hình THCS của geo-draw
 alwaysApply: true
+- Dữ kiện “P thuộc tia AB, AP = k·AB” với k > 1 đã đủ xác định: A, B, P thẳng hàng theo thứ tự
+  A-B-P; phải dựng P ngoài B, kéo tia AB qua P và giữ đúng tỉ số, không báo đề thiếu dữ kiện.
 ---
 
 # Geo-draw: bộ nhớ lỗi đã sửa
