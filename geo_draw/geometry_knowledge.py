@@ -39,6 +39,9 @@ GEOMETRY_HELP_VI = """
 DRAWING_ERROR_MEMORY = r"""
 
 NON-REGRESSION MEMORY -- previously corrected drawing failures:
+- A statement such as “P lies on ray AB and AP = 2AB” is already fully determined: place P beyond
+  B with A-B-P collinear, draw the complete ray from A through B past P, and preserve the exact
+  ratio. Do not ask for another position description or reject the construction as ambiguous.
 - Every confirmed drawing bug and its accepted fix is a permanent regression contract. Preserve
   the corresponding regression test and all earlier contracts in every later change; never fix a
   new case by reintroducing an old failure or by weakening/removing its guard.
