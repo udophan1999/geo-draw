@@ -63,6 +63,7 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("P = A + 2.00000000 * (B - A)", code)
         self.assertIn("carrier_ray = ray(A, B, length=6.80000000)", code)
         self.assertIn('Text("AP = 2AB"', code)
+        self.assertIn(".shift(RIGHT * 1.05)", code)
         self.assertIn("Line(P, C)", code)
         self.assertIn("Line(D, B)", code)
         validate_code(code, problem=problem)
@@ -81,6 +82,7 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("Line(P, C)", result.code)
         self.assertIn("Line(C, D)", result.code)
         self.assertIn("Line(D, B)", result.code)
+        self.assertNotIn("ordinary_polygon_check((B, P, C, D)", result.code)
 
     def test_isosceles_triangle_accepts_both_word_orders_and_marks_properties(self):
         variants = (

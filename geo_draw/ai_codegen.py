@@ -676,8 +676,8 @@ class GeoScene(Scene):
         )
         proof_boundary = VGroup(Line({point_name}, {C}), Line({D}, {B}))
         ratio_text = Text("{A}{point_name} = {ratio_label}{A}{B}", font_size=24).next_to(
-            Line({A}, {point_name}), DOWN, buff=0.28,
-        )
+            Line({A}, {point_name}), DOWN, buff=0.56,
+        ).shift(RIGHT * 1.05)
         self.add(carrier_ray, given_boundary, proof_boundary, ratio_text)
         self.add(Dot({A}), Dot({B}), Dot({C}), Dot({D}), Dot({point_name}))
         self.add(
@@ -1763,10 +1763,18 @@ def _drawing_facts_text(problem: str) -> str:
         if not clause:
             continue
         task_text = re.sub(r"^[a-z0-9]+\s*[)\].:/-]\s*", "", clause, flags=re.I)
-        if re.search(r"\blà\s+[^.]{0,80}\bgì\s*$", task_text, re.I) or re.match(
+        if (
+            re.search(r"\blà\s+[^.]{0,80}\bgì\s*$", task_text, re.I)
+            or re.search(
+                r"\bcó\s+phải\s+là\s+[^.]{0,120}\bkhông\s*$",
+                task_text,
+                re.I,
+            )
+            or re.match(
             r"^(?:tính|tìm|xác\s+định|so\s+sánh|suy\s+ra|kết\s+luận)\b",
             task_text,
             re.I,
+            )
         ):
             # Questions and requested conclusions are not construction facts.  In
             # particular, "Tam giác OAB là tam giác gì?" must not turn OAB into
