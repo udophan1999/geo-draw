@@ -108,6 +108,14 @@ Exact construction requirements:
 - Median AM: compute M as the midpoint of BC, then draw the segment from A to M.
 - Altitude AH to BC: use orthogonal projection
   `H = B + dot(A-B, C-B) / dot(C-B, C-B) * (C-B)`, draw AH and a RightAngle at H.
+- Treat every Vietnamese phrase "E là chân đường vuông góc hạ từ M xuống AC" as two exact
+  constraints: E lies on line AC and ME is perpendicular to AC at E. Compute E by orthogonally
+  projecting M onto line AC, draw `altitude_segment(M, E, A, C)`, and label E. For a grouped
+  phrase such as "E và K lần lượt là chân đường vuông góc hạ từ M và B xuống AC", construct
+  both projections separately: ME perpendicular to AC at E and BK perpendicular to AC at K.
+  Apply the same rule recursively when the reference is another constructed line, for example
+  "N là chân đường vuông góc hạ từ B xuống ME" means N lies on ME and BN is perpendicular to
+  ME at N. Never omit a named foot or treat it as only a prose description.
 - Internal angle bisector from A: normalize vectors AB and AC, sum the unit vectors for the
   direction, then intersect that ray with BC. Equivalently use the angle-bisector theorem
   `BD/DC = AB/AC`. `angle_bisector_segment` draws the bisector and matching arcs on both halves.
@@ -676,8 +684,8 @@ class GeoScene(Scene):
         )
         proof_boundary = VGroup(Line({point_name}, {C}), Line({D}, {B}))
         ratio_text = Text("{A}{point_name} = {ratio_label}{A}{B}", font_size=24).next_to(
-            Line({A}, {point_name}), DOWN, buff=0.28,
-        )
+            Line({A}, {point_name}), DOWN, buff=0.56,
+        ).shift(RIGHT * 1.05)
         self.add(carrier_ray, given_boundary, proof_boundary, ratio_text)
         self.add(Dot({A}), Dot({B}), Dot({C}), Dot({D}), Dot({point_name}))
         self.add(
@@ -1753,6 +1761,55 @@ def extract_python(text: str) -> str:
     raise ValueError("AI không trả về class GeoScene.")
 
 
+def _expand_perpendicular_foot_facts(text: str) -> str:
+    """Make Vietnamese perpendicular-foot constructions explicit for the drawer.
+
+    Textbooks often compress two projections into a single ``lần lượt`` clause,
+    for example ``E và K lần lượt là chân đường vuông góc hạ từ M và B xuống
+    AC``. A language model can otherwise mistake E/K for unnamed feet. Keep
+    the original wording, then append the equivalent incidence and
+    perpendicular relations used by both code generation and validation.
+    """
+    expanded = [text]
+    explicit: list[str] = []
+
+    grouped_pattern = (
+        r"\b([A-Z])\s+và\s+([A-Z])\s+lần\s+lượt\s+là\s+chân\s+"
+        r"(?:các\s+)?đường\s+vuông\s+góc\s+hạ\s+từ\s+([A-Z])\s+"
+        r"và\s+(?:từ\s+)?([A-Z])\s+"
+        r"(?:xuống|tới|đến|vuông(?:\s+góc\s+với)?)\s+([A-Z]{2})\b"
+    )
+    for match in re.finditer(grouped_pattern, text, re.I):
+        first_foot, second_foot, first_apex, second_apex, reference = (
+            value.upper() for value in match.groups()
+        )
+        explicit.extend((
+            f"{first_apex}{first_foot} vuông góc với {reference} tại {first_foot}",
+            f"{first_foot} thuộc {reference}",
+            f"{second_apex}{second_foot} vuông góc với {reference} tại {second_foot}",
+            f"{second_foot} thuộc {reference}",
+        ))
+
+    singular_pattern = (
+        r"\b([A-Z])\s+là\s+chân\s+(?:của\s+)?(?:đường\s+)?vuông\s+góc\s+"
+        r"hạ\s+từ\s+([A-Z])\s+"
+        r"(?:xuống|tới|đến|vuông(?:\s+góc\s+với)?)\s+([A-Z]{2})\b"
+    )
+    for match in re.finditer(singular_pattern, text, re.I):
+        foot, apex, reference = (value.upper() for value in match.groups())
+        explicit.extend((
+            f"{apex}{foot} vuông góc với {reference} tại {foot}",
+            f"{foot} thuộc {reference}",
+        ))
+
+    existing = {item.casefold() for item in expanded}
+    for fact in explicit:
+        if fact.casefold() not in existing:
+            expanded.append(fact)
+            existing.add(fact.casefold())
+    return ". ".join(expanded)
+
+
 def _drawing_facts_text(problem: str) -> str:
     """Return givens and constructions while excluding proof conclusions."""
     facts = []
@@ -1763,10 +1820,18 @@ def _drawing_facts_text(problem: str) -> str:
         if not clause:
             continue
         task_text = re.sub(r"^[a-z0-9]+\s*[)\].:/-]\s*", "", clause, flags=re.I)
-        if re.search(r"\blà\s+[^.]{0,80}\bgì\s*$", task_text, re.I) or re.match(
+        if (
+            re.search(r"\blà\s+[^.]{0,80}\bgì\s*$", task_text, re.I)
+            or re.search(
+                r"\bcó\s+phải\s+là\s+[^.]{0,120}\bkhông\s*$",
+                task_text,
+                re.I,
+            )
+            or re.match(
             r"^(?:tính|tìm|xác\s+định|so\s+sánh|suy\s+ra|kết\s+luận)\b",
             task_text,
             re.I,
+            )
         ):
             # Questions and requested conclusions are not construction facts.  In
             # particular, "Tam giác OAB là tam giác gì?" must not turn OAB into
@@ -1824,7 +1889,7 @@ def _drawing_facts_text(problem: str) -> str:
             )
             if conditional:
                 facts.append(conditional.group(1).strip(" ,:"))
-    return ". ".join(facts)
+    return _expand_perpendicular_foot_facts(". ".join(facts))
 
 
 def missing_reference_figure_points(problem: str) -> list[str]:

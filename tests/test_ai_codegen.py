@@ -63,6 +63,7 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("P = A + 2.00000000 * (B - A)", code)
         self.assertIn("carrier_ray = ray(A, B, length=6.80000000)", code)
         self.assertIn('Text("AP = 2AB"', code)
+        self.assertIn(".shift(RIGHT * 1.05)", code)
         self.assertIn("Line(P, C)", code)
         self.assertIn("Line(D, B)", code)
         validate_code(code, problem=problem)
@@ -81,6 +82,7 @@ class AiCodegenTests(unittest.TestCase):
         self.assertIn("Line(P, C)", result.code)
         self.assertIn("Line(C, D)", result.code)
         self.assertIn("Line(D, B)", result.code)
+        self.assertNotIn("ordinary_polygon_check((B, P, C, D)", result.code)
 
     def test_isosceles_triangle_accepts_both_word_orders_and_marks_properties(self):
         variants = (
@@ -875,6 +877,33 @@ class GeoScene(Scene):
         self.assertIn("altitude_segment(C, K, A, B)", result.code)
         self.assertIn("equal_segment_marks((A, B), (A, C), count=1)", result.code)
         self.assertIn("degrees=40", result.code)
+
+    def test_perpendicular_feet_wording_is_expanded_into_exact_relations(self):
+        problem = (
+            "Cho tam giác ABC cân tại A; M thuộc đường thẳng BC sao cho B ở giữa M và C. "
+            "Gọi E và K lần lượt là chân đường vuông góc hạ từ M và từ B xuống AC, "
+            "còn N là chân đường vuông góc hạ từ B xuống ME."
+        )
+        facts = _drawing_facts_text(problem)
+
+        self.assertIn("ME vuông góc với AC tại E", facts)
+        self.assertIn("E thuộc AC", facts)
+        self.assertIn("BK vuông góc với AC tại K", facts)
+        self.assertIn("K thuộc AC", facts)
+        self.assertIn("BN vuông góc với ME tại N", facts)
+        self.assertIn("N thuộc ME", facts)
+        self.assertIn(
+            '"E là chân đường vuông góc hạ từ M xuống AC"',
+            SYSTEM_PROMPT,
+        )
+
+        ocr_facts = _drawing_facts_text(
+            "Gọi E và K lần lượt là chân đường vuông góc hạ từ M và từ B vuông AC; "
+            "N là chân đường vuông góc hạ từ B vuông ME."
+        )
+        self.assertIn("ME vuông góc với AC tại E", ocr_facts)
+        self.assertIn("BK vuông góc với AC tại K", ocr_facts)
+        self.assertIn("BN vuông góc với ME tại N", ocr_facts)
 
     def test_circle_stated_in_givens_is_allowed(self):
         code = """from manim import *
